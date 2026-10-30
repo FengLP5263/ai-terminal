@@ -36,7 +36,7 @@ Git Bash 原生动作委托同仓库的 Windows 入口。macOS/Linux 对 GUI 构
 
 ## 当前 CI 边界
 
-project.ps1 ci 是厂商无关入口；还未选择远端托管／runner，不添加会被误认为已运行的云 CI 配置。
+project.ps1 ci 是厂商无关入口；源码托管于 GitHub，尚未配置云 runner，不把本机结果当作 GitHub Actions 检查。
 常规 CI 不需要 GPU、模型账号或代理权限；真实 GPU smoke 和视觉验收在 Windows 交互环境单独执行。
 
 2026-10-30 实跑：Windows ci（36 Rust + 3 Python）、原生 smoke、空闲测量、release package；

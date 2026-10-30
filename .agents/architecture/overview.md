@@ -26,5 +26,6 @@ UI 是否绘制、会话是否选中不能决定状态能否更新。
 
 已知边界：系统物理输入法的所有组合、图片粘贴、长期高并发会话与升级后的 CLI 协议仍需验收。
 Claude fullscreen renderer 的兼容性尚未建立；现有证据包含其回退界面。
-初始阶段没有远端仓库、自动发布服务或产品服务器，不添加臆测的部署配置。
+源码托管于 [GitHub](https://github.com/FengLP5263/ai-terminal)，使用 MIT 许可证；贡献入口见 [CONTRIBUTING.md](../../CONTRIBUTING.md)。
+尚无自动发布服务或产品服务器，源码公开不代表已建立二进制发行、云 CI 或部署流程。
 详细选型历史保留在 docs/architecture.md，历史测量不能当作当前构建的性能证明。

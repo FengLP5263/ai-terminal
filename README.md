@@ -1,36 +1,62 @@
 # ai-terminal
 
-精简的 Windows 原生 Agent 终端管理器，当前本地预览版本 **0.2.1**。
-左侧按项目管理会话，右侧保留 Codex、Claude Code 或 PowerShell 的真实终端。
-转圈表示工作中，黄点表示需要处理，绿点表示本轮完成未读。
+一个方便管理多个 AI 编程会话的 Windows 原生终端。把不同项目的 Codex、Claude Code 和 PowerShell 会话放在一个窗口里，快速切换，并查看哪些 Agent 正在工作、等待处理或已完成。
 
-## 开发与检查
+A lightweight Windows-native terminal workspace for managing multiple AI coding agents.
 
-Windows x64、Rust stable MSVC（已验证 1.99.1，最低版本见 Cargo.toml）、C++ Build Tools/Windows SDK，
-以及 Python 3.11+。CLI 预先安装和配置；管理器无需另填 API Key。
+**当前版本：0.2.1 预览版 · Windows x64 · MIT**
+
+[报告问题](https://github.com/FengLP5263/ai-terminal/issues) · [参与贡献](CONTRIBUTING.md) · [许可证](LICENSE)
+
+## 核心功能
+
+- **集中管理会话**：选择项目目录和 Agent，保留各 CLI 的真实终端、认证与权限操作。
+- **会话状态提示**：转圈表示工作中，黄点表示需要处理，绿点表示本轮完成未读；后台会话也会更新。
+- **整理工作区**：拖动排序、重命名、调整侧栏宽度，或收起为 Agent 头像栏。
+- **整体缩放**：Ctrl＋滚轮或 Ctrl＋加减缩放整个界面，Ctrl＋0 恢复 100%；终端随可用区域重排。
+- **原生文字显示**：内置 Hack 字体，Windows 原生文字绘制，支持中文、ANSI 颜色与系统彩色表情。
+- **按需恢复**：保存会话列表、顺序、界面偏好和 Agent 会话 ID，重开后由你选择继续会话。
+
+项目追求简洁、实用与性能。使用 Rust、egui、Alacritty 和 Windows ConPTY，不内嵌浏览器运行时。
+
+## 从源码运行
+
+当前提供源码构建，预编译安装包尚未发布。
+
+准备环境：
+
+- Windows x64。
+- Rust stable 的 MSVC 工具链，以及 Visual Studio C++ Build Tools 与 Windows SDK。已验证 Rust 1.99.1，最低声明版本见 Cargo.toml。
+- Python 3.11+，用于项目检查和打包。
+- 预先安装并配置好要使用的 Codex CLI、Claude Code 或 PowerShell。ai-terminal 沿用 CLI 的登录与模型设置，无需再填写 API Key。
+
+在 PowerShell 中执行：
 
 ```powershell
-.\scripts\windows\project.ps1 governance
-.\scripts\windows\project.ps1 check
-.\scripts\windows\project.ps1 test
+git clone https://github.com/FengLP5263/ai-terminal.git
+cd ai-terminal
+rustup component add rustfmt clippy
+.\scripts\windows\project.ps1 ci
 .\scripts\windows\project.ps1 run
 ```
 
-原脚本 scripts/dev.ps1、smoke.ps1 等保留为兼容入口。
-完整命令、参数和 Windows/POSIX 支持范围见 [脚本目录](scripts/README.md)。
-macOS/Linux 原生 GUI/ConPTY 尚未支持；静态治理和 ZIP 校验可使用 POSIX 入口。
+`ci` 包括治理检查、格式、Clippy、Rust 与 Python 回归，不调用模型 API。
+完整命令、参数和平台边界见[脚本目录](scripts/README.md)。macOS/Linux 原生 GUI 尚未支持。
 
 ## 使用
 
-1. 左上角＋或 Ctrl+Shift+N，选择项目目录、Agent 和可选名称。
-2. 左侧切换，右键重命名／关闭；信任和权限仍在原 CLI 中处理。
-3. Codex 首次在 /hooks 中检查并启用状态 hook；未连接时界面会提示。
-4. 重开后点“继续会话”恢复 Agent 历史，不自动恢复旧进程／终端屏幕。
+1. 点击左上角＋或按 Ctrl＋Shift＋N，选择项目目录、Agent 和可选名称。
+2. 在左侧切换会话；拖动调整顺序，悬停铅笔或右键编辑名称，右键也可关闭会话。
+3. 信任、登录和权限在原 CLI 中处理。Codex 首次需要在 `/hooks` 中审查并启用状态 hook；未连接时界面会提示。
+4. 点击侧栏的 ‹ 收起为头像栏，› 展开；拖动侧栏右边缘调宽度。
+5. 窗口内 Ctrl＋滚轮缩放整个界面（50%–250%），Ctrl＋0 或标题栏百分比按钮恢复 100%；普通滚轮保留终端历史滚动。
+6. 重开后点“继续会话”恢复 Agent 历史；不会自动恢复旧进程或原始终端屏幕。
 
-默认数据在 %LOCALAPPDATA%/ai-terminal，只保存会话元数据和临时 hook 配置。
-退出会回收本程序拥有的会话进程；不会按名称清理其他终端。
+默认数据位于 `%LOCALAPPDATA%/ai-terminal`，只保存会话元数据、界面偏好及临时 hook 配置。
+ai-terminal 不保存提示词、对话正文或 API Key；各 CLI 自己的数据管理规则仍适用。
+退出会回收本程序拥有的会话进程，不会按进程名清理其他终端。关闭活跃任务前请先保存工作。
 
-## 本地制品
+## 本地打包
 
 ```powershell
 .\scripts\windows\project.ps1 release
@@ -38,30 +64,26 @@ macOS/Linux 原生 GUI/ConPTY 尚未支持；静态治理和 ZIP 校验可使用
 .\scripts\windows\project.ps1 package
 ```
 
-package 生成 output/packages/ 下的独立版本目录、ZIP、manifest 和校验结果；不上传、不发布。
-已有本机 0.2.1 预览在 output/preview-v0.2.1/ai-terminal.exe，目录不入 Git，可通过正式脚本重新打包。
+`package` 要求干净的 Git 工作区，在 `output/packages/` 生成带 manifest、文件哈希和许可证的 ZIP，并回读校验；不会自动上传或发布。
+两个 EXE 必须放在同一目录。原生 smoke 使用隔离数据和三个真实 PowerShell 终端，不操作你的现有会话。
 
-## 架构与协作
+## 欢迎一起完善
 
-Rust + egui/glow GPU 界面 + Alacritty + Windows ConPTY，不内嵌浏览器。
-字体内置 Hack 常规／粗体／斜体；Windows 终端使用 DirectWrite／Direct2D，中文指定微软雅黑 UI，彩色表情使用系统字体。文字按物理像素网格和共同基线绘制。
-后台状态消费独立于 UI 绘制，隐藏终端继续排空输出。
+欢迎使用、报告问题、分享建议，也欢迎通过 Pull Request 一起完善。输入与渲染兼容性、状态可靠性、性能、无障碍和文档都是有价值的贡献方向。
+
+提交前请阅读[贡献指南](CONTRIBUTING.md)。遇到问题请附上系统、CLI 版本、复现步骤和截图，隐藏密钥与私人对话。
+
+## 架构与验证
 
 - [协作规范](AGENTS.md) · [架构总览](.agents/architecture/overview.md)
 - [运行与配置](.agents/architecture/runtime.md) · [数据与资产](.agents/architecture/data-and-assets.md)
 - [集成边界](.agents/architecture/integrations.md) · [第三方来源](THIRD_PARTY_NOTICES.md)
-- [治理验收](docs/governance.md) · [原始选型](docs/architecture.md)
+- [0.2.1 原生文字与整体缩放验证](docs/visual-quality-0.2.1.md) · [治理记录](docs/governance.md)
 
-## 验证边界
+状态来自 Agent 生命周期 hook 和进程退出；CLI 升级后可能需要重新验证 hook 兼容性。绿点表示本轮结束，不表示项目验收通过。
+实际 Agent TUI、合成事件与真实模型回合分别记录；真实模型验证需要显式授权，不属于默认 CI。
+物理输入法全部组合、图片粘贴、长期多会话和 Claude fullscreen renderer 仍有待验证范围。彩色表情受系统字体版本限制。
 
-常规测试不调用模型。原生 smoke 是真实 PowerShell + 合成状态；真实 Agent TUI 未提交文本与真实模型回合分别记录。
-模型验证需显式授权与 AllowModelRequest，不包含在默认 CI。
-物理输入法全部组合、图片粘贴、长期多会话、Claude fullscreen renderer 仍有未验证范围。
-历史记录：[0.1.0](docs/verification.md)、[0.1.1 输入修复](docs/input-display-0.1.1.md)、
-[0.1.2 REA/视觉修复](docs/visual-quality-0.1.2.md)、[0.2.0 侧栏改进](docs/visual-quality-0.2.0.md)、
-[0.2.1 全窗口缩放与原生文字](docs/visual-quality-0.2.1.md)。历史性能不能当作新版测量。
+## 许可证
 
-### 会话面板与缩放
-
-拖动左侧会话卡片调整顺序；悬停铅笔或右键编辑名称。‹ 收起为 Agent 头像栏，› 展开；拖面板右边缘调宽度。
-窗口内 Ctrl＋滚轮缩放整个界面，侧栏、控件与终端同步变化。Ctrl＋加减可缩放，Ctrl＋0 或标题栏百分比按钮恢复 100%。顺序、面板偏好与缩放比例会自动保存。
+项目代码使用 [MIT License](LICENSE)。字体、图标和其他第三方组件保留各自许可证，详见[第三方来源](THIRD_PARTY_NOTICES.md)。
