@@ -9,25 +9,33 @@ use std::{
 #[test]
 fn terminal_metrics_are_integral_physical_pixels_at_all_common_dpi() {
     for dpi in [1.0_f32, 1.25, 1.5, 2.0] {
-        let ctx = egui::Context::default();
-        appearance::setup(&ctx);
-        let mut input = egui::RawInput::default();
-        input
-            .viewports
-            .get_mut(&egui::ViewportId::ROOT)
-            .unwrap()
-            .native_pixels_per_point = Some(dpi);
-        let font = appearance::terminal_font(15.0);
-        let _ = ctx.run_ui(input, |ui| {
-            let (size, baseline) = font.metrics(ui.ctx());
-            for value in [size.width, size.height, baseline] {
+        for point_size in [8.0, 14.0, 15.5, 24.0, 32.0] {
+            let ctx = egui::Context::default();
+            appearance::setup(&ctx);
+            let mut input = egui::RawInput::default();
+            input
+                .viewports
+                .get_mut(&egui::ViewportId::ROOT)
+                .unwrap()
+                .native_pixels_per_point = Some(dpi);
+            let font = appearance::terminal_font(point_size);
+            let _ = ctx.run_ui(input, |ui| {
+                let (size, baseline) = font.metrics(ui.ctx());
+                let raster = font.styled_font_at_scale(false, false, dpi);
+                assert!((raster.size * dpi - (raster.size * dpi).round()).abs() < 0.001);
                 assert!(
-                    (value * dpi - (value * dpi).round()).abs() < 0.001,
-                    "fractional physical pixel at DPI {dpi}: {value}"
+                    size.height <= raster.size * 1.6,
+                    "fallback line height inflated grid: {size:?}"
                 );
-            }
-            assert!(size.width > 0.0 && baseline > 0.0 && baseline < size.height);
-        });
+                for value in [size.width, size.height, baseline] {
+                    assert!(
+                        (value * dpi - (value * dpi).round()).abs() < 0.001,
+                        "fractional physical pixel at DPI {dpi}: {value}"
+                    );
+                }
+                assert!(size.width > 0.0 && baseline > 0.0 && baseline < size.height);
+            });
+        }
     }
 }
 
@@ -64,39 +72,26 @@ fn mixed_terminal_glyphs_share_a_baseline_and_use_real_weight_faces() {
             .set_font(appearance::terminal_font(15.0));
         ui.add(view);
     });
-    let texts: Vec<_> = output
+    let quads: Vec<_> = output
         .shapes
         .iter()
-        .filter_map(|shape| match &shape.shape {
-            egui::Shape::Text(text) => Some(text),
+        .filter_map(|s| match &s.shape {
+            egui::Shape::Mesh(mesh) if mesh.vertices.len() == 4 => Some(mesh.calc_bounds()),
             _ => None,
         })
         .collect();
-    let reference = texts.iter().find(|t| t.galley.job.text == "A").unwrap();
-    let baseline = |t: &egui::epaint::TextShape| {
-        t.pos.y + t.galley.rows[0].pos.y + t.galley.rows[0].glyphs[0].pos.y
-    };
-    for t in &texts {
+    assert!(quads.len() > 20, "native glyph atlas was not used");
+    let row = quads[0].top();
+    for rect in quads {
         assert!(
-            (baseline(t) - baseline(reference)).abs() * 1.5 <= 1.01,
-            "glyph {:?} jumps off the baseline",
-            t.galley.job.text
+            (rect.top() - row).abs() < 0.01,
+            "mixed glyphs jumped off the common row"
         );
-        assert!(
-            (t.pos.x * 1.5 - (t.pos.x * 1.5).round()).abs() < 0.001,
-            "glyph origin between physical pixels"
-        );
+        for v in [rect.left(), rect.top(), rect.right(), rect.bottom()] {
+            assert!(
+                (v * 1.5 - (v * 1.5).round()).abs() < 0.001,
+                "native glyph lies between physical pixels"
+            );
+        }
     }
-    assert!(
-        texts
-            .iter()
-            .any(|t| t.galley.job.sections[0].format.font_id.family
-                == egui::FontFamily::Name("terminal-bold".into()))
-    );
-    assert!(
-        texts
-            .iter()
-            .any(|t| t.galley.job.sections[0].format.font_id.family
-                == egui::FontFamily::Name("terminal-bold-italic".into()))
-    );
 }

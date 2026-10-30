@@ -98,15 +98,15 @@ def build(allow_dirty=False):
     label=f"ai-terminal-v{version}-windows-x64-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}-{uuid.uuid4().hex[:6]}"
     folder=ROOT/'output/packages'/label;folder.mkdir(parents=True,exist_ok=False)
     for name in ['ai-terminal.exe','ai-terminal-hook.exe']:shutil.copy2(ROOT/'target/release'/name,folder/name)
-    for source,destination in [('LICENSE','LICENSE.txt'),('vendor/egui_term/LICENSE','egui-term-LICENSE.txt'),('assets/fonts/LICENSE.md','Hack-LICENSE.txt'),('THIRD_PARTY_NOTICES.md','THIRD_PARTY_NOTICES.md')]:shutil.copy2(ROOT/source,folder/destination)
+    for source,destination in [('LICENSE','LICENSE.txt'),('vendor/egui_term/LICENSE','egui-term-LICENSE.txt'),('assets/fonts/LICENSE.md','Hack-LICENSE.txt'),('assets/icons/LICENSE-lobe-icons','Lobe-Icons-LICENSE.txt'),('THIRD_PARTY_NOTICES.md','THIRD_PARTY_NOTICES.md')]:shutil.copy2(ROOT/source,folder/destination)
     (folder/'README.txt').write_text('ai-terminal '+version+'\n\n两个 exe 请放在同一目录。双击 ai-terminal.exe，选择项目目录和已配置的 Agent。\n会话数据在 %LOCALAPPDATA%/ai-terminal；退出会回收本程序拥有的会话进程。\nCodex 首次在 /hooks 中审查状态 hook。本 ZIP 仅本地打包，没有远端发布。\n',encoding='utf-8')
     dependencies(cargo,folder)
     source_hash=hashlib.sha256()
-    inputs=[ROOT/'Cargo.toml',ROOT/'Cargo.lock',ROOT/'vendor/egui_term/Cargo.toml']+list((ROOT/'src').rglob('*.rs'))+list((ROOT/'vendor/egui_term/src').rglob('*.rs'))+list((ROOT/'assets/fonts').iterdir())
+    inputs=[ROOT/'Cargo.toml',ROOT/'Cargo.lock',ROOT/'vendor/egui_term/Cargo.toml']+list((ROOT/'src').rglob('*.rs'))+list((ROOT/'vendor/egui_term/src').rglob('*.rs'))+list((ROOT/'assets/fonts').iterdir())+list((ROOT/'assets/icons').iterdir())
     for item in sorted(inputs,key=lambda p:p.relative_to(ROOT).as_posix()):
         source_hash.update(item.relative_to(ROOT).as_posix().encode());source_hash.update(b'\0');source_hash.update(item.read_bytes());source_hash.update(b'\0')
     head=command(['git','rev-parse','--verify','HEAD'],check=False)
-    manifest={'format_version':1,'version':version,'platform':'windows-x64','git_commit':head.stdout.strip() if head.returncode==0 else None,'dirty':dirty,'rustc':command(['rustc','-V']).stdout.strip(),'source_sha256':source_hash.hexdigest(),'source_scope':'Cargo manifests/lock, production Rust, font assets','build':'cargo build --locked --release','published':False,'files':{}}
+    manifest={'format_version':1,'version':version,'platform':'windows-x64','git_commit':head.stdout.strip() if head.returncode==0 else None,'dirty':dirty,'rustc':command(['rustc','-V']).stdout.strip(),'source_sha256':source_hash.hexdigest(),'source_scope':'Cargo manifests/lock, production Rust, font/icon assets','build':'cargo build --locked --release','published':False,'files':{}}
     for item in sorted(folder.rglob('*')):
         if item.is_file():manifest['files'][item.relative_to(folder).as_posix()]={'bytes':item.stat().st_size,'sha256':sha(item)}
     (folder/'manifest.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2),encoding='utf-8')

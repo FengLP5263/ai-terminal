@@ -52,6 +52,10 @@ def check():
     for name,expected in source['files'].items():
         data=(ROOT/'assets/fonts'/name).read_bytes()
         if len(data)!=expected['bytes'] or hashlib.sha256(data).hexdigest()!=expected['sha256']:errors.append('font identity mismatch: '+name)
+    icon_source=json.loads((ROOT/'assets/icons/SOURCE.json').read_text(encoding='utf-8'))
+    for expected in icon_source['files']:
+        data=(ROOT/'assets/icons'/expected['name']).read_bytes()
+        if len(data)!=expected['bytes'] or hashlib.sha256(data).hexdigest()!=expected['sha256']:errors.append('icon identity mismatch: '+expected['name'])
     ignore=(ROOT/'.gitignore').read_text(encoding='utf-8')
     for rule in ['/target/','/output/','/.tools/','.env','*.zip','*.pem','sessions.json']:
         if rule not in ignore.splitlines():errors.append('missing ignore: '+rule)
@@ -62,7 +66,7 @@ def check():
 def main():
     argparse.ArgumentParser(description=__doc__,formatter_class=argparse.RawDescriptionHelpFormatter).parse_args()
     paths,errors=check()
-    report={'ok':not errors,'candidate_files':len(paths),'font_identities_checked':5,'errors':errors}
+    report={'ok':not errors,'candidate_files':len(paths),'font_identities_checked':5,'icon_identities_checked':2,'errors':errors}
     print(json.dumps(report,ensure_ascii=False,indent=2))
     return 1 if errors else 0
 

@@ -9,7 +9,7 @@ use egui_term::{
     BackendCommand, PtyEvent, TerminalBackend, TerminalFont, TerminalTheme, TerminalView,
 };
 use std::{
-    collections::{BTreeMap, VecDeque},
+    collections::VecDeque,
     path::PathBuf,
     sync::{
         Arc,
@@ -19,8 +19,7 @@ use std::{
 };
 
 const BG: Color32 = ai_terminal::appearance::TERMINAL_BG;
-const MUTED: Color32 = Color32::from_rgb(137, 145, 158);
-const GREEN: Color32 = Color32::from_rgb(88, 191, 141);
+const MUTED: Color32 = Color32::from_gray(145);
 const YELLOW: Color32 = Color32::from_rgb(235, 184, 82);
 
 struct Session {
@@ -61,10 +60,13 @@ impl Drop for Session {
 }
 
 pub struct App {
+    renderer: egui_term::TextRendererSession,
     sessions: Vec<Session>,
     active: Option<String>,
     can_draw: bool,
     terminal_focus_pending: bool,
+    terminal_rect: Option<egui::Rect>,
+    sidebar_right: f32,
     bridge: Option<Bridge>,
     pty_sender: Sender<(u64, PtyEvent)>,
     pty_receiver: Receiver<(u64, PtyEvent)>,
@@ -85,6 +87,9 @@ pub struct App {
     allow_exit: bool,
     theme: TerminalTheme,
     font: TerminalFont,
+    preferences: model::UiSettings,
+    preferences_save_at: Option<Instant>,
+    icons: ai_terminal::sidebar::Icons,
     started: Instant,
     frames: u64,
     ui_micros: u128,
@@ -111,6 +116,8 @@ impl App {
                 Workspace::default()
             }
         };
+        let preferences = workspace.ui.normalize();
+        cc.egui_ctx.set_zoom_factor(preferences.ui_scale);
         let context = cc.egui_ctx.clone();
         let bridge = match Bridge::start(Arc::new(move || context.request_repaint())) {
             Ok(b) => Some(b),
@@ -122,10 +129,13 @@ impl App {
         let (pty_sender, pty_receiver) = mpsc::channel();
         let load_failed = error.is_some();
         Self {
+            renderer: egui_term::TextRendererSession::new(&cc.egui_ctx),
             sessions: workspace.sessions.into_iter().map(Session::new).collect(),
             active: workspace.active,
             can_draw: true,
             terminal_focus_pending: true,
+            terminal_rect: None,
+            sidebar_right: 0.0,
             bridge,
             pty_sender,
             pty_receiver,
@@ -145,7 +155,10 @@ impl App {
             confirm_exit: false,
             allow_exit: false,
             theme: TerminalTheme::default(),
-            font: ai_terminal::appearance::terminal_font(15.0),
+            font: ai_terminal::appearance::terminal_font(14.0),
+            preferences,
+            preferences_save_at: None,
+            icons: ai_terminal::sidebar::Icons::new(&cc.egui_ctx),
             started: Instant::now(),
             frames: 0,
             ui_micros: 0,
@@ -163,6 +176,7 @@ impl App {
         let workspace = Workspace {
             sessions: self.sessions.iter().map(|s| s.spec.clone()).collect(),
             active: self.active.clone(),
+            ui: self.preferences,
         };
         match model::save(&self.directory.join("sessions.json"), &workspace) {
             Ok(()) => {
@@ -255,6 +269,13 @@ impl App {
             self.sync_visibility();
         }
         self.receive_events(ctx);
+        if self
+            .preferences_save_at
+            .is_some_and(|deadline| Instant::now() >= deadline)
+        {
+            self.preferences_save_at = None;
+            self.dirty = true;
+        }
         self.persist();
     }
     fn receive_events(&mut self, ctx: &egui::Context) {
@@ -332,200 +353,100 @@ impl App {
             self.folder_receiver = None;
         }
     }
+    fn preferences_changed(&mut self, ctx: &egui::Context) {
+        self.preferences_save_at = Some(Instant::now() + Duration::from_millis(400));
+        ctx.request_repaint_after(Duration::from_millis(420));
+    }
+    fn set_ui_scale(&mut self, scale: f32, ctx: &egui::Context) {
+        if self.preferences.ui_scale != scale {
+            self.preferences.ui_scale = scale;
+            ctx.set_zoom_factor(scale);
+            self.preferences_changed(ctx);
+        }
+    }
     fn sidebar(&mut self, ui: &mut egui::Ui) {
-        let ctx = ui.ctx().clone();
-        egui::Panel::left("sessions")
-            .exact_size(238.0)
-            .resizable(false)
-            .frame(
-                egui::Frame::new()
-                    .fill(ai_terminal::appearance::SIDEBAR_BG)
-                    .inner_margin(16),
-            )
-            .show(ui, |ui| {
-                ui.horizontal(|ui| {
-                    ui.label(RichText::new("ai-terminal").size(19.0).strong());
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui
-                            .small_button("＋")
-                            .on_hover_text("新建会话 · Ctrl+Shift+N")
-                            .clicked()
-                        {
-                            self.show_new = true;
-                        }
-                    });
-                });
-                ui.add_space(22.0);
-                let mut groups: BTreeMap<PathBuf, Vec<usize>> = BTreeMap::new();
-                for (index, session) in self.sessions.iter().enumerate() {
-                    groups
-                        .entry(session.spec.directory.clone())
-                        .or_default()
-                        .push(index);
-                }
-                let mut select = None;
-                let mut resume = None;
-                let mut rename = None;
-                let mut close = None;
-                egui::ScrollArea::vertical().show(ui, |ui| {
-                    for (path, indices) in groups {
-                        let project = path
-                            .file_name()
-                            .unwrap_or(path.as_os_str())
-                            .to_string_lossy();
-                        ui.label(RichText::new(project).color(MUTED).size(12.0))
-                            .on_hover_text(path.to_string_lossy());
-                        ui.add_space(6.0);
-                        for index in indices {
-                            let session = &self.sessions[index];
-                            let selected = self.active.as_deref() == Some(&session.spec.id);
-                            let fill = if selected {
-                                Color32::from_rgb(40, 46, 57)
-                            } else {
-                                Color32::TRANSPARENT
-                            };
-                            let response = egui::Frame::new()
-                                .fill(fill)
-                                .corner_radius(7)
-                                .inner_margin(12)
-                                .show(ui, |ui| {
-                                    ui.set_min_width(ui.available_width());
-                                    ui.horizontal(|ui| {
-                                        let (rect, _) = ui.allocate_exact_size(
-                                            egui::vec2(15.0, 18.0),
-                                            egui::Sense::hover(),
-                                        );
-                                        match session.status.activity {
-                                            Activity::Working => {
-                                                let time = self.started.elapsed().as_secs_f32();
-                                                let center = rect.center();
-                                                let points: Vec<_> = (0..13)
-                                                    .map(|i| {
-                                                        let angle =
-                                                            time * 4.0 + i as f32 / 12.0 * 4.6;
-                                                        center
-                                                            + egui::vec2(angle.cos(), angle.sin())
-                                                                * 5.0
-                                                    })
-                                                    .collect();
-                                                ui.painter().add(egui::Shape::line(
-                                                    points,
-                                                    egui::Stroke::new(
-                                                        1.7,
-                                                        Color32::from_rgb(133, 167, 240),
-                                                    ),
-                                                ));
-                                                if !ctx.input(|i| {
-                                                    i.viewport().minimized.unwrap_or(false)
-                                                }) {
-                                                    ctx.request_repaint_after(
-                                                        Duration::from_millis(100),
-                                                    );
-                                                }
-                                            }
-                                            Activity::Waiting => {
-                                                ui.painter().circle_filled(
-                                                    rect.center(),
-                                                    4.0,
-                                                    YELLOW,
-                                                );
-                                            }
-                                            _ if session.status.unread => {
-                                                ui.painter().circle_filled(
-                                                    rect.center(),
-                                                    4.0,
-                                                    GREEN,
-                                                );
-                                            }
-                                            _ => {}
-                                        }
-                                        ui.vertical(|ui| {
-                                            ui.label(RichText::new(&session.spec.name).size(14.0));
-                                            if session.spec.name != session.spec.agent.label() {
-                                                ui.label(
-                                                    RichText::new(session.spec.agent.label())
-                                                        .size(11.0)
-                                                        .color(MUTED),
-                                                );
-                                            }
-                                        });
-                                    });
-                                })
-                                .response;
-                            let response = ui.interact(
-                                response.rect,
-                                response.id.with("choose"),
-                                egui::Sense::click(),
-                            );
-                            if response.clicked() {
-                                select = Some(session.spec.id.clone());
-                            }
-                            if response.double_clicked() && session.backend.is_none() {
-                                resume = Some(index);
-                            }
-                            let hint = match session.status.activity {
-                                Activity::Working => "正在工作",
-                                Activity::Waiting => "需要你处理",
-                                Activity::Unknown if session.backend.is_some() => "状态未连接",
-                                _ if session.status.unread => "本轮完成",
-                                _ => "",
-                            };
-                            response.clone().on_hover_text(format!(
-                                "{}\n{}",
-                                hint,
-                                session
-                                    .last_event
-                                    .map(|t| format!(
-                                        "最近事件：{} · {} 秒前",
-                                        session.status.last_event.as_deref().unwrap_or(""),
-                                        t.elapsed().as_secs()
-                                    ))
-                                    .unwrap_or_default()
-                            ));
-                            response.context_menu(|ui| {
-                                if ui.button("重命名").clicked() {
-                                    rename =
-                                        Some((session.spec.id.clone(), session.spec.name.clone()));
-                                    ui.close();
-                                }
-                                if session.backend.is_none()
-                                    && ui
-                                        .button(if session.spec.agent_session_id.is_some() {
-                                            "继续会话"
-                                        } else {
-                                            "启动会话"
-                                        })
-                                        .clicked()
-                                {
-                                    resume = Some(index);
-                                    ui.close();
-                                }
-                                if ui.button("关闭会话").clicked() {
-                                    close = Some(session.spec.id.clone());
-                                    ui.close();
-                                }
-                            });
-                            ui.add_space(4.0);
-                        }
-                        ui.add_space(16.0);
-                    }
-                });
-                if let Some(id) = select {
-                    self.activate(id);
-                }
-                if let Some(index) = resume {
-                    self.start_session(index, &ctx);
-                }
-                if let Some((id, name)) = rename {
-                    self.rename = Some(id);
-                    self.rename_text = name;
-                }
-                if close.is_some() {
-                    self.close_session = close;
-                }
-            });
+        let entries: Vec<_> = self
+            .sessions
+            .iter()
+            .map(|s| ai_terminal::sidebar::Entry {
+                id: &s.spec.id,
+                name: &s.spec.name,
+                directory: &s.spec.directory,
+                agent: s.spec.agent,
+                activity: s.status.activity,
+                unread: s.status.unread,
+                running: s.backend.is_some(),
+                resumable: s.spec.agent_session_id.is_some(),
+                hint: format!(
+                    "{}{}",
+                    match s.status.activity {
+                        Activity::Working => "正在工作",
+                        Activity::Waiting => "需要你处理",
+                        Activity::Unknown if s.backend.is_some() => "状态未连接",
+                        _ if s.status.unread => "本轮完成",
+                        _ => "",
+                    },
+                    s.last_event
+                        .map(|t| format!(
+                            " · 最近事件 {} · {} 秒前",
+                            s.status.last_event.as_deref().unwrap_or(""),
+                            t.elapsed().as_secs()
+                        ))
+                        .unwrap_or_default()
+                ),
+            })
+            .collect();
+        let actions = ai_terminal::sidebar::show(
+            ui,
+            &entries,
+            self.active.as_deref(),
+            self.preferences.sidebar_collapsed,
+            self.preferences.sidebar_width,
+            &self.icons,
+        );
+        self.sidebar_right = ui.cursor().min.x;
+        let ctx = ui.ctx();
+        if actions.create {
+            self.show_new = true;
+        }
+        if actions.toggle {
+            self.preferences.sidebar_collapsed = !self.preferences.sidebar_collapsed;
+            self.terminal_focus_pending = true;
+            self.preferences_changed(ctx);
+        } else if !self.preferences.sidebar_collapsed
+            && (actions.width - self.preferences.sidebar_width).abs() > 0.5
+        {
+            self.preferences.sidebar_width = actions.width;
+            self.preferences_changed(ctx);
+        }
+        if let Some(id) = actions.select {
+            self.activate(id);
+        }
+        if let Some(id) = actions.start
+            && let Some(index) = self.sessions.iter().position(|s| s.spec.id == id)
+        {
+            self.start_session(index, ctx);
+        }
+        if let Some(id) = actions.rename
+            && let Some(session) = self.sessions.iter().find(|s| s.spec.id == id)
+        {
+            self.rename_text = session.spec.name.clone();
+            self.rename = Some(id);
+            ctx.memory_mut(|m| m.request_focus(egui::Id::new("session-rename-input")));
+        }
+        if actions.close.is_some() {
+            self.close_session = actions.close;
+        }
+        if let Some((from, to, after)) = actions.reorder
+            && let Some(source) = self.sessions.iter().position(|s| s.spec.id == from)
+            && let Some(target) = self.sessions.iter().position(|s| s.spec.id == to)
+            && model::reorder(&mut self.sessions, source, target, after)
+        {
+            self.dirty = true;
+        }
     }
     fn terminal(&mut self, ui: &mut egui::Ui) {
+        self.terminal_rect = None;
         let ctx = ui.ctx().clone();
         let selected = self
             .sessions
@@ -550,43 +471,64 @@ impl App {
                     });
                     return;
                 };
-                let session = &mut self.sessions[index];
-                ui.horizontal(|ui| {
-                    ui.label(RichText::new(&session.spec.name).strong());
-                    ui.label(
-                        RichText::new(session.spec.directory.to_string_lossy())
-                            .size(12.0)
-                            .color(MUTED),
-                    );
-                });
+                let focus = !self.show_new
+                    && self.rename.is_none()
+                    && self.close_session.is_none()
+                    && !self.confirm_exit
+                    && !egui::Popup::is_any_open(&ctx);
+                let mut reset = false;
+                ui.allocate_ui_with_layout(
+                    egui::vec2(ui.available_width(), 24.0),
+                    egui::Layout::left_to_right(egui::Align::Center),
+                    |ui| {
+                        let session = &self.sessions[index];
+                        ui.label(RichText::new(&session.spec.name).strong());
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            reset = ui
+                                .small_button(format!("{:.0}%", self.preferences.ui_scale * 100.0))
+                                .on_hover_text("Ctrl＋滚轮缩放整个界面 · 点击恢复 100%")
+                                .clicked();
+                            if session.status.activity == Activity::Unknown
+                                && session.backend.is_some()
+                                && session.spec.agent != Agent::Shell
+                            {
+                                ui.label(RichText::new("○").color(MUTED)).on_hover_text(
+                                    if session.spec.agent == Agent::Codex {
+                                        "状态未连接 · 请在 /hooks 中检查并启用状态钩子"
+                                    } else {
+                                        "状态未连接 · 等待 Agent 的会话事件"
+                                    },
+                                );
+                            }
+                            ui.add(
+                                egui::Label::new(
+                                    RichText::new(session.spec.directory.to_string_lossy())
+                                        .size(12.0)
+                                        .color(MUTED),
+                                )
+                                .truncate(),
+                            )
+                            .on_hover_text(session.spec.directory.display().to_string());
+                        });
+                    },
+                );
                 ui.add_space(8.0);
+                if reset {
+                    self.set_ui_scale(1.0, &ctx);
+                    self.terminal_focus_pending = true;
+                }
+                let session = &mut self.sessions[index];
                 if let Some(error) = &session.error {
                     ui.colored_label(YELLOW, error);
                 }
                 if let Some(backend) = &mut session.backend {
-                    if session.status.activity == Activity::Unknown
-                        && session.spec.agent != Agent::Shell
-                    {
-                        let hint = if session.spec.agent == Agent::Codex {
-                            "状态未连接 · 首次使用请在 /hooks 中检查并启用状态钩子"
-                        } else {
-                            "状态未连接 · 等待 Agent 的会话事件"
-                        };
-                        ui.label(RichText::new(hint).size(11.0).color(MUTED));
-                        ui.add_space(4.0);
-                    }
-                    let focus = !self.show_new
-                        && self.rename.is_none()
-                        && self.close_session.is_none()
-                        && !self.confirm_exit
-                        && !egui::Popup::is_any_open(&ctx);
                     let view = TerminalView::new(ui, backend)
                         .set_theme(self.theme.clone())
                         .set_font(self.font.clone())
                         .set_focus(focus)
                         .request_focus(focus && std::mem::take(&mut self.terminal_focus_pending))
                         .set_size(ui.available_size());
-                    ui.add(view);
+                    self.terminal_rect = Some(ui.add(view).rect);
                 } else {
                     let can_resume = session.spec.agent_session_id.is_some();
                     ui.add_space(45.0);
@@ -696,10 +638,17 @@ impl App {
                 .resizable(false)
                 .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
                 .show(ctx, |ui| {
-                    ui.text_edit_singleline(&mut self.rename_text);
-                    if ui.button("保存").clicked() {
-                        done = true;
-                    }
+                    let input = ui.add(
+                        egui::TextEdit::singleline(&mut self.rename_text)
+                            .id(egui::Id::new("session-rename-input")),
+                    );
+                    done = input.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
+                    done |= ui
+                        .add_enabled(
+                            !self.rename_text.trim().is_empty(),
+                            egui::Button::new("保存"),
+                        )
+                        .clicked();
                 });
             if done && !self.rename_text.trim().is_empty() {
                 if let Some(s) = self.sessions.iter_mut().find(|s| s.spec.id == id) {
@@ -707,9 +656,11 @@ impl App {
                 }
                 self.dirty = true;
                 self.rename = None;
+                self.terminal_focus_pending = true;
             }
             if !open {
                 self.rename = None;
+                self.terminal_focus_pending = true;
             }
         }
         if let Some(id) = self.close_session.clone() {
@@ -895,6 +846,19 @@ impl App {
 }
 
 impl eframe::App for App {
+    #[cfg(feature = "renderer-glow")]
+    fn on_exit(&mut self, _: Option<&eframe::glow::Context>) {
+        self.renderer.release();
+    }
+    #[cfg(not(feature = "renderer-glow"))]
+    fn on_exit(&mut self) {
+        self.renderer.release();
+    }
+    fn raw_input_hook(&mut self, ctx: &egui::Context, input: &mut egui::RawInput) {
+        if let Some(scale) = ai_terminal::zoom::input(input, self.preferences.ui_scale) {
+            self.set_ui_scale(scale, ctx);
+        }
+    }
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // eframe calls logic even when painting is suspended (e.g. minimized).
         self.background_tick(ctx);
@@ -1086,6 +1050,149 @@ mod tests {
                 .unwrap()
                 .should_interrupt_composition,
             "focus restoration must not repeat on the next repaint"
+        );
+    }
+
+    #[test]
+    fn zoom_resizes_live_grid_without_restarting_or_interrupting_ime() {
+        let directory = tempfile::tempdir().unwrap();
+        let ctx = egui::Context::default();
+        let creation = eframe::CreationContext::_new_kittest(ctx.clone());
+        let mut app = App::new(&creation, directory.path().to_owned(), false, false);
+        let mut session = Session::new(SessionSpec {
+            id: "zoom".into(),
+            name: "zoom".into(),
+            directory: directory.path().into(),
+            agent: Agent::Shell,
+            agent_session_id: None,
+        });
+        session.backend = Some(
+            TerminalBackend::new(
+                918,
+                ctx.clone(),
+                app.pty_sender.clone(),
+                egui_term::BackendSettings {
+                    shell: "cmd.exe".into(),
+                    args: vec!["/D".into(), "/Q".into()],
+                    ..Default::default()
+                },
+            )
+            .unwrap(),
+        );
+        let pid = session.backend.as_ref().unwrap().pty_id();
+        app.sessions.push(session);
+        app.activate("zoom".into());
+        let raw = || egui::RawInput {
+            screen_rect: Some(egui::Rect::from_min_size(
+                egui::Pos2::ZERO,
+                egui::vec2(1000.0, 700.0),
+            )),
+            ..Default::default()
+        };
+        let _ = ctx.run_ui(raw(), |ui| app.terminal(ui));
+        let mut input = raw();
+        input.events = vec![
+            egui::Event::PointerMoved(egui::pos2(400.0, 350.0)),
+            egui::Event::MouseWheel {
+                unit: egui::MouseWheelUnit::Line,
+                delta: egui::vec2(0.0, 3.0),
+                modifiers: egui::Modifiers::CTRL,
+                phase: egui::TouchPhase::Move,
+            },
+            egui::Event::Ime(egui::ImeEvent::Preedit {
+                text: "nihao".into(),
+                active_range_chars: None,
+            }),
+        ];
+        eframe::App::raw_input_hook(&mut app, &ctx, &mut input);
+        let output = ctx.run_ui(input, |ui| app.terminal(ui));
+        assert!((app.preferences.ui_scale - 1.1).abs() < 0.0001);
+        assert_eq!(app.font.font_type().size, 14.0);
+        assert_eq!(app.sessions[0].backend.as_ref().unwrap().pty_id(), pid);
+        assert!(
+            !output
+                .platform_output
+                .ime
+                .unwrap()
+                .should_interrupt_composition
+        );
+        assert!(app.preferences_save_at.is_some());
+        app.preferences_save_at = Some(Instant::now());
+        app.background_tick(&ctx);
+        assert_eq!(
+            model::load(&directory.path().join("sessions.json"))
+                .unwrap()
+                .ui
+                .ui_scale,
+            1.1
+        );
+    }
+
+    #[test]
+    fn entire_window_zoom_keeps_terminal_attached_to_sidebar_and_right_edge() {
+        let directory = tempfile::tempdir().unwrap();
+        let ctx = egui::Context::default();
+        let creation = eframe::CreationContext::_new_kittest(ctx.clone());
+        let mut app = App::new(&creation, directory.path().into(), false, false);
+        let mut session = Session::new(SessionSpec {
+            id: "geometry".into(),
+            name: "geometry".into(),
+            directory: directory.path().into(),
+            agent: Agent::Shell,
+            agent_session_id: None,
+        });
+        session.backend = Some(
+            TerminalBackend::new(
+                933,
+                ctx.clone(),
+                app.pty_sender.clone(),
+                egui_term::BackendSettings {
+                    shell: "cmd.exe".into(),
+                    args: vec!["/D".into(), "/Q".into()],
+                    ..Default::default()
+                },
+            )
+            .unwrap(),
+        );
+        let pid = session.backend.as_ref().unwrap().pty_id();
+        app.sessions.push(session);
+        app.activate("geometry".into());
+        let mut sidebar_physical = Vec::new();
+        for scale in [0.75, 1.0, 1.5, 2.0] {
+            app.set_ui_scale(scale, &ctx);
+            for _ in 0..3 {
+                let input = egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1160.0 / scale, 760.0 / scale),
+                    )),
+                    ..Default::default()
+                };
+                let _ = ctx.run_ui(input, |ui| {
+                    app.sidebar(ui);
+                    app.terminal(ui);
+                });
+            }
+            let rect = app.terminal_rect.unwrap();
+            let screen = ctx.content_rect();
+            assert!(
+                (rect.left() - app.sidebar_right - 12.0).abs() <= 1.0,
+                "terminal detached from sidebar at {scale}: {rect:?}"
+            );
+            assert!(
+                (screen.right() - rect.right() - 12.0).abs() <= 1.0,
+                "dead area at right edge at {scale}: {rect:?} / {screen:?}"
+            );
+            assert!(
+                (screen.bottom() - rect.bottom() - 12.0).abs() <= 1.0,
+                "dead area below terminal"
+            );
+            assert_eq!(app.sessions[0].backend.as_ref().unwrap().pty_id(), pid);
+            sidebar_physical.push(app.sidebar_right * ctx.pixels_per_point());
+        }
+        assert!(
+            sidebar_physical.windows(2).all(|w| w[1] > w[0]),
+            "sidebar did not participate in UI zoom"
         );
     }
 }

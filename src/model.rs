@@ -30,11 +30,72 @@ pub struct SessionSpec {
     pub agent_session_id: Option<String>,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct UiSettings {
+    pub sidebar_collapsed: bool,
+    pub sidebar_width: f32,
+    pub terminal_font_size: f32,
+    pub ui_scale: f32,
+}
+impl Default for UiSettings {
+    fn default() -> Self {
+        Self {
+            sidebar_collapsed: false,
+            sidebar_width: 238.0,
+            terminal_font_size: 14.0,
+            ui_scale: 1.0,
+        }
+    }
+}
+impl UiSettings {
+    pub const MIN_ZOOM: f32 = 0.5;
+    pub const MAX_ZOOM: f32 = 2.5;
+    pub const MIN_FONT: f32 = 8.0;
+    pub const MAX_FONT: f32 = 32.0;
+    pub fn normalize(mut self) -> Self {
+        self.ui_scale = if self.ui_scale.is_finite() {
+            self.ui_scale.clamp(Self::MIN_ZOOM, Self::MAX_ZOOM)
+        } else {
+            1.0
+        };
+        self.sidebar_width = if self.sidebar_width.is_finite() {
+            self.sidebar_width.clamp(190.0, 420.0)
+        } else {
+            238.0
+        };
+        self.terminal_font_size = if self.terminal_font_size.is_finite() {
+            self.terminal_font_size
+                .clamp(Self::MIN_FONT, Self::MAX_FONT)
+        } else {
+            14.0
+        };
+        self
+    }
+}
+
+/// Move ownership, never clone/restart the live terminal or its Job Object.
+pub fn reorder<T>(items: &mut Vec<T>, source: usize, target: usize, after: bool) -> bool {
+    if source >= items.len() || target >= items.len() || source == target {
+        return false;
+    }
+    let insertion = target + usize::from(after);
+    let destination = insertion - usize::from(source < insertion);
+    if source == destination {
+        return false;
+    }
+    let item = items.remove(source);
+    items.insert(destination, item);
+    true
+}
+
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Workspace {
     #[serde(default)]
     pub sessions: Vec<SessionSpec>,
     pub active: Option<String>,
+    #[serde(default)]
+    pub ui: UiSettings,
 }
 
 pub fn data_directory() -> PathBuf {
@@ -84,6 +145,38 @@ mod tests {
             Some("actual-agent-id")
         );
         assert_eq!(read.sessions[0].name, "中文项目");
+    }
+    #[test]
+    fn old_workspace_keeps_sessions_and_defaults_new_preferences() {
+        let old = r#"{"sessions":[],"active":null}"#;
+        let workspace: Workspace = serde_json::from_str(old).unwrap();
+        assert_eq!(workspace.ui, UiSettings::default());
+        let mut workspace = workspace;
+        workspace.ui.sidebar_collapsed = true;
+        workspace.ui.terminal_font_size = 18.0;
+        let read: Workspace =
+            serde_json::from_slice(&serde_json::to_vec(&workspace).unwrap()).unwrap();
+        assert_eq!(read.ui, workspace.ui);
+        assert_eq!(
+            UiSettings {
+                terminal_font_size: 999.0,
+                sidebar_width: 0.0,
+                ..Default::default()
+            }
+            .normalize()
+            .terminal_font_size,
+            32.0
+        );
+    }
+    #[test]
+    fn moving_rows_preserves_identity_and_handles_both_directions() {
+        let mut rows = vec!["a", "b", "c", "d"];
+        assert!(reorder(&mut rows, 0, 2, true));
+        assert_eq!(rows, ["b", "c", "a", "d"]);
+        assert!(reorder(&mut rows, 3, 0, false));
+        assert_eq!(rows, ["d", "b", "c", "a"]);
+        assert!(!reorder(&mut rows, 0, 1, false));
+        assert!(!reorder(&mut rows, 99, 0, false));
     }
     #[test]
     fn malformed_workspace_is_reported_instead_of_silently_replaced() {

@@ -32,9 +32,13 @@ GUI 只改自己的进程环境，不改 Windows 用户／系统环境或 Warp�
 ## 启动、就绪、退出
 
 `scripts/windows/project.ps1 run` 构建并打开交互窗口；点＋选择项目和 Agent。
+左侧会话可拖动排序；悬停铅笔或右键编辑名称，标题栏 ‹ 收起为头像栏，› 展开。
+面板右边缘可调宽度。窗口内 Ctrl＋滚轮缩放整个界面（50%–250%），Ctrl＋加减同样可用；Ctrl＋0 或标题栏比例按钮恢复 100%。终端跟随剩余内容区重新计算行列，普通滚轮保留历史滚动。
 首次 Codex 在 /hooks 中审查状态 hook。恢复列表后必须用户选择继续，不自动启动所有会话。
 正常退出通过应用窗口；活跃任务先保存／确认。没有全局 stop/reset 命令，不删除用户会话数据。
 
 readiness 是实际窗口／终端与状态消息，不是后台进程存在。应用没有日志采集服务；
 隔离 smoke、性能测量与探针把 JSON/PNG 写到被忽略的 output/。首次 UI 标记不等于严格屏幕首帧。
 默认检查和测试不调用模型；verify-claude 必须显式 AllowModelRequest，费用边界见项目测试技能。
+
+Windows 文字资源由 TextRendererSession 管理，主程序与原生探针在 on_exit 中先释放；不能依赖线程 TLS 析构顺序。独立 hook helper 不初始化原生文字、字体或 GPU。

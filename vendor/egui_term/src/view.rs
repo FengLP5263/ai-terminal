@@ -11,6 +11,7 @@ use egui::{CornerRadius, Key};
 use egui::{Id, PointerButton};
 use egui::{Painter, Pos2, Rect, Response, Stroke, Vec2};
 use std::sync::{Arc, OnceLock};
+use unicode_segmentation::UnicodeSegmentation;
 
 use crate::backend::BackendCommand;
 use crate::backend::TerminalBackend;
@@ -288,6 +289,7 @@ impl<'a> TerminalView<'a> {
             global_bg,
         ))];
         let mut foregrounds = Vec::new();
+        let mut cursors = Vec::new();
         let window_focused = layout.ctx.input(|i| i.focused);
         let active = layout.has_focus() && window_focused;
         let cursor_shape = if active || content.cursor_shape == CursorShape::Hidden {
@@ -295,7 +297,8 @@ impl<'a> TerminalView<'a> {
         } else {
             CursorShape::HollowBlock
         };
-        for indexed in &content.cells {
+        let mut skip_glyph_until = None;
+        for (cell_index, indexed) in content.cells.iter().enumerate() {
             let flags = indexed.cell.flags;
             let wide = flags.contains(cell::Flags::WIDE_CHAR);
             let spacer = flags
@@ -342,18 +345,19 @@ impl<'a> TerminalView<'a> {
                             cursor_color,
                         )));
                         fg = global_bg;
+                        bg = cursor_color;
                     }
-                    CursorShape::Beam => foregrounds.push(Shape::Rect(RectShape::filled(
+                    CursorShape::Beam => cursors.push(Shape::Rect(RectShape::filled(
                         Rect::from_min_size(rect.min, Vec2::new(1.5, cell_height)),
                         CornerRadius::ZERO,
                         cursor_color,
                     ))),
-                    CursorShape::Underline => foregrounds.push(Shape::Rect(RectShape::filled(
+                    CursorShape::Underline => cursors.push(Shape::Rect(RectShape::filled(
                         Rect::from_min_size(Pos2::new(x, rect.max.y - 1.5), Vec2::new(width, 1.5)),
                         CornerRadius::ZERO,
                         cursor_color,
                     ))),
-                    CursorShape::HollowBlock => foregrounds.push(Shape::Rect(RectShape::stroke(
+                    CursorShape::HollowBlock => cursors.push(Shape::Rect(RectShape::stroke(
                         rect.shrink(0.5),
                         CornerRadius::ZERO,
                         Stroke::new(1.0, cursor_color),
@@ -362,11 +366,18 @@ impl<'a> TerminalView<'a> {
                     CursorShape::Hidden => {}
                 }
             }
-            if !flags.contains(cell::Flags::HIDDEN) && indexed.cell.c != '\t' {
-                let mut text = indexed.cell.c.to_string();
-                if let Some(combining) = indexed.cell.zerowidth() {
-                    text.extend(combining);
+            if !flags.contains(cell::Flags::HIDDEN)
+                && indexed.cell.c != '\t'
+                && !skip_glyph_until.is_some_and(|end| cell_index <= end)
+            {
+                let (text, end, columns) = glyph_cluster(&content.cells, cell_index);
+                if end > cell_index {
+                    skip_glyph_until = Some(end);
                 }
+                let glyph_rect = Rect::from_min_size(
+                    rect.min,
+                    egui::vec2(columns as f32 * cell_width, cell_height),
+                );
                 if text != " " {
                     let builtin = indexed
                         .cell
@@ -377,26 +388,52 @@ impl<'a> TerminalView<'a> {
                     if let Some(shapes) = builtin {
                         foregrounds.extend(shapes);
                     } else {
-                        let font = self.font.styled_font(
-                            flags.contains(cell::Flags::BOLD),
-                            flags.contains(cell::Flags::ITALIC),
-                        );
-                        let galley = painter.layout_no_wrap(text, font, egui::Color32::PLACEHOLDER);
-                        let glyph_baseline = galley
-                            .rows
-                            .first()
-                            .and_then(|row| row.glyphs.first().map(|glyph| row.pos.y + glyph.pos.y))
-                            .unwrap_or(0.0);
-                        let inset = if wide {
-                            ((width - galley.size().x) / 2.0).max(0.0)
+                        #[cfg(windows)]
+                        let native = self.font.native.as_ref().and_then(|font| {
+                            crate::native_text::shape(
+                                &layout.ctx,
+                                font,
+                                self.font.font_type().size,
+                                &text,
+                                glyph_rect,
+                                baseline,
+                                flags.contains(cell::Flags::BOLD),
+                                flags.contains(cell::Flags::ITALIC),
+                                fg,
+                                bg,
+                            )
+                        });
+                        #[cfg(not(windows))]
+                        let native: Option<Shape> = None;
+                        if let Some(native) = native {
+                            foregrounds.push(native);
                         } else {
-                            0.0
-                        };
-                        let pos = Pos2::new(snap(x + inset), snap(y + baseline - glyph_baseline));
-                        foregrounds.push(Shape::Text(
-                            egui::epaint::TextShape::new(pos, galley, fg)
-                                .with_override_text_color(fg),
-                        ));
+                            let font = self.font.styled_font_at_scale(
+                                flags.contains(cell::Flags::BOLD),
+                                flags.contains(cell::Flags::ITALIC),
+                                painter.ctx().pixels_per_point(),
+                            );
+                            let galley =
+                                painter.layout_no_wrap(text, font, egui::Color32::PLACEHOLDER);
+                            let glyph_baseline = galley
+                                .rows
+                                .first()
+                                .and_then(|row| {
+                                    row.glyphs.first().map(|glyph| row.pos.y + glyph.pos.y)
+                                })
+                                .unwrap_or(0.0);
+                            let inset = if wide {
+                                ((width - galley.size().x) / 2.0).max(0.0)
+                            } else {
+                                0.0
+                            };
+                            let pos =
+                                Pos2::new(snap(x + inset), snap(y + baseline - glyph_baseline));
+                            foregrounds.push(Shape::Text(
+                                egui::epaint::TextShape::new(pos, galley, fg)
+                                    .with_override_text_color(fg),
+                            ));
+                        }
                     }
                 }
             }
@@ -420,6 +457,7 @@ impl<'a> TerminalView<'a> {
         }
         painter.extend(backgrounds);
         painter.extend(foregrounds);
+        painter.extend(cursors);
         if layout.has_focus() && self.has_focus {
             let cursor_pos = Pos2::new(
                 origin.x + content.cursor_point.column.0 as f32 * cell_width,
@@ -438,7 +476,8 @@ impl<'a> TerminalView<'a> {
             if !state.preedit.is_empty() {
                 let galley = painter.layout_no_wrap(
                     state.preedit.clone(),
-                    self.font.font_type(),
+                    self.font
+                        .styled_font_at_scale(false, false, painter.ctx().pixels_per_point()),
                     egui::Color32::WHITE,
                 );
                 let rect = Rect::from_min_size(
@@ -454,6 +493,77 @@ impl<'a> TerminalView<'a> {
             }
         }
     }
+}
+
+/// Preserve emulator coordinates while joining emoji modifiers, flags and ZWJ sequences for shaping.
+fn glyph_cluster(cells: &[crate::backend::RenderCell], index: usize) -> (String, usize, usize) {
+    let first = &cells[index];
+    let mut text = first.cell.c.to_string();
+    if let Some(zero) = first.cell.zerowidth() {
+        text.extend(zero);
+    }
+    let mut end = index;
+    let first_width = if first.cell.flags.contains(cell::Flags::WIDE_CHAR) {
+        2
+    } else {
+        1
+    };
+    let mut columns = first_width;
+    if !first.cell.c.is_ascii() {
+        loop {
+            let mut next = end + 1;
+            while next < cells.len()
+                && cells[next]
+                    .cell
+                    .flags
+                    .contains(cell::Flags::WIDE_CHAR_SPACER)
+            {
+                next += 1;
+            }
+            let Some(candidate) = cells.get(next) else {
+                break;
+            };
+            if candidate.point.line != first.point.line
+                || candidate.point.column.0 != first.point.column.0 + columns
+                || candidate.cell.c == ' '
+                || candidate.cell.fg != first.cell.fg
+                || candidate.cell.bg != first.cell.bg
+                || candidate.cell.flags != first.cell.flags
+            {
+                break;
+            }
+            let mut joined = text.clone();
+            joined.push(candidate.cell.c);
+            if let Some(zero) = candidate.cell.zerowidth() {
+                joined.extend(zero);
+            }
+            if joined.graphemes(true).count() != 1 {
+                break;
+            }
+            text = joined;
+            end = next;
+            columns += if candidate.cell.flags.contains(cell::Flags::WIDE_CHAR) {
+                2
+            } else {
+                1
+            };
+            if text.len() > 128 {
+                break;
+            }
+        }
+    }
+    let presentation = text.contains('\u{fe0f}');
+    let blank_after = cells.get(index + 1).is_some_and(|c| {
+        c.point.line == first.point.line
+            && c.point.column.0 == first.point.column.0 + 1
+            && c.cell.c == ' '
+    });
+    let visual = if presentation && first_width == 1 && blank_after {
+        2
+    } else {
+        columns.min(2)
+    };
+    (text, end, visual)
 }
 
 fn process_keyboard_event(

@@ -1,0 +1,19 @@
+{
+  "repository": "https://github.com/lobehub/lobe-icons",
+  "license": "MIT",
+  "retrieved": "2026-10-30",
+  "files": [
+    {
+      "name": "openai.png",
+      "source": "https://raw.githubusercontent.com/lobehub/lobe-icons/master/packages/static-png/dark/openai.png",
+      "sha256": "375016542ebe78b63c7f36b8f6aee3058f2b706d861e5153fd74f9c27f63b8b7",
+      "bytes": 11297
+    },
+    {
+      "name": "claude-color.png",
+      "source": "https://raw.githubusercontent.com/lobehub/lobe-icons/master/packages/static-png/dark/claude-color.png",
+      "sha256": "97b53fb85b3bf401ffeb8ee7c5ebad734ce9f6edc3038f242021c53bcc18e23d",
+      "bytes": 9337
+    }
+  ]
+}

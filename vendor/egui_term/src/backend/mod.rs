@@ -540,6 +540,10 @@ impl TerminalBackend {
         let lines = (layout_size.height / font_size.height.max(1.0)) as u16;
         let cols = (layout_size.width / font_size.width.max(1.0)) as u16;
         if lines > 0 && cols > 0 {
+            let grid_changed = cols != self.size.num_cols || lines != self.size.num_lines;
+            let cell_changed = font_size.width != self.size.cell_width
+                || font_size.height != self.size.cell_height
+                || pixels_per_point != self.size.pixels_per_point;
             self.size = TerminalSize {
                 layout_size,
                 cell_height: font_size.height,
@@ -549,11 +553,12 @@ impl TerminalBackend {
                 num_cols: cols,
             };
 
-            self.notifier.on_resize(self.size.into());
-            terminal.resize(TermSize::new(
-                self.size.num_cols as usize,
-                self.size.num_lines as usize,
-            ));
+            if grid_changed || cell_changed {
+                self.notifier.on_resize(self.size.into());
+            }
+            if grid_changed {
+                terminal.resize(TermSize::new(cols as usize, lines as usize));
+            }
         }
     }
 

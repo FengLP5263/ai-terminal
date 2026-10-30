@@ -6,15 +6,16 @@ Alacritty 0.26；默认 glow/OpenGL，可选 wgpu/DX12 用于本机对照。依�
 | 边界 | 职责 |
 | --- | --- |
 | src/main.rs、app.rs | 原生窗口、会话列表、终端控件、后台事件归约 |
+| src/sidebar.rs、zoom.rs | UUID 会话导航、拖动排序、头像和全窗口缩放 |
 | src/appearance.rs | 正式界面与探针共用字体／主题 |
 | src/status.rs | 生命周期状态、并行工具等待、过期回合与子会话过滤、未读 |
 | src/bridge.rs、bin/ai-terminal-hook.rs | 认证 loopback 元数据桥与独立 hook helper |
 | src/launch.rs | CLI 定位、会话级配置和启动环境 |
 | src/model.rs | 会话元数据原子保存与加载 |
 | src/platform.rs | Windows Job Object、主进程内存观测 |
-| vendor/egui_term | Alacritty/ConPTY 接入、输入、字形与 viewport 渲染 |
-| assets/fonts | 固定来源的 Hack 字体和许可证 |
-| examples/terminal_probe.rs | 开发核查：真实 TUI、受控未提交文本、截图后退出 |
+| vendor/egui_term | Alacritty/ConPTY、输入、字形与 viewport 渲染；Windows 原生文字、组合 emoji 和有界 atlas |
+| assets/fonts、assets/icons | 固定来源的 Hack 字体、Agent 图标和许可证 |
+| examples/terminal_probe.rs、workspace_probe.rs | 开发核查：真实 TUI 或本地 ANSI 样例、受控输入、GPU 截图后退出 |
 
 数据流：ConPTY I/O 线程 → Alacritty 网格 → 活动 viewport → GPU。
 另一条独立路径为 Agent hook → 独立 helper → 认证 TCP → 有界队列 → App::logic → 侧栏提示。

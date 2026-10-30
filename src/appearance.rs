@@ -2,19 +2,20 @@ use egui::{Color32, FontData, FontDefinitions, FontFamily, FontId};
 use egui_term::{FontSettings, TerminalFont};
 use std::sync::Arc;
 
-pub const TERMINAL_BG: Color32 = Color32::from_rgb(15, 17, 22);
-pub const SIDEBAR_BG: Color32 = Color32::from_rgb(21, 24, 31);
+pub const TERMINAL_BG: Color32 = Color32::BLACK;
+pub const SIDEBAR_BG: Color32 = Color32::from_gray(18);
 
 /// Fonts are embedded so the terminal's Latin metrics do not depend on the PC.
 pub fn setup(ctx: &egui::Context) {
     let mut visuals = egui::Visuals::dark();
     visuals.panel_fill = SIDEBAR_BG;
-    visuals.window_fill = Color32::from_rgb(26, 30, 39);
-    visuals.override_text_color = Some(Color32::from_rgb(220, 225, 234));
-    visuals.selection.bg_fill = Color32::from_rgb(42, 52, 72);
-    visuals.widgets.noninteractive.bg_stroke.color = Color32::from_rgb(43, 48, 59);
+    visuals.window_fill = Color32::from_gray(24);
+    visuals.override_text_color = Some(Color32::from_gray(220));
+    visuals.selection.bg_fill = Color32::from_gray(64);
+    visuals.widgets.noninteractive.bg_stroke.color = Color32::from_gray(44);
     ctx.set_visuals(visuals);
     ctx.set_theme(egui::Theme::Dark);
+    ctx.options_mut(|o| o.zoom_with_keyboard = false);
     let mut style = (*ctx.style_of(egui::Theme::Dark)).clone();
     style.spacing.item_spacing = egui::vec2(8.0, 7.0);
     style.spacing.button_padding = egui::vec2(12.0, 7.0);
@@ -48,9 +49,9 @@ pub fn setup(ctx: &egui::Context) {
         face.tweak.subpixel_binning = Some(false);
         face.tweak.hinting_target =
             egui::epaint::text::HintingTarget::Smooth(egui::epaint::text::SmoothHinting {
-                light: false,
+                light: true,
                 symmetric_rendering: false,
-                preserve_linear_metrics: false,
+                preserve_linear_metrics: true,
             });
         fonts.font_data.insert(name.into(), Arc::new(face));
     }
@@ -104,6 +105,12 @@ pub fn setup(ctx: &egui::Context) {
 }
 
 pub fn terminal_font(size: f32) -> TerminalFont {
+    static FACES: [&[u8]; 4] = [
+        include_bytes!("../assets/fonts/Hack-Regular.ttf"),
+        include_bytes!("../assets/fonts/Hack-Bold.ttf"),
+        include_bytes!("../assets/fonts/Hack-Italic.ttf"),
+        include_bytes!("../assets/fonts/Hack-BoldItalic.ttf"),
+    ];
     TerminalFont::new(FontSettings {
         font_type: FontId::new(size, FontFamily::Name("terminal-regular".into())),
     })
@@ -112,4 +119,5 @@ pub fn terminal_font(size: f32) -> TerminalFont {
         FontId::new(size, FontFamily::Name("terminal-italic".into())),
         FontId::new(size, FontFamily::Name("terminal-bold-italic".into())),
     )
+    .with_native_font("Hack", &FACES)
 }

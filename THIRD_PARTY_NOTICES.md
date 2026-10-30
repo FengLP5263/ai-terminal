@@ -11,3 +11,8 @@
 Windows 系统字体只在运行时读取，不随包复制。项目 LICENSE 适用于本项目代码，不替代第三方许可。
 本地 package 流程生成 dependencies.json，收集可获得的 LICENSE/COPYING/NOTICE 并保留未找到项。
 这份清单记录来源和收集范围，不声称已经完成所有依赖、运行时或发行方式的法律审查。
+
+## Agent icons
+
+OpenAI and Claude icons are from [Lobe Icons](https://github.com/lobehub/lobe-icons), MIT.
+See assets/icons/SOURCE.json and assets/icons/LICENSE-lobe-icons. Brand names and marks belong to their respective owners.

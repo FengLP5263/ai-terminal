@@ -11,17 +11,27 @@ use std::{
 mod platform;
 
 struct Probe {
+    renderer: egui_term::TextRendererSession,
     terminal: TerminalBackend,
     _job: platform::ProcessJob,
     began: Instant,
     input_stage: u8,
+    ready_at: Option<Instant>,
     screenshot: bool,
     output: PathBuf,
 }
 
 impl eframe::App for Probe {
+    #[cfg(feature = "renderer-glow")]
+    fn on_exit(&mut self, _: Option<&eframe::glow::Context>) {
+        self.renderer.release();
+    }
+    #[cfg(not(feature = "renderer-glow"))]
+    fn on_exit(&mut self) {
+        self.renderer.release();
+    }
     fn logic(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
-        if self.began.elapsed() > Duration::from_secs(20) {
+        if self.began.elapsed() > Duration::from_secs(40) {
             let _ = std::fs::write(
                 self.output.join("timeout.json"),
                 "{\"ui_capture_timeout\":true}",
@@ -38,12 +48,21 @@ impl eframe::App for Probe {
             .entry(egui::ViewportId::ROOT)
             .or_default()
             .focused = Some(true);
-        let elapsed = self.began.elapsed().as_secs_f32();
-        let next = if elapsed > 7.5 {
+        if self.ready_at.is_none() {
+            let text = self.terminal.plain_text();
+            if text.contains("Claude Code") || text.contains("OpenAI Codex") {
+                self.ready_at = Some(Instant::now());
+            }
+        }
+        let elapsed = self
+            .ready_at
+            .map(|t| t.elapsed().as_secs_f32())
+            .unwrap_or(0.0);
+        let next = if elapsed > 1.5 {
             3
-        } else if elapsed > 7.0 {
+        } else if elapsed > 1.0 {
             2
-        } else if elapsed > 6.5 {
+        } else if elapsed > 0.5 {
             1
         } else {
             0
@@ -66,10 +85,14 @@ impl eframe::App for Probe {
         ui.label("测试仅输入文本，不发送 Enter，不请求模型。");
         let view = TerminalView::new(ui, &mut self.terminal)
             .set_focus(true)
-            .set_font(ai_terminal::appearance::terminal_font(15.0));
+            .set_font(ai_terminal::appearance::terminal_font(14.0));
         ui.add(view);
         let ctx = ui.ctx();
-        if self.began.elapsed() > Duration::from_secs(10) && !self.screenshot {
+        if self
+            .ready_at
+            .is_some_and(|t| t.elapsed() > Duration::from_secs(3))
+            && !self.screenshot
+        {
             self.screenshot = true;
             ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::default()));
         }
@@ -115,7 +138,7 @@ impl eframe::App for Probe {
             .unwrap();
             ctx.send_viewport_cmd(egui::ViewportCommand::Close);
         }
-        if self.began.elapsed() > Duration::from_secs(16) {
+        if self.began.elapsed() > Duration::from_secs(35) {
             ctx.send_viewport_cmd(egui::ViewportCommand::Close);
         }
         ctx.request_repaint_after(Duration::from_millis(100));
@@ -177,10 +200,12 @@ fn main() -> eframe::Result {
             std::fs::write(output.join("phase.txt"), "PTY ready").unwrap();
             let job = platform::ProcessJob::attach(terminal.pty_id())?;
             Ok(Box::new(Probe {
+                renderer: egui_term::TextRendererSession::new(&cc.egui_ctx),
                 terminal,
                 _job: job,
                 began: Instant::now(),
                 input_stage: 0,
+                ready_at: None,
                 screenshot: false,
                 output,
             }))
