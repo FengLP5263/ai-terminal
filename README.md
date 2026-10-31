@@ -4,7 +4,9 @@
 
 A lightweight Windows-native terminal workspace for managing multiple AI coding agents.
 
-**当前版本：0.2.1 预览版 · Windows x64 · MIT**
+**当前开发版本：0.2.2 · Windows x64 · MIT**
+
+已发布的预览版及 Windows ZIP 见 [GitHub Releases](https://github.com/FengLP5263/ai-terminal/releases)。
 
 [报告问题](https://github.com/FengLP5263/ai-terminal/issues) · [参与贡献](CONTRIBUTING.md) · [许可证](LICENSE)
 
@@ -21,7 +23,7 @@ A lightweight Windows-native terminal workspace for managing multiple AI coding 
 
 ## 从源码运行
 
-当前提供源码构建，预编译安装包尚未发布。
+如需直接使用，可下载 [Releases](https://github.com/FengLP5263/ai-terminal/releases) 中的 Windows ZIP，完整解压后运行 `ai-terminal.exe`，无需安装 Rust 或 Python。以下步骤适用于从源码构建。
 
 准备环境：
 
@@ -51,6 +53,12 @@ rustup component add rustfmt clippy
 4. 点击侧栏的 ‹ 收起为头像栏，› 展开；拖动侧栏右边缘调宽度。
 5. 窗口内 Ctrl＋滚轮缩放整个界面（50%–250%），Ctrl＋0 或标题栏百分比按钮恢复 100%；普通滚轮保留终端历史滚动。
 6. 重开后点“继续会话”恢复 Agent 历史；不会自动恢复旧进程或原始终端屏幕。
+
+### 已安装 CLI 却提示找不到？
+
+0.2.1 对 npm 安装布局有过强假设，会漏掉自定义安装目录。0.2.2 改为查找公开的 `.exe`、`.cmd` 和 `.bat` 启动器，并在每次启动会话时读取进程 PATH 及 Windows 保存的用户／系统 PATH；不再依赖包内部目录。
+
+自定义安装目录若不在任何 PATH 中，可将启动器所在目录加入 Windows 用户 PATH，或从能够运行该 CLI 的终端启动 ai-terminal。仅在 WSL 或 PowerShell 别名／函数中可用的命令不等于已安装可直接启动的 Windows CLI。
 
 默认数据位于 `%LOCALAPPDATA%/ai-terminal`，只保存会话元数据、界面偏好及临时 hook 配置。
 ai-terminal 不保存提示词、对话正文或 API Key；各 CLI 自己的数据管理规则仍适用。

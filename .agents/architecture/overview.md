@@ -10,7 +10,7 @@ Alacritty 0.26；默认 glow/OpenGL，可选 wgpu/DX12 用于本机对照。依�
 | src/appearance.rs | 正式界面与探针共用字体／主题 |
 | src/status.rs | 生命周期状态、并行工具等待、过期回合与子会话过滤、未读 |
 | src/bridge.rs、bin/ai-terminal-hook.rs | 认证 loopback 元数据桥与独立 hook helper |
-| src/launch.rs | CLI 定位、会话级配置和启动环境 |
+| src/discovery.rs、launch.rs | CLI 公开入口定位、会话级配置和启动环境 |
 | src/model.rs | 会话元数据原子保存与加载 |
 | src/platform.rs | Windows Job Object、主进程内存观测 |
 | vendor/egui_term | Alacritty/ConPTY、输入、字形与 viewport 渲染；Windows 原生文字、组合 emoji 和有界 atlas |
@@ -27,5 +27,5 @@ UI 是否绘制、会话是否选中不能决定状态能否更新。
 已知边界：系统物理输入法的所有组合、图片粘贴、长期高并发会话与升级后的 CLI 协议仍需验收。
 Claude fullscreen renderer 的兼容性尚未建立；现有证据包含其回退界面。
 源码托管于 [GitHub](https://github.com/FengLP5263/ai-terminal)，使用 MIT 许可证；贡献入口见 [CONTRIBUTING.md](../../CONTRIBUTING.md)。
-尚无自动发布服务或产品服务器，源码公开不代表已建立二进制发行、云 CI 或部署流程。
+Windows 预览包通过 GitHub Releases 分发；尚无自动发布服务、云 CI 或产品服务器。
 详细选型历史保留在 docs/architecture.md，历史测量不能当作当前构建的性能证明。
