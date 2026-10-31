@@ -15,29 +15,48 @@ pub struct Launch {
 }
 
 pub fn executable(agent: Agent) -> Option<PathBuf> {
-    let name = match agent {
-        Agent::Codex => "codex.exe",
-        Agent::Claude => "claude.exe",
-        Agent::Shell => "powershell.exe",
+    crate::discovery::CliSearch::current().find(agent)
+}
+
+/// A native helper lets Rust handle batch-file quoting instead of interpolating
+/// a cmd.exe command line through the terminal emulator's C-style argument quoting.
+pub fn pty_command(
+    binary: &Path,
+    mut arguments: Vec<String>,
+    helper: &Path,
+) -> Result<(String, Vec<String>), String> {
+    let program = if crate::discovery::is_batch(binary) {
+        if !helper.is_file() {
+            return Err("缺少 ai-terminal-hook.exe，请完整解压发行包".into());
+        }
+        arguments.insert(0, binary.to_string_lossy().into_owned());
+        arguments.insert(0, "--launch-cli".into());
+        helper
+    } else {
+        binary
     };
-    if let Some(path) = std::env::var_os("PATH") {
-        for directory in std::env::split_paths(&path) {
-            let candidate = directory.join(name);
-            if candidate.is_file() {
-                return Some(candidate);
-            }
+    let program = program.to_string_lossy();
+    let executable = if program.contains([' ', '\t']) {
+        format!("\"{program}\"")
+    } else {
+        program.into_owned()
+    };
+    Ok((executable, arguments))
+}
+
+/// Runs only in the lightweight helper, inside the owned ConPTY / Job Object.
+/// Inherit interactive handles and propagate the CLI's actual exit status.
+pub fn run_cli(mut arguments: impl Iterator<Item = std::ffi::OsString>) -> i32 {
+    let Some(program) = arguments.next() else {
+        return 2;
+    };
+    match std::process::Command::new(program).args(arguments).status() {
+        Ok(status) => status.code().unwrap_or(1),
+        Err(error) => {
+            eprintln!("无法启动 CLI：{error}");
+            1
         }
     }
-    let profile = std::env::var_os("USERPROFILE").map(PathBuf::from)?;
-    let roaming = std::env::var_os("APPDATA")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| profile.join("AppData/Roaming"));
-    let candidates:Vec<PathBuf>=match agent {
-        Agent::Codex=>vec![roaming.join("npm/node_modules/@openai/codex/node_modules/@openai/codex-win32-x64/vendor/x86_64-pc-windows-msvc/bin/codex.exe"),profile.join(".local/bin/codex.exe")],
-        Agent::Claude=>vec![profile.join(".local/bin/claude.exe"),roaming.join("npm/node_modules/@anthropic-ai/claude-code/bin/claude.exe"),roaming.join("npm/node_modules/@anthropic-ai/claude-code/node_modules/@anthropic-ai/claude-code-win32-x64/claude.exe")],
-        Agent::Shell=>vec![PathBuf::from(std::env::var_os("SystemRoot").unwrap_or_else(||"C:/Windows".into())).join("System32/WindowsPowerShell/v1.0/powershell.exe")],
-    };
-    candidates.into_iter().find(|p| p.is_file())
 }
 
 pub fn build(
@@ -49,8 +68,9 @@ pub fn build(
     if !spec.directory.is_dir() {
         return Err("项目目录不存在".into());
     }
-    let binary = executable(spec.agent)
-        .ok_or_else(|| format!("未找到 {}，请先安装对应 CLI", spec.agent.label()))?;
+    let search = crate::discovery::CliSearch::current();
+    let binary = search.find(spec.agent).ok_or_else(|| format!(
+        "未找到 {}。已检查 PATH、Windows 用户／系统 PATH 和常见安装目录。请确认本机可运行对应 CLI；自定义安装请将启动器目录加入用户 PATH，或从可运行该 CLI 的终端启动 ai-terminal。仅在 WSL 中安装的 CLI 暂不支持。", spec.agent.label()))?;
     let generation = uuid::Uuid::new_v4().to_string();
     let mut arguments = vec![];
     let mut environment = HashMap::from([
@@ -62,6 +82,14 @@ pub fn build(
         ("AI_TERMINAL_SESSION".into(), spec.id.clone()),
         ("AI_TERMINAL_GENERATION".into(), generation.clone()),
     ]);
+    environment.insert(
+        "PATH".into(),
+        search
+            .child_path()
+            .map_err(|e| e.to_string())?
+            .to_string_lossy()
+            .into_owned(),
+    );
     // Avoid inheriting a parent Claude invocation's nested-session marker.
     environment.insert("CLAUDECODE".into(), String::new());
     match spec.agent {
@@ -108,13 +136,7 @@ pub fn build(
             arguments.extend(["-NoLogo".into(),"-NoProfile".into(),"-NoExit".into(),"-Command".into(),"[Console]::InputEncoding=[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false); $OutputEncoding=[Console]::OutputEncoding; Clear-Host".into()]);
         }
     }
-    // The Alacritty Windows backend quotes argument values; executable needs its own quotes.
-    let program = binary.to_string_lossy();
-    let executable = if program.contains(' ') {
-        format!("\"{program}\"")
-    } else {
-        program.into_owned()
-    };
+    let (executable, arguments) = pty_command(&binary, arguments, helper)?;
     Ok(Launch {
         executable,
         arguments,
@@ -176,13 +198,9 @@ mod tests {
         if executable(Agent::Claude).is_none() {
             return;
         }
-        let plan = build(
-            &spec,
-            &bridge,
-            dir.path(),
-            Path::new("C:/tools/ai-terminal.exe"),
-        )
-        .unwrap();
+        let helper = dir.path().join("ai-terminal-hook.exe");
+        std::fs::write(&helper, b"fixture").unwrap();
+        let plan = build(&spec, &bridge, dir.path(), &helper).unwrap();
         assert!(
             plan.arguments
                 .windows(2)

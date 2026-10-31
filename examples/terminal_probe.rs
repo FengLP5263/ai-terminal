@@ -50,7 +50,9 @@ impl eframe::App for Probe {
             .focused = Some(true);
         if self.ready_at.is_none() {
             let text = self.terminal.plain_text();
-            if text.contains("Claude Code") || text.contains("OpenAI Codex") {
+            if (text.contains("Claude Code") || text.contains("OpenAI Codex"))
+                && (text.contains("Ask Codex") || text.contains("❯") || text.contains("Try "))
+            {
                 self.ready_at = Some(Instant::now());
             }
         }
@@ -91,6 +93,7 @@ impl eframe::App for Probe {
         if self
             .ready_at
             .is_some_and(|t| t.elapsed() > Duration::from_secs(3))
+            && self.terminal.plain_text().contains("中文输入 abc123")
             && !self.screenshot
         {
             self.screenshot = true;
@@ -139,6 +142,10 @@ impl eframe::App for Probe {
             ctx.send_viewport_cmd(egui::ViewportCommand::Close);
         }
         if self.began.elapsed() > Duration::from_secs(35) {
+            let _ = std::fs::write(
+                self.output.join("startup-text.txt"),
+                self.terminal.plain_text(),
+            );
             ctx.send_viewport_cmd(egui::ViewportCommand::Close);
         }
         ctx.request_repaint_after(Duration::from_millis(100));
@@ -171,24 +178,30 @@ fn main() -> eframe::Result {
             ai_terminal::appearance::setup(&cc.egui_ctx);
             let (sender, _) = mpsc::channel();
             std::fs::write(output.join("phase.txt"), "create PTY").unwrap();
+            let binary = launch::executable(agent).expect("installed agent");
+            let helper = std::env::current_exe()?
+                .parent()
+                .and_then(std::path::Path::parent)
+                .expect("example output directory")
+                .join("ai-terminal-hook.exe");
+            let cli_args = if agent == Agent::Codex {
+                vec![
+                    "-c".into(),
+                    "check_for_update_on_startup=false".into(),
+                    "--no-alt-screen".into(),
+                ]
+            } else {
+                vec![]
+            };
+            let (program, cli_args) =
+                launch::pty_command(&binary, cli_args, &helper).expect("prepare installed agent");
             let terminal = TerminalBackend::new(
                 901,
                 cc.egui_ctx.clone(),
                 sender,
                 BackendSettings {
-                    shell: launch::executable(agent)
-                        .expect("installed agent")
-                        .to_string_lossy()
-                        .into_owned(),
-                    args: if agent == Agent::Codex {
-                        vec![
-                            "-c".into(),
-                            "check_for_update_on_startup=false".into(),
-                            "--no-alt-screen".into(),
-                        ]
-                    } else {
-                        vec![]
-                    },
+                    shell: program,
+                    args: cli_args,
                     working_directory: Some(std::env::current_dir()?),
                     env: std::collections::HashMap::from([
                         ("TERM".into(), "xterm-256color".into()),

@@ -17,7 +17,8 @@ Cargo.toml 声明最低 Rust 1.92；使用 stable 工具链，制品记录实际
 | 名称 | 来源与用途 |
 | --- | --- |
 | LOCALAPPDATA | 默认会话元数据根目录；缺失时回退临时目录 |
-| PATH、APPDATA、USERPROFILE、SystemRoot | 查找已安装的 CLI／Windows 组件 |
+| PATH、APPDATA、LOCALAPPDATA、USERPROFILE、SystemRoot、ProgramFiles | 查找已安装的 CLI／Windows 组件；启动时补读注册表用户／系统 PATH |
+| NPM_CONFIG_PREFIX、PNPM_HOME、NVM_SYMLINK、VOLTA_HOME、BUN_INSTALL | 可选现有安装工具的目录线索；不设默认值、不写用户环境 |
 | AI_TERMINAL_ENDPOINT、AI_TERMINAL_TOKEN | 本轮管理器的 loopback 桥和认证，不能提交值 |
 | AI_TERMINAL_SESSION、AI_TERMINAL_GENERATION | 本地会话标识与启动代次 |
 | TERM、COLORTERM、NO_COLOR、FORCE_COLOR、CLICOLOR_FORCE | GUI 启动前在本进程内规范交互终端颜色能力 |
@@ -42,3 +43,11 @@ readiness 是实际窗口／终端与状态消息，不是后台进程存在。�
 默认检查和测试不调用模型；verify-claude 必须显式 AllowModelRequest，费用边界见项目测试技能。
 
 Windows 文字资源由 TextRendererSession 管理，主程序与原生探针在 on_exit 中先释放；不能依赖线程 TLS 析构顺序。独立 hook helper 不初始化原生文字、字体或 GPU。
+
+## Windows CLI 发现
+
+0.2.2 按当前进程 PATH、注册表保存的系统／用户 PATH、当前用户常见安装目录的顺序查找公开的 exe/cmd/bat 入口，不扫描磁盘，不依赖 npm 包内部布局，不执行用户 profile。按目录保留优先级，同一目录优先 exe；空与相对 PATH 项不隐式指向用户项目。
+
+查找仅在启动会话时发生；合并后的 PATH 只传入本次子进程，便于 npm 启动器找到 Node，不修改管理器或 Windows 的环境。仅 WSL 内的 CLI 与 PowerShell 函数／别名不属于可直接启动的 Windows 程序。
+
+cmd/bat 由独立 ai-terminal-hook.exe 的 --launch-cli 模式通过 Rust Command 启动，不将参数拼成 cmd.exe 命令串。helper 使用 console subsystem 继承已有 ConPTY，仍不初始化字体／GPU；主程序仍是无控制台 GUI。退出码透传，helper、cmd 和 CLI 属于本会话的 Job Object。生命周期 hook 路径和认证协议不变。
