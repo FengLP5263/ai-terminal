@@ -46,11 +46,12 @@ fn main() {
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
-    // Keep the helper independent of GUI branding/resources.
+    // Main app and developer examples share the approved icon; the helper stays independent.
     println!(
         "cargo:rustc-link-arg-bin=ai-terminal={}",
         compiled.display()
     );
+    println!("cargo:rustc-link-arg-examples={}", compiled.display());
 }
 
 fn resource_compiler() -> PathBuf {

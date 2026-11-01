@@ -1,5 +1,6 @@
 use ai_terminal::{
     bridge::Bridge,
+    i18n::{self, tr},
     launch,
     model::{self, Agent, SessionSpec, Workspace},
     status::{Activity, HookEvent, Status},
@@ -61,8 +62,13 @@ impl Session {
         self.invocation = None;
         self.agent_process.take();
         let unread = self.status.unread;
+        let failed = self.status.activity == Activity::Failed;
         self.status = Status::default();
-        self.status.activity = Activity::Idle;
+        self.status.activity = if failed {
+            Activity::Failed
+        } else {
+            Activity::Idle
+        };
         self.status.unread = unread;
     }
     fn event(&mut self, event: &HookEvent, viewing: bool) -> bool {
@@ -95,6 +101,13 @@ impl Session {
                 return false;
             }
             if event.name == "ShellAgentEnded" {
+                if event
+                    .exit_code
+                    .is_some_and(ai_terminal::status::failed_exit)
+                {
+                    self.status.activity = Activity::Failed;
+                    self.status.unread = !viewing;
+                }
                 self.agent_ended();
                 return true;
             }
@@ -141,6 +154,10 @@ pub struct App {
     theme: TerminalTheme,
     font: TerminalFont,
     preferences: model::UiSettings,
+    settings_open: bool,
+    floating_session_count: Option<usize>,
+    floating_zoom: Option<f32>,
+    floating: ai_terminal::floating::FloatingBar,
     preferences_save_at: Option<Instant>,
     icons: ai_terminal::sidebar::Icons,
     started: Instant,
@@ -181,11 +198,23 @@ impl App {
         }
         let preferences = workspace.ui.normalize();
         cc.egui_ctx.set_zoom_factor(preferences.ui_scale);
+        i18n::apply(&cc.egui_ctx, preferences.language);
+        let icons = ai_terminal::sidebar::Icons::new(&cc.egui_ctx);
+        let floating = ai_terminal::floating::FloatingBar::new(icons.clone());
         let context = cc.egui_ctx.clone();
-        let bridge = match Bridge::start(Arc::new(move || context.request_repaint())) {
+        let bridge = match Bridge::start(Arc::new(move || {
+            context.request_repaint_of(egui::ViewportId::ROOT)
+        })) {
             Ok(b) => Some(b),
             Err(e) => {
-                error = Some(format!("状态服务无法启动：{e}"));
+                error = Some(format!(
+                    "{}: {e}",
+                    tr(
+                        &cc.egui_ctx,
+                        "状态服务无法启动",
+                        "Unable to start the status service"
+                    )
+                ));
                 None
             }
         };
@@ -218,8 +247,12 @@ impl App {
             theme: TerminalTheme::default(),
             font: ai_terminal::appearance::terminal_font(14.0),
             preferences,
+            settings_open: false,
+            floating_session_count: None,
+            floating_zoom: None,
+            floating,
             preferences_save_at: None,
-            icons: ai_terminal::sidebar::Icons::new(&cc.egui_ctx),
+            icons,
             started: Instant::now(),
             frames: 0,
             ui_micros: 0,
@@ -262,7 +295,12 @@ impl App {
             (|| -> Result<(TerminalBackend, crate::platform::ProcessJob, String), String> {
                 let helper = self.helper.as_ref().map_err(Clone::clone)?;
                 if !helper.is_file() {
-                    return Err("缺少 ai-terminal-hook.exe，请完整构建项目".into());
+                    return Err(tr(
+                        ctx,
+                        "缺少 ai-terminal-hook.exe，请完整构建项目",
+                        "Missing ai-terminal-hook.exe. Keep both executables together.",
+                    )
+                    .into());
                 }
                 let launch = launch::build(
                     &session.spec,
@@ -282,8 +320,16 @@ impl App {
                     },
                 )
                 .map_err(|e| e.to_string())?;
-                let job = crate::platform::ProcessJob::attach(backend.pty_id())
-                    .map_err(|e| format!("无法管理会话进程：{e}"))?;
+                let job = crate::platform::ProcessJob::attach(backend.pty_id()).map_err(|e| {
+                    format!(
+                        "{}: {e}",
+                        tr(
+                            ctx,
+                            "无法管理会话进程",
+                            "Unable to manage the session process"
+                        )
+                    )
+                })?;
                 Ok((backend, job, launch.generation))
             })();
         match result {
@@ -305,6 +351,7 @@ impl App {
             }
             Err(e) => {
                 session.error = Some(e);
+                session.status.activity = Activity::Failed;
             }
         }
         self.sync_visibility();
@@ -357,7 +404,85 @@ impl App {
             self.preferences_save_at = None;
             self.dirty = true;
         }
+        self.manage_floating(ctx);
         self.persist();
+    }
+    fn manage_floating(&mut self, ctx: &egui::Context) {
+        use ai_terminal::floating::{Item, Snapshot};
+        let zoom = ctx.zoom_factor();
+        let zoom_changed = self.floating_zoom.is_some_and(|old| old != zoom);
+        for action in self.floating.actions() {
+            // An old child-frame position can be queued while the point scale changes.
+            if zoom_changed && matches!(action, ai_terminal::floating::Action::Position(_)) {
+                continue;
+            }
+            self.floating_action(action, ctx);
+        }
+        if self.preferences.floating_enabled {
+            if self.floating_session_count != Some(self.sessions.len()) || zoom_changed {
+                // Older workspaces stored egui points. Migrate once using the main viewport scale.
+                let saved = self.preferences.floating_position_pixels.or_else(|| {
+                    self.preferences.floating_position.map(|p| {
+                        let scale = ctx.pixels_per_point();
+                        [p[0] * scale, p[1] * scale]
+                    })
+                });
+                let position = Some(
+                    ai_terminal::floating::centered_geometry(ctx, self.sessions.len(), saved).0,
+                );
+                if self.preferences.floating_position_pixels != position {
+                    self.preferences.floating_position_pixels = position;
+                    self.preferences_changed(ctx);
+                }
+            }
+            self.floating.update(
+                Snapshot {
+                    items: self
+                        .sessions
+                        .iter()
+                        .map(|s| Item {
+                            id: s.spec.id.clone(),
+                            name: s.spec.name.clone(),
+                            agent: s.display_agent(),
+                            color: s.spec.color,
+                            activity: s.status.activity,
+                            unread: s.status.unread,
+                        })
+                        .collect(),
+                    active: self.active.clone(),
+                    locale: i18n::locale(ctx),
+                },
+                ctx,
+            );
+            self.floating
+                .show(ctx, self.preferences.floating_position_pixels);
+        }
+        self.floating_session_count = self
+            .preferences
+            .floating_enabled
+            .then_some(self.sessions.len());
+        self.floating_zoom = self.preferences.floating_enabled.then_some(zoom);
+    }
+    fn floating_action(&mut self, action: ai_terminal::floating::Action, ctx: &egui::Context) {
+        use ai_terminal::floating::Action;
+        match action {
+            Action::Activate(id) if self.sessions.iter().any(|s| s.spec.id == id) => {
+                self.activate(id, ctx);
+                ai_terminal::floating::restore_main(ctx);
+            }
+            Action::Disable => {
+                self.preferences.floating_enabled = false;
+                self.preferences_changed(ctx);
+            }
+            Action::Position(position)
+                if position.iter().all(|v| v.is_finite())
+                    && self.preferences.floating_position_pixels != Some(position) =>
+            {
+                self.preferences.floating_position_pixels = Some(position);
+                self.preferences_changed(ctx);
+            }
+            _ => {}
+        }
     }
     fn receive_events(&mut self, ctx: &egui::Context) {
         let focused = ctx.input(|i| i.viewport().focused.unwrap_or(false));
@@ -422,13 +547,16 @@ impl App {
                 }
                 PtyEvent::ChildExit(status) => {
                     if !status.success() {
-                        session.error = Some(format!("会话进程已退出：{status}"));
+                        session.error = Some(format!(
+                            "{}: {status}",
+                            tr(ctx, "会话进程已退出", "Session process exited")
+                        ));
                     }
                 }
                 PtyEvent::Exit => {
                     session.agent_ended();
                     session.status.activity = if session.error.is_some() {
-                        Activity::Waiting
+                        Activity::Failed
                     } else {
                         Activity::Exited
                     };
@@ -460,6 +588,7 @@ impl App {
         }
     }
     fn sidebar(&mut self, ui: &mut egui::Ui) {
+        let locale = i18n::locale(ui.ctx());
         let entries: Vec<_> = self
             .sessions
             .iter()
@@ -473,19 +602,18 @@ impl App {
                 unread: s.status.unread,
                 hint: format!(
                     "{}{}",
-                    match s.status.activity {
-                        Activity::Working => "进行中",
-                        Activity::Completed => "已完成",
-                        Activity::Waiting => "需要你处理",
-                        Activity::Unknown if s.backend.is_some() => "等待任务通知",
-                        _ if s.status.unread => "本轮完成",
-                        _ => "",
+                    if s.backend.is_some() || s.status.activity != Activity::Unknown {
+                        i18n::activity(locale, s.status.activity)
+                    } else {
+                        ""
                     },
                     s.last_event
                         .map(|t| format!(
-                            " · 最近事件 {} · {} 秒前",
+                            " · {} {} · {} {}",
+                            locale.text("最近事件", "Last event"),
                             s.status.last_event.as_deref().unwrap_or(""),
-                            t.elapsed().as_secs()
+                            t.elapsed().as_secs(),
+                            locale.text("秒前", "seconds ago")
                         ))
                         .unwrap_or_default()
                 ),
@@ -501,6 +629,9 @@ impl App {
         );
         self.sidebar_right = ui.cursor().min.x;
         let ctx = ui.ctx();
+        if actions.settings {
+            self.settings_open = !self.settings_open;
+        }
         if let Some(shell) = actions.create {
             self.new_shell(shell, ctx);
         }
@@ -559,11 +690,11 @@ impl App {
                 let Some(index) = selected else {
                     ui.centered_and_justified(|ui| {
                         ui.vertical_centered(|ui| {
-                            ui.heading("打开一个终端");
+                            ui.heading(tr(&ctx,"打开一个终端","Open a terminal"));
                             ui.add_space(10.0);
                             ui.label(
                                 RichText::new(
-                                    "选择 PowerShell、CMD 或 Bash，在终端中启动 codex 或 claude。",
+                                    tr(&ctx,"选择 PowerShell、CMD 或 Bash，在终端中启动 codex 或 claude。","Choose PowerShell, CMD or Bash, then launch codex or claude."),
                                 )
                                 .color(MUTED),
                             );
@@ -581,6 +712,7 @@ impl App {
                 let focus = self.rename.is_none()
                     && self.close_session.is_none()
                     && !self.confirm_exit
+                    && !self.settings_open
                     && !egui::Popup::is_any_open(&ctx);
                 let mut reset = false;
                 ui.allocate_ui_with_layout(
@@ -606,7 +738,7 @@ impl App {
                                     ))
                                     .frame(false),
                                 )
-                                .on_hover_text("Ctrl＋滚轮缩放整个界面 · 点击恢复 100%")
+                                .on_hover_text(tr(&ctx,"Ctrl＋滚轮缩放整个界面 · 点击恢复 100%","Ctrl+wheel zooms the window · Click to reset to 100%"))
                                 .clicked();
                             if session.backend.is_some() && !session.display_agent().is_shell() {
                                 ai_terminal::connection_ui::show(
@@ -649,7 +781,7 @@ impl App {
                 } else if session.error.is_none() {
                     ui.label(
                         RichText::new(
-                            "终端已退出。点击左侧会话重新打开，或按 Ctrl＋Shift＋N 新建终端。",
+                            tr(&ctx,"终端已退出。点击左侧会话重新打开，或按 Ctrl＋Shift＋N 新建终端。","Terminal exited. Select it in the sidebar to reopen, or press Ctrl+Shift+N for a new terminal."),
                         )
                         .color(MUTED),
                     );
@@ -681,10 +813,15 @@ impl App {
         self.activate(id, ctx);
     }
     fn dialogs(&mut self, ctx: &egui::Context) {
+        if ai_terminal::settings::show(ctx, &mut self.settings_open, &mut self.preferences) {
+            i18n::apply(ctx, self.preferences.language);
+            self.preferences_changed(ctx);
+            ctx.request_repaint();
+        }
         if let Some(id) = self.rename.clone() {
             let mut done = false;
             let mut open = true;
-            egui::Window::new("重命名")
+            egui::Window::new(tr(ctx, "重命名", "Rename"))
                 .open(&mut open)
                 .collapsible(false)
                 .resizable(false)
@@ -700,7 +837,7 @@ impl App {
                     done |= ui
                         .add_enabled(
                             !self.rename_text.trim().is_empty(),
-                            egui::Button::new("保存"),
+                            egui::Button::new(tr(ctx, "保存", "Save")),
                         )
                         .clicked();
                 });
@@ -720,15 +857,19 @@ impl App {
         if let Some(id) = self.close_session.clone() {
             let mut close = false;
             let mut cancel = false;
-            egui::Window::new("关闭会话？")
+            egui::Window::new(tr(ctx, "关闭会话？", "Close session?"))
                 .collapsible(false)
                 .resizable(false)
                 .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
                 .show(ctx, |ui| {
-                    ui.label("该会话的运行进程将结束，对话历史仍由 Agent 保留。");
+                    ui.label(tr(
+                        ctx,
+                        "该会话的运行进程将结束，对话历史仍由 Agent 保留。",
+                        "This session will stop. Conversation history remains with the agent.",
+                    ));
                     ui.horizontal(|ui| {
-                        close = ui.button("关闭会话").clicked();
-                        cancel = ui.button("取消").clicked();
+                        close = ui.button(tr(ctx, "关闭会话", "Close session")).clicked();
+                        cancel = ui.button(tr(ctx, "取消", "Cancel")).clicked();
                     });
                 });
             if close {
@@ -754,15 +895,19 @@ impl App {
         if self.confirm_exit {
             let mut exit = false;
             let mut cancel = false;
-            egui::Window::new("退出 ai-terminal？")
+            egui::Window::new(tr(ctx, "退出 ai-terminal？", "Quit ai-terminal?"))
                 .collapsible(false)
                 .resizable(false)
                 .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
                 .show(ctx, |ui| {
-                    ui.label("运行中的会话将结束，下次可以恢复对话历史。");
+                    ui.label(tr(
+                        ctx,
+                        "运行中的会话将结束，下次可以恢复对话历史。",
+                        "Running sessions will stop. You can resume conversations next time.",
+                    ));
                     ui.horizontal(|ui| {
-                        exit = ui.button("退出").clicked();
-                        cancel = ui.button("取消").clicked();
+                        exit = ui.button(tr(ctx, "退出", "Quit")).clicked();
+                        cancel = ui.button(tr(ctx, "取消", "Cancel")).clicked();
                     });
                 });
             if exit {
@@ -863,6 +1008,7 @@ impl App {
                                     None
                                 },
                                 background_running: false,
+                                exit_code: None,
                             };
                             let _ = ai_terminal::bridge::send(&endpoint, &token, event);
                         }
@@ -922,6 +1068,9 @@ impl App {
 }
 
 impl eframe::App for App {
+    fn clear_color(&self, _: &egui::Visuals) -> [f32; 4] {
+        [0.0, 0.0, 0.0, 0.0]
+    }
     #[cfg(feature = "renderer-glow")]
     fn on_exit(&mut self, _: Option<&eframe::glow::Context>) {
         self.renderer.release();
@@ -931,7 +1080,9 @@ impl eframe::App for App {
         self.renderer.release();
     }
     fn raw_input_hook(&mut self, ctx: &egui::Context, input: &mut egui::RawInput) {
-        if let Some(scale) = ai_terminal::zoom::input(input, self.preferences.ui_scale) {
+        if input.viewport_id == egui::ViewportId::ROOT
+            && let Some(scale) = ai_terminal::zoom::input(input, self.preferences.ui_scale)
+        {
             self.set_ui_scale(scale, ctx);
         }
     }
@@ -942,14 +1093,20 @@ impl eframe::App for App {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let began = Instant::now();
         let ctx = ui.ctx().clone();
-        self.frames += 1;
         if ctx.input(|i| i.viewport().close_requested())
             && !self.allow_exit
             && self.sessions.iter().any(|s| s.backend.is_some())
         {
             ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
             self.confirm_exit = true;
+            if !self.can_draw {
+                ai_terminal::floating::restore_main(&ctx);
+            }
         }
+        if !self.can_draw {
+            return;
+        }
+        self.frames += 1;
         self.smoke_step(&ctx);
         if ctx.input_mut(|i| {
             i.consume_key(egui::Modifiers::CTRL | egui::Modifiers::SHIFT, egui::Key::N)
@@ -1049,6 +1206,7 @@ mod tests {
                 notification_type: None,
                 source: None,
                 background_running: false,
+                exit_code: None,
             },
         )
         .unwrap();
@@ -1290,6 +1448,7 @@ mod tests {
             notification_type: None,
             source: Some(source.into()),
             background_running: false,
+            exit_code: None,
             invocation: Some(invocation.into()),
             process_id: Some(std::process::id()),
         }
@@ -1484,6 +1643,207 @@ mod tests {
         assert_eq!(
             app.active.as_deref(),
             Some(app.sessions[0].spec.id.as_str())
+        );
+    }
+    #[test]
+    fn island_selection_restores_existing_pty_and_position_and_disable_are_saved() {
+        use ai_terminal::floating::Action;
+        let root = tempfile::tempdir().unwrap();
+        let ctx = egui::Context::default();
+        let creation = eframe::CreationContext::_new_kittest(ctx.clone());
+        let mut app = App::new(&creation, root.path().into(), false, false);
+        use_built_helper(&mut app);
+        app.startup_pending = false;
+        app.new_shell(Agent::Cmd, &ctx);
+        app.new_shell(Agent::Cmd, &ctx);
+        let id = app.sessions[0].spec.id.clone();
+        let pid = app.sessions[0].backend.as_ref().unwrap().pty_id();
+        app.sessions[0].status.activity = Activity::Completed;
+        app.sessions[0].status.unread = true;
+        app.can_draw = false;
+        let mut input = egui::RawInput::default();
+        input
+            .viewports
+            .get_mut(&egui::ViewportId::ROOT)
+            .unwrap()
+            .minimized = Some(true);
+        ctx.begin_pass(input);
+        app.floating_action(Action::Activate(id.clone()), &ctx);
+        let output = ctx.end_pass();
+        assert_eq!(app.active.as_deref(), Some(id.as_str()));
+        assert_eq!(app.sessions[0].backend.as_ref().unwrap().pty_id(), pid);
+        assert_eq!(app.sessions[0].status.activity, Activity::Completed);
+        assert!(!app.sessions[0].status.unread);
+        assert!(
+            output.viewport_output[&egui::ViewportId::ROOT]
+                .commands
+                .contains(&egui::ViewportCommand::Minimized(false))
+        );
+        app.preferences.floating_enabled = true;
+        app.floating_action(Action::Position([-320.0, 80.0]), &ctx);
+        assert_eq!(
+            app.preferences.floating_position_pixels,
+            Some([-320.0, 80.0])
+        );
+        app.floating_action(Action::Disable, &ctx);
+        assert!(!app.preferences.floating_enabled);
+        app.dirty = true;
+        app.persist();
+        let saved = model::load(&root.path().join("sessions.json")).unwrap();
+        assert!(!saved.ui.floating_enabled);
+        assert_eq!(saved.ui.floating_position_pixels, Some([-320.0, 80.0]));
+    }
+    #[test]
+    fn island_stays_on_screen_when_the_session_count_grows() {
+        let root = tempfile::tempdir().unwrap();
+        let ctx = egui::Context::default();
+        let creation = eframe::CreationContext::_new_kittest(ctx.clone());
+        let mut app = App::new(&creation, root.path().into(), false, false);
+        app.startup_pending = false;
+        app.preferences.floating_enabled = true;
+        app.preferences.floating_position_pixels = Some([1_000_000.0, 30.0]);
+        let make = |i| {
+            Session::new(SessionSpec {
+                id: format!("session-{i}"),
+                name: format!("Session {i}"),
+                directory: root.path().into(),
+                agent: Agent::Shell,
+                agent_session_id: None,
+                color: None,
+            })
+        };
+        app.sessions.push(make(0));
+        let frame = |app: &mut App| {
+            ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1200.0, 800.0),
+                    )),
+                    ..Default::default()
+                },
+                |_| app.manage_floating(&ctx),
+            )
+        };
+        frame(&mut app);
+        let first = app.preferences.floating_position_pixels.unwrap();
+        for i in 1..8 {
+            app.sessions.push(make(i));
+        }
+        frame(&mut app);
+        let second = app.preferences.floating_position_pixels.unwrap();
+        let (_, first_width) = ai_terminal::floating::centered_geometry(&ctx, 1, Some(first));
+        let (_, second_width) = ai_terminal::floating::centered_geometry(&ctx, 8, Some(second));
+        assert!(
+            (first[0] + first_width * ctx.pixels_per_point() / 2.0
+                - second[0]
+                - second_width * ctx.pixels_per_point() / 2.0)
+                .abs()
+                < 0.1,
+            "changing session count must preserve the monitor's horizontal center"
+        );
+        assert_eq!(
+            ai_terminal::floating::geometry(&ctx, app.sessions.len(), Some(second)).0,
+            second
+        );
+    }
+    #[test]
+    fn island_migrates_legacy_logical_position_to_physical_pixels() {
+        let root = tempfile::tempdir().unwrap();
+        let ctx = egui::Context::default();
+        let creation = eframe::CreationContext::_new_kittest(ctx.clone());
+        let mut app = App::new(&creation, root.path().into(), false, false);
+        app.startup_pending = false;
+        app.preferences.floating_enabled = true;
+        app.preferences.floating_position = Some([300.0, 80.0]);
+        assert!(app.preferences.floating_position_pixels.is_none());
+        let _ = ctx.run_ui(
+            egui::RawInput {
+                screen_rect: Some(egui::Rect::from_min_size(
+                    egui::Pos2::ZERO,
+                    egui::vec2(1200.0, 800.0),
+                )),
+                ..Default::default()
+            },
+            |_| app.manage_floating(&ctx),
+        );
+        let pos = app.preferences.floating_position_pixels.unwrap();
+        assert!((pos[1] - 80.0 * ctx.pixels_per_point()).abs() < 0.1);
+        assert_eq!(app.preferences.floating_position, Some([300.0, 80.0]));
+        app.dirty = true;
+        app.persist();
+        let restored = model::load(&root.path().join("sessions.json")).unwrap();
+        assert_eq!(restored.ui.floating_position_pixels, Some(pos));
+    }
+
+    #[test]
+    fn island_zoom_resizes_and_recenters_while_preserving_vertical_position() {
+        let root = tempfile::tempdir().unwrap();
+        let ctx = egui::Context::default();
+        ctx.set_embed_viewports(false);
+        let creation = eframe::CreationContext::_new_kittest(ctx.clone());
+        let mut app = App::new(&creation, root.path().into(), false, false);
+        app.startup_pending = false;
+        app.preferences.floating_enabled = true;
+        app.preferences.floating_position_pixels = Some([200.0, 80.0]);
+        app.sessions.push(Session::new(SessionSpec {
+            id: "zoom-test".into(),
+            name: "Zoom test".into(),
+            directory: root.path().into(),
+            agent: Agent::Shell,
+            agent_session_id: None,
+            color: None,
+        }));
+        let frame = |app: &mut App| {
+            ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1200.0, 800.0),
+                    )),
+                    ..Default::default()
+                },
+                |_| app.manage_floating(&ctx),
+            )
+        };
+        frame(&mut app);
+        let initial = app.preferences.floating_position_pixels.unwrap();
+        for zoom in [0.71_f32, 1.0, 1.5] {
+            ctx.set_zoom_factor(zoom);
+            let out = frame(&mut app);
+            let current = app.preferences.floating_position_pixels.unwrap();
+            let centered =
+                ai_terminal::floating::centered_geometry(&ctx, app.sessions.len(), Some(current)).0;
+            assert!(
+                (current[0] - centered[0]).abs() < 0.1,
+                "floating window must remain centered at {zoom}"
+            );
+            assert!(
+                (current[1] - initial[1]).abs() < 0.1,
+                "y position changed at {zoom}"
+            );
+            assert!(
+                out.viewport_output
+                    .get(&ai_terminal::floating::viewport_id())
+                    .is_some_and(|v| v.commands.iter().any(|command| matches!(command,
+                    egui::ViewportCommand::InnerSize(size) if (size.y - 48.0).abs() < 0.01))),
+                "zoom {zoom} must resize the native viewport; outputs={:?}",
+                out.viewport_output
+                    .iter()
+                    .map(|(id, viewport)| (*id, &viewport.commands))
+                    .collect::<Vec<_>>()
+            );
+        }
+        app.preferences.floating_position_pixels = Some([1_000_000.0, 80.0]);
+        app.floating_session_count = None;
+        frame(&mut app);
+        ctx.set_zoom_factor(2.0);
+        frame(&mut app);
+        let edge = app.preferences.floating_position_pixels.unwrap();
+        assert_eq!(
+            ai_terminal::floating::geometry(&ctx, app.sessions.len(), Some(edge)).0,
+            edge,
+            "zooming near the edge keeps the floating window in the work area"
         );
     }
 }

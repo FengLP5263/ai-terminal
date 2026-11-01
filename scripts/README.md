@@ -49,3 +49,8 @@ Git Bash governance/format-check。verify-package 与失败路径以最终验收
 
 
 打包从 Cargo metadata 的 target_directory 读取本次 release 二进制，遵循标准 CARGO_TARGET_DIR／build.target-dir。默认构建目录的 EXE 被正在运行的预览占用时，可在当前命令环境设置 CARGO_TARGET_DIR 为另一个忽略的构建目录再执行相同 package 入口；不会覆盖已打开的程序，也不会从旧默认目录误取 EXE。
+
+
+0.4.0 多窗口开发验收：先用现有工具链运行 `cargo build --offline --locked --example island_probe`，再运行 `target/debug/examples/island_probe.exe output/<unique-island-probe>`。探针只使用合成状态和自身窗口，生成中英文 PNG／JSON 后退出；与真实 Agent 回合分开记录。浮窗默认关闭，性能核查需要明确记录是否开启以及任务状态。
+
+缩放回归另运行 `cargo build --offline --locked --example island_zoom_probe` 和 `target/debug/examples/island_zoom_probe.exe output/<unique-zoom-probe>`，核验真实原生视口在 50%、71%、100% 和 150% 下的物理尺寸、屏幕居中、垂直位置与截图；探针只读取自身窗口并使用合成会话；可附加目标显示器的物理 X 坐标来验证不同 DPI 的屏幕。

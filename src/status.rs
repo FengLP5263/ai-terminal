@@ -7,6 +7,7 @@ pub enum Activity {
     Idle,
     Completed,
     Working,
+    Failed,
     Waiting,
     Exited,
 }
@@ -29,6 +30,8 @@ pub struct HookEvent {
     pub notification_type: Option<String>,
     pub source: Option<String>,
     pub background_running: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub exit_code: Option<i32>,
 }
 
 #[derive(Debug, Default)]
@@ -125,10 +128,14 @@ impl Status {
                 self.waiting_tool = None;
             }
             "StopFailure" => {
-                self.activity = Activity::Waiting;
+                self.activity = Activity::Failed;
+                self.unread = !viewing;
+                self.waiting_tool = None;
             }
             "SessionEnd" => {
-                self.activity = Activity::Exited;
+                if self.activity != Activity::Failed {
+                    self.activity = Activity::Exited;
+                }
             }
             _ => return false,
         }
@@ -158,6 +165,7 @@ mod tests {
             notification_type: None,
             source: None,
             background_running: false,
+            exit_code: None,
         }
     }
     #[test]
@@ -277,5 +285,38 @@ mod tests {
         notification.notification_type = Some("auth_success".into());
         s.apply(&notification, false);
         assert_eq!(s.activity, Activity::Working);
+    }
+}
+
+/// Interrupted sessions are not failed tasks.
+pub fn failed_exit(code: i32) -> bool {
+    code != 0 && !matches!(code, 130 | 143 | -1073741510)
+}
+
+#[cfg(test)]
+mod failure_tests {
+    use super::*;
+    #[test]
+    fn failure_is_distinct_from_questions_and_a_recoverable_tool_error() {
+        let mut state = Status::default();
+        let mut event:HookEvent=serde_json::from_value(serde_json::json!({"event_id":"failure","local_id":"one","generation":"new","name":"UserPromptSubmit","session_id":"agent","turn_id":"one","background_running":false})).unwrap();
+        state.apply(&event, false);
+        event.name = "PostToolUseFailure".into();
+        state.apply(&event, false);
+        assert_eq!(state.activity, Activity::Working);
+        event.name = "PermissionRequest".into();
+        state.apply(&event, false);
+        assert_eq!(state.activity, Activity::Waiting);
+        event.name = "StopFailure".into();
+        state.apply(&event, false);
+        assert_eq!(state.activity, Activity::Failed);
+        assert!(state.unread);
+        event.name = "SessionEnd".into();
+        state.apply(&event, false);
+        assert_eq!(state.activity, Activity::Failed);
+        for code in [0, 130, 143, -1073741510] {
+            assert!(!failed_exit(code));
+        }
+        assert!(failed_exit(23));
     }
 }

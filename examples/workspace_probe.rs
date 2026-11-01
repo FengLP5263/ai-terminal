@@ -233,7 +233,9 @@ fn main() -> eframe::Result {
         "ai-terminal workspace visual probe",
         eframe::NativeOptions {
             renderer: eframe::Renderer::Glow,
-            viewport: egui::ViewportBuilder::default().with_inner_size([width, 760.0]),
+            viewport: egui::ViewportBuilder::default()
+                .with_icon(ai_terminal::appearance::window_icon())
+                .with_inner_size([width, 760.0]),
             ..Default::default()
         },
         Box::new(move |cc| {

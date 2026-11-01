@@ -173,7 +173,7 @@ pub fn shim_agent() -> Option<Agent> {
     }
 }
 
-fn notice(name: &str, agent: Agent, invocation: &str) {
+fn notice(name: &str, agent: Agent, invocation: &str, exit_code: Option<i32>) {
     let Some((endpoint, token, local_id, generation)) = std::env::var("AI_TERMINAL_ENDPOINT")
         .ok()
         .zip(std::env::var("AI_TERMINAL_TOKEN").ok())
@@ -204,6 +204,7 @@ fn notice(name: &str, agent: Agent, invocation: &str) {
             .into(),
         ),
         background_running: false,
+        exit_code,
     };
     let _ = bridge::send(&endpoint, &token, event);
 }
@@ -256,14 +257,19 @@ pub fn run_agent(agent: Agent, args: Vec<OsString>) -> i32 {
             }
             windows_sys::Win32::System::Console::SetConsoleCtrlHandler(Some(keep_launcher), 1);
         }
-        notice("ShellAgentStarted", agent, &invocation);
+        notice("ShellAgentStarted", agent, &invocation, None);
         let status = std::process::Command::new(binary)
             .args(injected)
             .args(args)
             .env("AI_TERMINAL_INVOCATION", &invocation)
             .env("CLAUDECODE", "")
             .status();
-        notice("ShellAgentEnded", agent, &invocation);
+        notice(
+            "ShellAgentEnded",
+            agent,
+            &invocation,
+            Some(status.as_ref().map(|s| s.code().unwrap_or(1)).unwrap_or(1)),
+        );
         status
             .map(|s| s.code().unwrap_or(1))
             .map_err(|e| e.to_string())

@@ -56,3 +56,6 @@ galleys reused across ANSI colors. Application embeds licensed Hack faces.
 0.3.6：滚轮改为独立 MouseWheel 命令，在后端当前模式下路由：应用启用 MOUSE_MODE 时发送标准 SGR／传统鼠标滚轮事件，普通终端使用本地历史。Shift 强制本地历史，Ctrl／Command 留给宿主缩放。鼠标位置采用屏幕网格，单事件最多发送 32 次；仍不合成方向键。保留平滑点滚动的余量和有界历史，鼠标协议按实时模式选择。
 
 0.3.7：TerminalView 可由宿主为已识别的编码 CLI 开启 native_image_paste。收到 Paste 时仅查询 Windows 图片格式；图片转发 Alt+V，CLI 自行读取与附加，文本继续使用原有的 bracketed paste 和换行规则。没有像素复制、临时图片、剪贴板写入或后台查询。Codex 宿主已恢复默认全屏 TUI，不再强制 --no-alt-screen。
+
+
+0.4.0：PTY 元数据／退出与重绘事件明确请求 ROOT viewport 重绘；管理器新增独立 deferred 状态浮窗后，不能依赖当前正在绘制的 viewport 来唤醒根 logic。终端 I/O、隐藏输出排空、鼠标协议与有界历史保持原有实现。

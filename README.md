@@ -4,7 +4,7 @@
 
 A lightweight Windows-native terminal workspace for managing multiple AI coding agents.
 
-**当前开发版本：0.3.7 · Windows x64 · MIT**
+**当前开发版本：0.4.0 · Windows x64 · MIT**
 
 已发布的预览版及 Windows ZIP 见 [GitHub Releases](https://github.com/FengLP5263/ai-terminal/releases)。
 
@@ -101,3 +101,6 @@ ai-terminal 不保存提示词、对话正文或 API Key；各 CLI 自己的数�
 项目代码使用 [MIT License](LICENSE)。字体、图标和其他第三方组件保留各自许可证，详见[第三方来源](THIRD_PARTY_NOTICES.md)。
 
 0.3.7 恢复 Codex 原生全屏 TUI（启动 Logo、底部输入框及应用内滚动），并为受管终端使用独立引擎以保留会话级状态环境。识别到 Codex／Claude 后，Ctrl+V 或 Shift+Insert 可将剪贴板图片交给 CLI 原生附件处理；普通文字粘贴、Shell 和会话命名仍按原方式处理。图片不会被管理器保存或发送。
+
+
+0.4.0 新增设置与灵动岛状态浮窗：左上角齿轮替代“AI终端”文字，可选择跟随系统、简体中文或 English，立即生效并保存。设置中开启置顶浮窗后，精简的横向头像栏在主窗口最小化时继续显示侧栏同款状态角标；最多显示 10 个头像，更多会话按住头像区拖动浏览；鼠标悬停显示名称和状态。点击头像恢复原终端，拖动浮窗边缘可移动，在设置中关闭。浮窗随全局缩放同步改变大小，并在缩放或会话数量变化时保持所在屏幕的横向居中；拖动设置的高度和开关随偏好保存，默认关闭。终端正文、Agent 输出和用户命名不作翻译。
