@@ -24,6 +24,8 @@ POSIX 静态治理和包校验原生执行 Python；format-check 可调用已配
 Git Bash 原生动作委托同仓库的 Windows 入口。macOS/Linux 对 GUI 构建／原生测试／模型 helper 动作明确返回非零，
 没有隐藏跳过或假装可用。Git Bash 检查不是 macOS/Linux 运行验收，后者仍待对应平台验证。
 
+Windows 构建由 `build.rs` 编译程序图标资源；需 Windows SDK 的 rc.exe，自动从 PATH／SDK 定位，也可用 RC 指定编译器路径。Windows 与 Git Bash 入口均沿用 Cargo 构建，无需独立的图片工具；制品源码身份包括 build.rs 与 assets/branding。
+
 ## 参数与影响
 
 - Action 默认 governance。Release 仅切换 smoke/measure 的 debug/release 目录，测试前需已构建。

@@ -6,17 +6,69 @@ use std::{
 
 #[derive(Debug, Default, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum Agent {
-    #[default]
     Codex,
     Claude,
+    #[default]
     Shell,
+    Cmd,
+    Bash,
 }
 impl Agent {
+    pub fn is_shell(self) -> bool {
+        matches!(self, Self::Shell | Self::Cmd | Self::Bash)
+    }
     pub fn label(self) -> &'static str {
         match self {
             Self::Codex => "Codex",
             Self::Claude => "Claude Code",
             Self::Shell => "PowerShell",
+            Self::Cmd => "CMD",
+            Self::Bash => "Bash",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum SessionColor {
+    Blue,
+    Green,
+    Teal,
+    Amber,
+    Orange,
+    Pink,
+    Purple,
+}
+impl SessionColor {
+    pub const ALL: [Self; 7] = [
+        Self::Blue,
+        Self::Green,
+        Self::Teal,
+        Self::Amber,
+        Self::Orange,
+        Self::Pink,
+        Self::Purple,
+    ];
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Blue => "蓝色",
+            Self::Green => "绿色",
+            Self::Teal => "青色",
+            Self::Amber => "黄色",
+            Self::Orange => "橙色",
+            Self::Pink => "粉色",
+            Self::Purple => "紫色",
+        }
+    }
+    pub fn rgb(self) -> [u8; 3] {
+        match self {
+            Self::Blue => [100, 156, 238],
+            Self::Green => [99, 177, 132],
+            Self::Teal => [75, 180, 180],
+            Self::Amber => [212, 174, 80],
+            Self::Orange => [216, 140, 84],
+            Self::Pink => [205, 120, 165],
+            Self::Purple => [163, 127, 218],
         }
     }
 }
@@ -28,6 +80,8 @@ pub struct SessionSpec {
     pub directory: PathBuf,
     pub agent: Agent,
     pub agent_session_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub color: Option<SessionColor>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
@@ -95,6 +149,8 @@ pub struct Workspace {
     pub sessions: Vec<SessionSpec>,
     pub active: Option<String>,
     #[serde(default)]
+    pub last_directory: Option<PathBuf>,
+    #[serde(default)]
     pub ui: UiSettings,
 }
 
@@ -137,6 +193,7 @@ mod tests {
             directory: PathBuf::from("C:/项目/with space"),
             agent: Agent::Claude,
             agent_session_id: Some("actual-agent-id".into()),
+            color: None,
         });
         save(&path, &w).unwrap();
         let read = load(&path).unwrap();
@@ -151,6 +208,7 @@ mod tests {
         let old = r#"{"sessions":[],"active":null}"#;
         let workspace: Workspace = serde_json::from_str(old).unwrap();
         assert_eq!(workspace.ui, UiSettings::default());
+        assert_eq!(workspace.last_directory, None);
         let mut workspace = workspace;
         workspace.ui.sidebar_collapsed = true;
         workspace.ui.terminal_font_size = 18.0;
@@ -178,6 +236,23 @@ mod tests {
         assert!(!reorder(&mut rows, 0, 1, false));
         assert!(!reorder(&mut rows, 99, 0, false));
     }
+
+    #[test]
+    fn per_session_colors_roundtrip_and_old_sessions_default_to_uncolored() {
+        let old = r#"{"sessions":[{"id":"one","name":"项目 👋🏽","directory":"C:/project","agent":"Shell","agent_session_id":null}],"active":"one"}"#;
+        let mut workspace: Workspace = serde_json::from_str(old).unwrap();
+        assert_eq!(workspace.sessions[0].color, None);
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("sessions.json");
+        workspace.sessions[0].color = Some(SessionColor::Purple);
+        save(&path, &workspace).unwrap();
+        let read = load(&path).unwrap();
+        assert_eq!(read.sessions[0].color, Some(SessionColor::Purple));
+        assert_eq!(read.sessions[0].name, "项目 👋🏽");
+        workspace.sessions[0].color = None;
+        save(&path, &workspace).unwrap();
+        assert_eq!(load(&path).unwrap().sessions[0].color, None);
+    }
     #[test]
     fn malformed_workspace_is_reported_instead_of_silently_replaced() {
         let dir = tempfile::tempdir().unwrap();
@@ -185,5 +260,47 @@ mod tests {
         std::fs::write(&path, b"{").unwrap();
         assert!(load(&path).is_err());
         assert_eq!(std::fs::read(path).unwrap(), b"{");
+    }
+}
+
+/// Prefer the active terminal's latest directory, then the saved last directory.
+pub fn default_directory(active: Option<&Path>, last: Option<&Path>) -> PathBuf {
+    active
+        .into_iter()
+        .chain(last)
+        .filter(|path| path.is_dir())
+        .map(Path::to_path_buf)
+        .chain(
+            std::env::var_os("USERPROFILE")
+                .map(PathBuf::from)
+                .filter(|p| p.is_dir()),
+        )
+        .chain(std::env::current_dir().ok())
+        .next()
+        .unwrap_or_else(std::env::temp_dir)
+}
+
+#[cfg(test)]
+mod directory_tests {
+    use super::*;
+    #[test]
+    fn defaults_prefer_active_cwd_then_saved_last_directory() {
+        let root = tempfile::tempdir().unwrap();
+        let active = root.path().join("active");
+        let last = root.path().join("last");
+        std::fs::create_dir(&active).unwrap();
+        std::fs::create_dir(&last).unwrap();
+        assert_eq!(default_directory(Some(&active), Some(&last)), active);
+        assert_eq!(
+            default_directory(Some(&root.path().join("deleted")), Some(&last)),
+            last
+        );
+        let path = root.path().join("workspace.json");
+        let workspace = Workspace {
+            last_directory: Some(last.clone()),
+            ..Default::default()
+        };
+        save(&path, &workspace).unwrap();
+        assert_eq!(load(&path).unwrap().last_directory, Some(last));
     }
 }

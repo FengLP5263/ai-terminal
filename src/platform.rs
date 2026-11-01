@@ -75,3 +75,47 @@ pub fn resident_bytes() -> usize {
     }
     0
 }
+
+/// An event-owned handle, checked only on root-shell prompts; no process scanning.
+#[allow(dead_code)]
+#[cfg(windows)]
+pub struct ProcessWatch(windows_sys::Win32::Foundation::HANDLE);
+#[allow(dead_code)]
+#[cfg(windows)]
+impl ProcessWatch {
+    pub fn open(pid: u32) -> Option<Self> {
+        let handle = unsafe {
+            windows_sys::Win32::System::Threading::OpenProcess(
+                windows_sys::Win32::System::Threading::PROCESS_SYNCHRONIZE,
+                0,
+                pid,
+            )
+        };
+        (!handle.is_null()).then_some(Self(handle))
+    }
+    pub fn exited(&self) -> bool {
+        unsafe {
+            windows_sys::Win32::System::Threading::WaitForSingleObject(self.0, 0)
+                == windows_sys::Win32::Foundation::WAIT_OBJECT_0
+        }
+    }
+}
+#[cfg(windows)]
+impl Drop for ProcessWatch {
+    fn drop(&mut self) {
+        unsafe {
+            windows_sys::Win32::Foundation::CloseHandle(self.0);
+        }
+    }
+}
+#[cfg(not(windows))]
+pub struct ProcessWatch;
+#[cfg(not(windows))]
+impl ProcessWatch {
+    pub fn open(_: u32) -> Option<Self> {
+        Some(Self)
+    }
+    pub fn exited(&self) -> bool {
+        false
+    }
+}

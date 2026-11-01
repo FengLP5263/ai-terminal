@@ -19,6 +19,10 @@ struct Probe {
     ready_at: Option<Instant>,
     screenshot: bool,
     output: PathBuf,
+    shell_pending: bool,
+    through_shell: bool,
+    bridge: Option<ai_terminal::bridge::Bridge>,
+    managed_events: Vec<String>,
 }
 
 impl eframe::App for Probe {
@@ -31,6 +35,24 @@ impl eframe::App for Probe {
         self.renderer.release();
     }
     fn logic(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
+        if self.shell_pending && self.terminal.plain_text().contains("PS ") {
+            self.terminal
+                .process_command(egui_term::BackendCommand::Write(
+                    b"codex -c check_for_update_on_startup=false --no-alt-screen\r".to_vec(),
+                ));
+            self.shell_pending = false;
+        }
+        if let Some(bridge) = &self.bridge {
+            for event in bridge.receiver.try_iter().take(64) {
+                if self.managed_events.len() < 32 {
+                    self.managed_events.push(format!(
+                        "{}:{}",
+                        event.name,
+                        event.source.as_deref().unwrap_or("")
+                    ));
+                }
+            }
+        }
         if self.began.elapsed() > Duration::from_secs(40) {
             let _ = std::fs::write(
                 self.output.join("timeout.json"),
@@ -84,7 +106,11 @@ impl eframe::App for Probe {
 
     fn ui(&mut self, ui: &mut egui::Ui, _: &mut eframe::Frame) {
         ui.heading("Agent 终端交互核查");
-        ui.label("测试仅输入文本，不发送 Enter，不请求模型。");
+        ui.label(if self.through_shell {
+            "Shell 中只提交启动命令；Agent 中只输入文本，不提交模型请求。"
+        } else {
+            "测试仅输入文本，不发送 Enter，不请求模型。"
+        });
         let view = TerminalView::new(ui, &mut self.terminal)
             .set_focus(true)
             .set_font(ai_terminal::appearance::terminal_font(14.0));
@@ -133,7 +159,7 @@ impl eframe::App for Probe {
                 .iter()
                 .filter(|c| c.cell.c != ' ' && !format!("{:?}", c.cell.fg).contains("Foreground"))
                 .count();
-            let report = serde_json::json!({"text_input_visible":text.contains("中文输入 abc123"),"colored_cells":colored_cells,"enter_sent":false,"model_request_sent":false,"text":text,"pty_pid":self.terminal.pty_id(),"manager_resident_bytes":platform::resident_bytes()});
+            let report = serde_json::json!({"text_input_visible":text.contains("中文输入 abc123"),"colored_cells":colored_cells,"enter_sent":false,"shell_command_enter_sent":self.through_shell,"managed_events":self.managed_events,"model_request_sent":false,"text":text,"pty_pid":self.terminal.pty_id(),"manager_resident_bytes":platform::resident_bytes()});
             std::fs::write(
                 self.output.join("result.json"),
                 serde_json::to_vec_pretty(&report).unwrap(),
@@ -155,6 +181,7 @@ impl eframe::App for Probe {
 fn main() -> eframe::Result {
     launch::prepare_gui_environment();
     let args: Vec<_> = std::env::args().collect();
+    let through_shell = args.get(1).is_some_and(|mode| mode == "shell-codex");
     let agent = if args.get(1).is_some_and(|s| s == "claude") {
         Agent::Claude
     } else {
@@ -193,8 +220,34 @@ fn main() -> eframe::Result {
             } else {
                 vec![]
             };
-            let (program, cli_args) =
+            let (mut program, mut cli_args) =
                 launch::pty_command(&binary, cli_args, &helper).expect("prepare installed agent");
+            let mut environment = std::collections::HashMap::from([
+                ("TERM".into(), "xterm-256color".into()),
+                ("COLORTERM".into(), "truecolor".into()),
+                ("CLAUDECODE".into(), String::new()),
+            ]);
+            let mut shell_bridge = None;
+            if through_shell {
+                let context = cc.egui_ctx.clone();
+                let bridge = ai_terminal::bridge::Bridge::start(std::sync::Arc::new(move || {
+                    context.request_repaint()
+                }))?;
+                let spec = ai_terminal::model::SessionSpec {
+                    id: "native-shell-probe".into(),
+                    name: "PowerShell".into(),
+                    directory: std::env::current_dir()?,
+                    agent: Agent::Shell,
+                    agent_session_id: None,
+                    color: None,
+                };
+                let plan = launch::build(&spec, &bridge, &output.join("runtime"), &helper)
+                    .map_err(std::io::Error::other)?;
+                program = plan.executable;
+                cli_args = plan.arguments;
+                environment = plan.environment;
+                shell_bridge = Some(bridge);
+            }
             let terminal = TerminalBackend::new(
                 901,
                 cc.egui_ctx.clone(),
@@ -203,11 +256,7 @@ fn main() -> eframe::Result {
                     shell: program,
                     args: cli_args,
                     working_directory: Some(std::env::current_dir()?),
-                    env: std::collections::HashMap::from([
-                        ("TERM".into(), "xterm-256color".into()),
-                        ("COLORTERM".into(), "truecolor".into()),
-                        ("CLAUDECODE".into(), String::new()),
-                    ]),
+                    env: environment,
                 },
             )?;
             std::fs::write(output.join("phase.txt"), "PTY ready").unwrap();
@@ -221,6 +270,10 @@ fn main() -> eframe::Result {
                 ready_at: None,
                 screenshot: false,
                 output,
+                shell_pending: through_shell,
+                through_shell,
+                bridge: shell_bridge,
+                managed_events: Vec::new(),
             }))
         }),
     )

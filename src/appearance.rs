@@ -101,6 +101,26 @@ pub fn setup(ctx: &egui::Context) {
             .unwrap()
             .push("ui-cjk".into());
     }
+    // Use the system emoji face for complete shaped clusters in UI labels/editors.
+    let system_fonts = std::env::var_os("WINDIR")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| std::path::PathBuf::from("C:/Windows"))
+        .join("Fonts");
+    if let Ok(bytes) = std::fs::read(system_fonts.join("seguiemj.ttf")) {
+        fonts
+            .font_data
+            .insert("ui-emoji".into(), Arc::new(FontData::from_owned(bytes)));
+        let mut family = vec!["ui-emoji".into()];
+        family.extend(fonts.families[&FontFamily::Proportional].clone());
+        fonts
+            .families
+            .insert(FontFamily::Name("ui-emoji".into()), family);
+        fonts
+            .families
+            .get_mut(&FontFamily::Proportional)
+            .unwrap()
+            .insert(2, "ui-emoji".into());
+    }
     ctx.set_fonts(fonts);
 }
 
@@ -120,4 +140,24 @@ pub fn terminal_font(size: f32) -> TerminalFont {
         FontId::new(size, FontFamily::Name("terminal-bold-italic".into())),
     )
     .with_native_font("Hack", &FACES)
+}
+
+/// The approved B artwork is embedded; startup performs no asset-file I/O.
+pub fn app_icon() -> egui::IconData {
+    let mut reader = png::Decoder::new(std::io::Cursor::new(include_bytes!(
+        "../assets/branding/ai-terminal.png"
+    )))
+    .read_info()
+    .expect("embedded app icon header");
+    let mut rgba = vec![0; reader.output_buffer_size().expect("bounded app icon")];
+    let info = reader
+        .next_frame(&mut rgba)
+        .expect("embedded app icon pixels");
+    assert_eq!(info.color_type, png::ColorType::Rgba);
+    rgba.truncate(info.buffer_size());
+    egui::IconData {
+        rgba,
+        width: info.width,
+        height: info.height,
+    }
 }

@@ -244,3 +244,77 @@ fn renderer_honors_requested_beam_cursor() {
         "the requested caret was painted as a solid character block"
     );
 }
+
+#[test]
+fn wheel_scrolls_terminal_output_up_and_down_without_typing_history_keys() {
+    let ctx = egui::Context::default();
+    let mut backend = terminal(
+        &ctx,
+        "1..160 | ForEach-Object { [Console]::WriteLine(('SCROLL-LINE-'+$_)) }; [Console]::WriteLine('SCROLL_READY'); Start-Sleep -Seconds 30",
+    );
+    frame(&ctx, &mut backend, vec![], false);
+    wait_text(&mut backend, "SCROLL_READY");
+    frame(&ctx, &mut backend, vec![], false);
+    let bottom = backend.plain_text();
+    assert_eq!(backend.sync().display_offset, 0);
+    frame(
+        &ctx,
+        &mut backend,
+        vec![
+            Event::PointerMoved(egui::pos2(200.0, 200.0)),
+            Event::MouseWheel {
+                unit: egui::MouseWheelUnit::Line,
+                delta: egui::vec2(0.0, 3.0),
+                modifiers: Modifiers::NONE,
+                phase: egui::TouchPhase::Move,
+            },
+        ],
+        false,
+    );
+    assert!(backend.sync().display_offset > 0);
+    assert_ne!(backend.plain_text(), bottom);
+    frame(
+        &ctx,
+        &mut backend,
+        vec![Event::MouseWheel {
+            unit: egui::MouseWheelUnit::Point,
+            delta: egui::vec2(0.0, -42.0),
+            modifiers: Modifiers::NONE,
+            phase: egui::TouchPhase::Move,
+        }],
+        false,
+    );
+    assert_eq!(backend.sync().display_offset, 0);
+}
+
+#[test]
+fn alternate_screen_wheel_never_injects_up_or_down_arrow_sequences() {
+    let ctx = egui::Context::default();
+    let mut backend = terminal(
+        &ctx,
+        "$e=[char]27; [Console]::Write($e+'[?1049h'+$e+'[?1007h'+'ALT_WHEEL_READY'); $c=[Console]::ReadKey($true); [Console]::WriteLine(('FIRST_INPUT_'+[int]$c.KeyChar)); Start-Sleep -Seconds 20",
+    );
+    frame(&ctx, &mut backend, vec![], false);
+    wait_text(&mut backend, "ALT_WHEEL_READY");
+    assert!(
+        backend.sync().terminal_mode.contains(
+            egui_term::TerminalMode::ALT_SCREEN | egui_term::TerminalMode::ALTERNATE_SCROLL
+        )
+    );
+    frame(
+        &ctx,
+        &mut backend,
+        vec![
+            Event::PointerMoved(egui::pos2(200.0, 200.0)),
+            Event::MouseWheel {
+                unit: egui::MouseWheelUnit::Line,
+                delta: egui::vec2(0.0, 3.0),
+                modifiers: Modifiers::NONE,
+                phase: egui::TouchPhase::Move,
+            },
+        ],
+        false,
+    );
+    backend.process_command(egui_term::BackendCommand::Write(b"z".to_vec()));
+    wait_text(&mut backend, "FIRST_INPUT_122");
+}

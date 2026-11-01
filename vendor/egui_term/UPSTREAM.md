@@ -46,3 +46,9 @@ galleys reused across ANSI colors. Application embeds licensed Hack faces.
 - 原生图块使用实际背景／光标颜色，插入光标在文字之后绘制。
 - TextRendererSession 必须在 on_exit 释放缓存，在窗口／COM 拆卸之前销毁原生资源；Drop 为补充保护。
 - Windows 原生路径失败或其他平台保留 epaint 回退；回退不代表支持彩色 emoji。
+
+0.3.0：将专用 ai-terminal-cwd; OSC 标题事件转发给宿主，用于有代次验证的工作目录更新；其他标题仍不用于推测 Agent 身份或任务状态。
+
+0.3.2：为宿主名称／编辑器暴露 TerminalFont::emoji_shape，复用同一引擎与有界图集，以系统 Segoe UI Emoji 完整布局组合序列。UI 图块保留 PBGRA 透明度并按预乘颜色上传；终端的不透明背景保持相同语义。没有额外的字体引擎缓存或后台轮询。
+
+0.3.3：普通滚轮始终调用 Term::scroll_display，不再为 ALTERNATE_SCROLL＋ALT_SCREEN 生成 ESC OA／OB 方向键；保留真实键盘、指针与 Ctrl 缩放处理。宿主的 Codex 入口同时使用公开的 --no-alt-screen 保留正常网格滚动历史。

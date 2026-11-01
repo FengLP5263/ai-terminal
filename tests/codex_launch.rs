@@ -16,7 +16,10 @@ fn installed_codex_accepts_scoped_hook_toml_without_auth_or_trust_changes() {
     for setting in launch::codex_hook_overrides(helper) {
         command.args(["-c", &setting]);
     }
-    let output = command.args(["features", "list"]).output().unwrap();
+    let output = command
+        .args(["--no-alt-screen", "features", "list"])
+        .output()
+        .unwrap();
     assert!(
         output.status.success(),
         "Codex rejected generated hook config: {}",

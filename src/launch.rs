@@ -68,6 +68,9 @@ pub fn build(
     if !spec.directory.is_dir() {
         return Err("项目目录不存在".into());
     }
+    if spec.agent.is_shell() {
+        return crate::shell::build(spec, bridge, runtime, helper);
+    }
     let search = crate::discovery::CliSearch::current();
     let binary = search.find(spec.agent).ok_or_else(|| format!(
         "未找到 {}。已检查 PATH、Windows 用户／系统 PATH 和常见安装目录。请确认本机可运行对应 CLI；自定义安装请将启动器目录加入用户 PATH，或从可运行该 CLI 的终端启动 ai-terminal。仅在 WSL 中安装的 CLI 暂不支持。", spec.agent.label()))?;
@@ -92,6 +95,22 @@ pub fn build(
     );
     // Avoid inheriting a parent Claude invocation's nested-session marker.
     environment.insert("CLAUDECODE".into(), String::new());
+    arguments.extend(agent_arguments(spec, runtime, helper)?);
+    let (executable, arguments) = pty_command(&binary, arguments, helper)?;
+    Ok(Launch {
+        executable,
+        arguments,
+        environment,
+        generation,
+    })
+}
+
+pub fn agent_arguments(
+    spec: &SessionSpec,
+    runtime: &Path,
+    helper: &Path,
+) -> Result<Vec<String>, String> {
+    let mut arguments = Vec::new();
     match spec.agent {
         Agent::Claude => {
             let mut hooks = serde_json::Map::new();
@@ -113,18 +132,19 @@ pub fn build(
             }
             std::fs::create_dir_all(runtime).map_err(|e| e.to_string())?;
             let path = runtime.join(format!("{}-claude.json", spec.id));
-            std::fs::write(
-                &path,
-                serde_json::to_vec(&serde_json::json!({"hooks":hooks}))
-                    .map_err(|e| e.to_string())?,
-            )
-            .map_err(|e| e.to_string())?;
+            let bytes = serde_json::to_vec(&serde_json::json!({"hooks":hooks}))
+                .map_err(|e| e.to_string())?;
+            if std::fs::read(&path).ok().as_deref() != Some(bytes.as_slice()) {
+                std::fs::write(&path, bytes).map_err(|e| e.to_string())?;
+            }
             arguments.extend(["--settings".into(), path.to_string_lossy().into_owned()]);
             if let Some(id) = &spec.agent_session_id {
                 arguments.extend(["--resume".into(), id.clone()]);
             }
         }
         Agent::Codex => {
+            // Keep Codex output in the terminal's normal scrollback grid.
+            arguments.push("--no-alt-screen".into());
             for setting in codex_hook_overrides(helper) {
                 arguments.extend(["-c".into(), setting]);
             }
@@ -132,17 +152,9 @@ pub fn build(
                 arguments.extend(["resume".into(), id.clone()]);
             }
         }
-        Agent::Shell => {
-            arguments.extend(["-NoLogo".into(),"-NoProfile".into(),"-NoExit".into(),"-Command".into(),"[Console]::InputEncoding=[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false); $OutputEncoding=[Console]::OutputEncoding; Clear-Host".into()]);
-        }
+        Agent::Shell | Agent::Cmd | Agent::Bash => {}
     }
-    let (executable, arguments) = pty_command(&binary, arguments, helper)?;
-    Ok(Launch {
-        executable,
-        arguments,
-        environment,
-        generation,
-    })
+    Ok(arguments)
 }
 
 pub fn codex_hook_overrides(helper: &Path) -> Vec<String> {
@@ -194,6 +206,7 @@ mod tests {
             directory: dir.path().into(),
             agent: Agent::Claude,
             agent_session_id: Some("actual-id".into()),
+            color: None,
         };
         if executable(Agent::Claude).is_none() {
             return;

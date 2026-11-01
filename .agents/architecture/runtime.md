@@ -23,6 +23,7 @@ Cargo.toml 声明最低 Rust 1.92；使用 stable 工具链，制品记录实际
 | AI_TERMINAL_SESSION、AI_TERMINAL_GENERATION | 本地会话标识与启动代次 |
 | TERM、COLORTERM、NO_COLOR、FORCE_COLOR、CLICOLOR_FORCE | GUI 启动前在本进程内规范交互终端颜色能力 |
 | CLAUDECODE | 子会话避免继承父 Claude 的嵌套标记 |
+| RC | 可选 Windows SDK 资源编译器路径，仅构建时读取；默认从 PATH／SDK 查找 |
 | CARGO_HOME、RUSTUP_HOME | 可选本机 Rust 安装位置，由忽略的 .tools/env.ps1 提供 |
 | AI_TERMINAL_PYTHON | 可选脚本 Python 可执行文件路径 |
 
@@ -32,10 +33,11 @@ GUI 只改自己的进程环境，不改 Windows 用户／系统环境或 Warp�
 
 ## 启动、就绪、退出
 
-`scripts/windows/project.ps1 run` 构建并打开交互窗口；点＋选择项目和 Agent。
-左侧会话可拖动排序；悬停铅笔或右键编辑名称，标题栏 ‹ 收起为头像栏，› 展开。
+`scripts/windows/project.ps1 run` 构建并打开交互窗口；点＋只选择 PowerShell、CMD 或 Git Bash；无需目录或 Agent 表单。默认用户主目录，随后沿用当前／最近的有效目录。
+左侧会话可拖动排序；悬停铅笔或右键编辑名称，标题栏的面板按钮收起为头像栏，再次点击展开。
+右键会话 → 会话颜色可选 7 种颜色或恢复默认；颜色随会话保存，当前行采用更亮的底色和文字，行间分隔线保持一物理像素。标题 AI终端 与两个按钮共用 32 逻辑像素的高度和中心。
 面板右边缘可调宽度。窗口内 Ctrl＋滚轮缩放整个界面（50%–250%），Ctrl＋加减同样可用；Ctrl＋0 或标题栏比例按钮恢复 100%。终端跟随剩余内容区重新计算行列，普通滚轮保留历史滚动。
-首次 Codex 在 /hooks 中审查状态 hook。恢复列表后必须用户选择继续，不自动启动所有会话。
+首次 Codex 在 /hooks 中审查状态 hook。打开窗口直接进入上次选中的 Shell；其余标签按单击打开，不批量启动。首次空工作区直接创建 PowerShell。
 正常退出通过应用窗口；活跃任务先保存／确认。没有全局 stop/reset 命令，不删除用户会话数据。
 
 readiness 是实际窗口／终端与状态消息，不是后台进程存在。应用没有日志采集服务；
@@ -51,3 +53,21 @@ Windows 文字资源由 TextRendererSession 管理，主程序与原生探针在
 查找仅在启动会话时发生；合并后的 PATH 只传入本次子进程，便于 npm 启动器找到 Node，不修改管理器或 Windows 的环境。仅 WSL 内的 CLI 与 PowerShell 函数／别名不属于可直接启动的 Windows 程序。
 
 cmd/bat 由独立 ai-terminal-hook.exe 的 --launch-cli 模式通过 Rust Command 启动，不将参数拼成 cmd.exe 命令串。helper 使用 console subsystem 继承已有 ConPTY，仍不初始化字体／GPU；主程序仍是无控制台 GUI。退出码透传，helper、cmd 和 CLI 属于本会话的 Job Object。生命周期 hook 路径和认证协议不变。
+
+## 0.3.0 终端优先
+
+新会话以 shell 为根进程；0.3.2 起，旧 Codex/Claude 标签在加载时兼容为 PowerShell，保留名称、目录与历史 ID，不自动执行 Agent。Shell 提示符发出 ai-terminal-cwd;<generation>;<sequence>;<directory> 元数据，后台验证代次和目录后更新列表／默认目录。Bash 用内置 pwd -W 报告本机路径。目录更新只发生在提示符边界，不轮询。
+
+每次终端启动在隔离 runtime/<session>/<generation>/bin 生成两份 helper 入口（优先硬链接、跨卷回退复制）。只对本次子进程 PATH 生效，不改用户／系统 PATH、CLI 安装或 profile。输入 codex/claude 调用真实已安装的 CLI，并报告 ShellAgentStarted／ShellAgentEnded；普通输出不决定图标。显式绝对路径、用户自定义别名和其他 Agent 暂不接入自动识别。
+
+图标身份与工作状态分开：身份来自受管 CLI 启停，Working/Waiting/完成仍来自生命周期 hook。HookEvent 增加可选 invocation、process_id，旧事件默认 None。每次调用的 ID 隔离迟到事件和嵌套 Agent；当前进程句柄仅在根 shell 提示符事件上检查，不扫描进程列表。CLI 退出回到终端，保留用户自定义名称。
+
+Claude 状态配置在同一终端启动代次内复用，仅内容变化时写入。新建终端不加载 Agent 或要求配置 hook。用户显式 --settings 保持优先，不覆盖该文件；此时状态连接以实际 CLI 事件为准。所有交互仍由用户处理，不自动信任或发起模型请求。
+
+终端默认保持受控启动：PowerShell -NoProfile、CMD /D、Bash 使用会话 rcfile，不修改或自动载入用户启动文件。关闭终端仍只回收自身 Job Object。运行中的 CLI、控制台句柄、提示词和正文不持久化。
+
+## 0.3.3 普通滚轮
+
+普通滚轮只滚动本地终端显示，不再因 ALTERNATE_SCROLL 与 ALT_SCREEN 合成上下方向键。Codex 的受管入口附加其公开参数 --no-alt-screen，以内联模式保留正常终端滚动历史；无需改用户 Codex 配置。已运行的旧 Codex 需自行退出并重新启动才使用新模式。键盘方向键、状态 hook 和 Ctrl＋滚轮整体缩放维持原行为。其他全屏程序若不提供滚动历史，本地滚轮不虚构历史内容。
+
+0.3.4 起窗口使用内嵌 256×256 RGBA B「会话叠窗」图标，EXE 包含 16–256 像素的 10 档 ICO 资源。图标无运行时外部文件依赖；hook helper 不链接 GUI 图标资源。

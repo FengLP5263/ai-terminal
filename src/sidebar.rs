@@ -1,4 +1,8 @@
-use crate::{appearance, model::Agent, status::Activity};
+use crate::{
+    appearance, chrome,
+    model::{Agent, SessionColor},
+    status::Activity,
+};
 use egui::{Color32, Pos2, Rect, Sense, Stroke, Vec2};
 use std::{
     io::{BufReader, Cursor},
@@ -10,20 +14,19 @@ pub struct Entry<'a> {
     pub name: &'a str,
     pub directory: &'a std::path::Path,
     pub agent: Agent,
+    pub color: Option<SessionColor>,
     pub activity: Activity,
     pub unread: bool,
-    pub running: bool,
-    pub resumable: bool,
     pub hint: String,
 }
 
 #[derive(Default, Debug)]
 pub struct Actions {
-    pub create: bool,
+    pub create: Option<Agent>,
     pub toggle: bool,
     pub select: Option<String>,
-    pub start: Option<String>,
     pub rename: Option<String>,
+    pub color: Option<(String, Option<SessionColor>)>,
     pub close: Option<String>,
     pub reorder: Option<(String, String, bool)>,
     pub width: f32,
@@ -70,8 +73,8 @@ impl Icons {
         }
     }
     fn paint(&self, painter: &egui::Painter, rect: Rect, agent: Agent) {
-        painter.circle_filled(rect.center(), rect.width() / 2.0, Color32::from_gray(30));
-        let icon = rect.shrink(5.0);
+        painter.circle_filled(rect.center(), rect.width() / 2.0, Color32::from_gray(29));
+        let icon = Rect::from_center_size(rect.center(), Vec2::splat(chrome::AVATAR_ICON));
         match agent {
             Agent::Codex | Agent::Claude => {
                 let texture = if agent == Agent::Codex {
@@ -86,19 +89,7 @@ impl Icons {
                     Color32::WHITE,
                 );
             }
-            Agent::Shell => {
-                let c = icon.center();
-                let s = Stroke::new(1.8, Color32::from_gray(205));
-                painter.add(egui::Shape::line(
-                    vec![
-                        c + egui::vec2(-6.0, -5.0),
-                        c + egui::vec2(-1.0, 0.0),
-                        c + egui::vec2(-6.0, 5.0),
-                    ],
-                    s,
-                ));
-                painter.line_segment([c + egui::vec2(1.0, 5.0), c + egui::vec2(7.0, 5.0)], s);
-            }
+            Agent::Shell | Agent::Cmd | Agent::Bash => chrome::paint_shell(painter, icon, agent),
         }
     }
 }
@@ -132,34 +123,59 @@ pub fn show(
     let response = panel.show(ui, |ui| {
         ui.horizontal(|ui| {
             if collapsed {
-                actions.toggle = ui
-                    .add_sized([34.0, 28.0], egui::Button::new("›").frame(false))
-                    .on_hover_text("展开会话面板")
-                    .clicked();
+                ui.add_space(2.0);
+                actions.toggle = chrome::icon_button(
+                    ui,
+                    egui::Id::new("sidebar-toggle"),
+                    chrome::ActionIcon::Expand,
+                    "展开会话面板",
+                )
+                .clicked();
             } else {
-                ui.label(egui::RichText::new("ai-terminal").size(17.0).strong());
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    actions.toggle = ui.small_button("‹").on_hover_text("收起会话面板").clicked();
-                    actions.create = ui
-                        .small_button("＋")
-                        .on_hover_text("新建会话 · Ctrl+Shift+N")
-                        .clicked();
+                let title_width = (ui.available_width()
+                    - 2.0 * chrome::CONTROL
+                    - 2.0 * ui.spacing().item_spacing.x)
+                    .max(1.0);
+                let (rect, _) = ui
+                    .allocate_exact_size(egui::vec2(title_width, chrome::CONTROL), Sense::hover());
+                let title = ui.interact(rect, egui::Id::new("sidebar-title"), Sense::hover());
+                title.widget_info(|| {
+                    egui::WidgetInfo::labeled(egui::WidgetType::Label, ui.is_enabled(), "AI终端")
                 });
+                ui.painter().text(
+                    egui::pos2(rect.left(), rect.center().y),
+                    egui::Align2::LEFT_CENTER,
+                    "AI终端",
+                    egui::FontId::proportional(16.0),
+                    chrome::TEXT,
+                );
+                actions.create = new_session_menu(ui);
+                actions.toggle = chrome::icon_button(
+                    ui,
+                    egui::Id::new("sidebar-toggle"),
+                    chrome::ActionIcon::Collapse,
+                    "收起会话面板",
+                )
+                .clicked();
             }
         });
-        ui.add_space(10.0);
+        ui.add_space(12.0);
         if collapsed {
-            actions.create = ui
-                .add_sized([34.0, 28.0], egui::Button::new("＋").frame(false))
-                .on_hover_text("新建会话")
-                .clicked();
-            ui.add_space(5.0);
+            ui.horizontal(|ui| {
+                ui.add_space(2.0);
+                actions.create = new_session_menu(ui);
+            });
+            ui.add_space(8.0);
         }
         egui::ScrollArea::vertical()
             .auto_shrink([false, false])
             .show(ui, |ui| {
-                for entry in entries {
-                    let height = if collapsed { 42.0 } else { 60.0 };
+                for (index, entry) in entries.iter().enumerate() {
+                    let height = if collapsed {
+                        chrome::RAIL_ROW
+                    } else {
+                        chrome::ROW
+                    };
                     let (rect, _) = ui.allocate_exact_size(
                         Vec2::new(ui.available_width(), height),
                         Sense::hover(),
@@ -170,19 +186,14 @@ pub fn show(
                         Sense::click_and_drag(),
                     );
                     let selected = active == Some(entry.id);
-                    let fill = if selected {
-                        Color32::from_gray(48)
-                    } else if response.hovered() {
-                        Color32::from_gray(31)
-                    } else {
-                        Color32::TRANSPARENT
-                    };
-                    ui.painter().rect_filled(rect, 5, fill);
+                    let hovered = ui.rect_contains_pointer(rect);
+                    let fill = chrome::session_fill(entry.color, selected, hovered);
+                    ui.painter().rect_filled(rect, 6, fill);
                     if selected {
                         ui.painter().rect_stroke(
                             rect.shrink(0.5),
                             5,
-                            Stroke::new(1.0, Color32::from_gray(75)),
+                            Stroke::new(1.0, chrome::session_border(entry.color)),
                             egui::StrokeKind::Inside,
                         );
                     }
@@ -191,16 +202,13 @@ pub fn show(
                             rect.left() + if collapsed { 18.0 } else { 24.0 },
                             rect.center().y,
                         ),
-                        Vec2::splat(30.0),
+                        Vec2::splat(chrome::AVATAR),
                     );
                     icons.paint(ui.painter(), avatar, entry.agent);
                     let indicator = avatar.right_bottom() - egui::vec2(2.0, 2.0);
+                    let surface = fill;
                     if entry.activity == Activity::Working {
-                        ui.painter().circle_filled(
-                            indicator,
-                            6.0,
-                            fill.gamma_multiply(1.0).to_opaque(),
-                        );
+                        ui.painter().circle_filled(indicator, 5.5, surface);
                         let time = ui.input(|i| i.time as f32);
                         let points = (0..13)
                             .map(|i| {
@@ -210,12 +218,11 @@ pub fn show(
                             .collect();
                         ui.painter().add(egui::Shape::line(
                             points,
-                            Stroke::new(1.7, Color32::from_rgb(136, 180, 246)),
+                            Stroke::new(1.5, Color32::from_rgb(136, 180, 246)),
                         ));
                         ui.ctx().request_repaint_after(Duration::from_millis(80));
                     } else if entry.activity == Activity::Waiting || entry.unread {
-                        ui.painter()
-                            .circle_filled(indicator, 5.0, appearance::SIDEBAR_BG);
+                        ui.painter().circle_filled(indicator, 5.5, surface);
                         ui.painter().circle_filled(
                             indicator,
                             3.5,
@@ -228,18 +235,24 @@ pub fn show(
                     }
                     let mut edit = false;
                     if !collapsed {
-                        let left = rect.left() + 46.0;
+                        let left = rect.left() + 52.0;
                         let text_rect = Rect::from_min_max(
-                            Pos2::new(left, rect.top() + 8.0),
-                            Pos2::new(rect.right() - 28.0, rect.bottom()),
+                            Pos2::new(left, rect.center().y - 18.0),
+                            Pos2::new(rect.right() - 40.0, rect.bottom()),
                         );
                         let painter = ui.painter().with_clip_rect(text_rect);
-                        painter.text(
+                        crate::ui_text::paint(
+                            ui,
+                            &painter,
                             text_rect.left_top(),
-                            egui::Align2::LEFT_TOP,
                             entry.name,
-                            egui::FontId::proportional(14.0),
-                            Color32::from_gray(225),
+                            14.0,
+                            if selected {
+                                Color32::from_gray(245)
+                            } else {
+                                chrome::TEXT
+                            },
+                            text_rect.width(),
                         );
                         let project = entry
                             .directory
@@ -247,58 +260,35 @@ pub fn show(
                             .unwrap_or(entry.directory.as_os_str())
                             .to_string_lossy();
                         painter.text(
-                            Pos2::new(left, rect.top() + 31.0),
+                            Pos2::new(left, rect.center().y + 4.0),
                             egui::Align2::LEFT_TOP,
                             project,
-                            egui::FontId::proportional(11.0),
-                            Color32::from_gray(145),
+                            egui::FontId::proportional(12.0),
+                            if selected {
+                                Color32::from_gray(180)
+                            } else {
+                                chrome::SECONDARY
+                            },
                         );
-                        if response.hovered() || selected {
+                        if hovered || selected {
                             let edit_rect = Rect::from_center_size(
-                                Pos2::new(rect.right() - 15.0, rect.center().y),
-                                Vec2::splat(24.0),
+                                Pos2::new(rect.right() - 18.0, rect.center().y),
+                                Vec2::splat(chrome::CONTROL),
                             );
-                            let edit_response = ui.interact(
+                            edit = chrome::icon_at(
+                                ui,
                                 edit_rect,
                                 egui::Id::new(("edit-session", entry.id)),
-                                Sense::click(),
-                            );
-                            if edit_response.hovered() {
-                                ui.painter()
-                                    .rect_filled(edit_rect, 3, Color32::from_gray(65));
-                            }
-                            let c = edit_rect.center();
-                            let stroke = Stroke::new(1.5, Color32::from_gray(195));
-                            ui.painter().line_segment(
-                                [c + egui::vec2(-4.0, 3.0), c + egui::vec2(3.0, -4.0)],
-                                stroke,
-                            );
-                            ui.painter().line_segment(
-                                [c + egui::vec2(-2.0, 5.0), c + egui::vec2(5.0, -2.0)],
-                                stroke,
-                            );
-                            ui.painter().line_segment(
-                                [c + egui::vec2(3.0, -4.0), c + egui::vec2(5.0, -2.0)],
-                                stroke,
-                            );
-                            ui.painter().line_segment(
-                                [c + egui::vec2(-4.0, 3.0), c + egui::vec2(-5.0, 6.0)],
-                                stroke,
-                            );
-                            ui.painter().line_segment(
-                                [c + egui::vec2(-5.0, 6.0), c + egui::vec2(-2.0, 5.0)],
-                                stroke,
-                            );
-                            edit = edit_response.on_hover_text("编辑会话名称").clicked();
+                                chrome::ActionIcon::Edit,
+                                "编辑会话名称",
+                            )
+                            .clicked();
                         }
                     }
                     if edit {
                         actions.rename = Some(entry.id.into());
                     } else if response.clicked() {
                         actions.select = Some(entry.id.into());
-                    }
-                    if response.double_clicked() && !entry.running {
-                        actions.start = Some(entry.id.into());
                     }
                     response.dnd_set_drag_payload(DragSession(entry.id.into()));
                     let after = ui
@@ -331,27 +321,115 @@ pub fn show(
                             actions.rename = Some(entry.id.into());
                             ui.close();
                         }
-                        if !entry.running
-                            && ui
-                                .button(if entry.resumable {
-                                    "继续会话"
-                                } else {
-                                    "启动会话"
-                                })
-                                .clicked()
-                        {
-                            actions.start = Some(entry.id.into());
-                            ui.close();
-                        }
+                        ui.menu_button("会话颜色", |ui| {
+                            egui::Grid::new(("session-palette", entry.id))
+                                .num_columns(4)
+                                .spacing(egui::vec2(6.0, 6.0))
+                                .show(ui, |ui| {
+                                    for (index, color) in std::iter::once(None)
+                                        .chain(SessionColor::ALL.into_iter().map(Some))
+                                        .enumerate()
+                                    {
+                                        if color_swatch(ui, entry.id, color, entry.color == color)
+                                            .clicked()
+                                        {
+                                            actions.color = Some((entry.id.into(), color));
+                                            ui.close();
+                                        }
+                                        if index % 4 == 3 {
+                                            ui.end_row();
+                                        }
+                                    }
+                                });
+                        });
                         if ui.button("关闭会话").clicked() {
                             actions.close = Some(entry.id.into());
                             ui.close();
                         }
                     });
+                    if index + 1 < entries.len() {
+                        ui.painter().hline(
+                            rect.left() + 4.0..=rect.right() - 4.0,
+                            rect.bottom() + 5.0,
+                            Stroke::new(1.0 / ui.ctx().pixels_per_point(), Color32::from_gray(40)),
+                        );
+                    }
                     ui.add_space(4.0);
                 }
             });
     });
     actions.width = response.response.rect.width();
     actions
+}
+
+/// A new terminal is one menu choice; project and Agent selection belong in the shell.
+pub fn new_session_menu(ui: &mut egui::Ui) -> Option<Agent> {
+    new_session_menu_with_id(ui, egui::Id::new(chrome::NEW_TERMINAL_ID))
+}
+
+pub fn new_session_menu_with_id(ui: &mut egui::Ui, id: egui::Id) -> Option<Agent> {
+    let trigger = chrome::icon_button(
+        ui,
+        id,
+        chrome::ActionIcon::Add,
+        "新建终端 · Ctrl+Shift+N 打开 PowerShell",
+    );
+    let mut selected = None;
+    egui::Popup::menu(&trigger).show(|ui| {
+        ui.set_min_width(148.0);
+        ui.spacing_mut().interact_size.y = chrome::CONTROL;
+        for shell in [Agent::Shell, Agent::Cmd, Agent::Bash] {
+            if ui.button(shell.label()).clicked() {
+                selected = Some(shell);
+                ui.close();
+            }
+        }
+    });
+    selected
+}
+
+fn color_swatch(
+    ui: &mut egui::Ui,
+    session: &str,
+    color: Option<SessionColor>,
+    selected: bool,
+) -> egui::Response {
+    let (rect, _) = ui.allocate_exact_size(Vec2::splat(chrome::CONTROL), Sense::hover());
+    let response = ui.interact(
+        rect,
+        egui::Id::new(("session-color", session, color)),
+        Sense::click(),
+    );
+    let label = color.map(SessionColor::label).unwrap_or("默认");
+    response.widget_info(|| {
+        egui::WidgetInfo::labeled(egui::WidgetType::Button, ui.is_enabled(), label)
+    });
+    if response.hovered() || response.is_pointer_button_down_on() {
+        ui.painter().rect_filled(rect, 6, chrome::HOVER);
+    }
+    let fill = color
+        .map(|c| {
+            let [r, g, b] = c.rgb();
+            Color32::from_rgb(r, g, b)
+        })
+        .unwrap_or(Color32::from_gray(90));
+    ui.painter().circle_filled(rect.center(), 9.0, fill);
+    if color.is_none() {
+        ui.painter().line_segment(
+            [
+                rect.center() + egui::vec2(-5.0, 5.0),
+                rect.center() + egui::vec2(5.0, -5.0),
+            ],
+            Stroke::new(1.5, Color32::from_gray(200)),
+        );
+    }
+    if selected || response.has_focus() {
+        ui.painter().rect_stroke(
+            rect.shrink(0.5),
+            6,
+            Stroke::new(1.5, chrome::TEXT),
+            egui::StrokeKind::Inside,
+        );
+    }
+    response.on_hover_text(label)
 }

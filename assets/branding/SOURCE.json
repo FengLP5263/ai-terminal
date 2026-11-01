@@ -1,0 +1,32 @@
+{
+  "design": "B · 会话叠窗",
+  "origin": "design/icon-concepts/b.svg",
+  "license": "MIT (project-original artwork)",
+  "rendering": "Chromium Canvas: vector rendered separately at each ICO frame size; RGBA PNG",
+  "ico_sizes": [
+    16,
+    20,
+    24,
+    32,
+    40,
+    48,
+    64,
+    96,
+    128,
+    256
+  ],
+  "files": {
+    "ai-terminal.svg": {
+      "bytes": 572,
+      "sha256": "01aaca15bd3b7995593cab84573e2a3a0484154248e89e6ad621d149b296de3f"
+    },
+    "ai-terminal.png": {
+      "bytes": 9384,
+      "sha256": "2122177db09ec5424ff6cb260d1b84b266d50d729902dc6bbc1eae3717b11f00"
+    },
+    "ai-terminal.ico": {
+      "bytes": 25820,
+      "sha256": "b2924edbe73829af76b0a3ae2e843bfed40481d680522be7d97aaf0ea750d673"
+    }
+  }
+}
