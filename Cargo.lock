@@ -40,7 +40,7 @@ dependencies = [
 
 [[package]]
 name = "ai-terminal"
-version = "0.3.4"
+version = "0.3.7"
 dependencies = [
  "eframe",
  "egui",
@@ -577,8 +577,6 @@ dependencies = [
 [[package]]
 name = "egui-winit"
 version = "0.35.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9ea6bf3608db949588b95b8b341ee358d0c3f95cf4dc3f53d8d76717edee87db"
 dependencies = [
  "arboard",
  "bytemuck",
@@ -620,6 +618,7 @@ dependencies = [
  "unicode-segmentation",
  "windows",
  "windows-numerics",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

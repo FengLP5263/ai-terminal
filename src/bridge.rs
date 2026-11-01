@@ -145,6 +145,9 @@ pub fn report_hook() {
                 .and_then(|v| v.as_str())
                 .map(|s| s.chars().take(200).collect::<String>())
         };
+        if field("agent_id").is_some_and(|id| !id.is_empty()) {
+            return Ok(());
+        }
         let event = HookEvent {
             invocation: std::env::var("AI_TERMINAL_INVOCATION").ok(),
             process_id: None,

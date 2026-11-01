@@ -43,3 +43,9 @@ project.ps1 ci 是厂商无关入口；源码托管于 GitHub，尚未配置云 
 
 2026-10-30 实跑：Windows ci（36 Rust + 3 Python）、原生 smoke、空闲测量、release package；
 Git Bash governance/format-check。verify-package 与失败路径以最终验收记录为准；macOS/Linux runtime 未验证。
+
+
+0.3.7 起 test／ci 显式执行本地 egui-winit 补丁的 paste_tests，覆盖无文本的粘贴请求；该补丁保持在 workspace 外。真实图片核查由 terminal_probe 的 codex-image／claude-image 模式完成，只插入未发送的附件。lifecycle_probe offline 使用本机动态端口的假 Responses 服务验证真实 CLI 生命周期，不消耗真实模型。
+
+
+打包从 Cargo metadata 的 target_directory 读取本次 release 二进制，遵循标准 CARGO_TARGET_DIR／build.target-dir。默认构建目录的 EXE 被正在运行的预览占用时，可在当前命令环境设置 CARGO_TARGET_DIR 为另一个忽略的构建目录再执行相同 package 入口；不会覆盖已打开的程序，也不会从旧默认目录误取 EXE。

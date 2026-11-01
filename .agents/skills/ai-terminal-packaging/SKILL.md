@@ -20,3 +20,6 @@ package 会调用 Cargo release 构建，生成独立版本目录和 ZIP，记�
 依赖许可证收集缺口须在 manifest/第三方清单明确，不把自动收集当作完整法律审查。
 签名、公开发行与自动更新尚未建立；用户授权发布后才对具体目标处理。
 变更打包规则时同步 Python 回归、Windows/POSIX 入口、scripts/README.md、README 和数据/资产记录。
+
+
+打包从 Cargo metadata 的 target_directory 读取本次 release 二进制，遵循标准 CARGO_TARGET_DIR／build.target-dir。默认构建目录的 EXE 被正在运行的预览占用时，可在当前命令环境设置 CARGO_TARGET_DIR 为另一个忽略的构建目录再执行相同 package 入口；不会覆盖已打开的程序，也不会从旧默认目录误取 EXE。

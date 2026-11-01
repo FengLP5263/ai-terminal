@@ -1,6 +1,7 @@
 pub mod appearance;
 pub mod bridge;
 pub mod chrome;
+pub mod connection_ui;
 pub mod discovery;
 pub mod launch;
 pub mod model;

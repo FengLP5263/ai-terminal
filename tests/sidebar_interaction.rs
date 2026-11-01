@@ -12,6 +12,7 @@ struct Harness {
     tick: usize,
     output: Option<egui::FullOutput>,
     color: Option<SessionColor>,
+    activity: Activity,
 }
 impl Harness {
     fn new() -> Self {
@@ -24,6 +25,7 @@ impl Harness {
             tick: 0,
             output: None,
             color: None,
+            activity: Activity::Idle,
         }
     }
     fn frame(&mut self, events: Vec<Event>, collapsed: bool) -> Actions {
@@ -46,7 +48,11 @@ impl Harness {
             directory: std::path::Path::new("C:/项目"),
             agent,
             color: if id == "b" { self.color } else { None },
-            activity: Activity::Idle,
+            activity: if id == "a" {
+                self.activity
+            } else {
+                Activity::Idle
+            },
             unread: false,
             hint: String::new(),
         })
@@ -228,5 +234,39 @@ fn right_click_palette_sets_and_resets_color_without_selecting_another_tab() {
                 collapsed,
             );
         }
+    }
+}
+
+#[test]
+fn completed_indicator_stays_visible_on_the_active_read_tab_in_both_sidebar_sizes() {
+    fn green_dot(shape: &egui::Shape) -> bool {
+        match shape {
+            egui::Shape::Circle(circle) => circle.fill == egui::Color32::from_rgb(88, 191, 141),
+            egui::Shape::Vec(shapes) => shapes.iter().any(green_dot),
+            _ => false,
+        }
+    }
+    for collapsed in [false, true] {
+        let mut h = Harness::new();
+        h.activity = Activity::Completed;
+        h.frame(vec![], collapsed);
+        assert!(
+            h.output
+                .as_ref()
+                .unwrap()
+                .shapes
+                .iter()
+                .any(|s| green_dot(&s.shape))
+        );
+        h.activity = Activity::Working;
+        h.frame(vec![], collapsed);
+        assert!(
+            !h.output
+                .as_ref()
+                .unwrap()
+                .shapes
+                .iter()
+                .any(|s| green_dot(&s.shape))
+        );
     }
 }

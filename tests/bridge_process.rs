@@ -35,6 +35,43 @@ fn native_hook_executable_reports_metadata_without_gui_or_prompt_content() {
     assert_eq!(String::from_utf8_lossy(&result.stdout).trim(), "{}");
     let mut status = ai_terminal::status::Status::default();
     status.apply(&event, false);
-    assert_eq!(status.activity, Activity::Idle);
+    assert_eq!(status.activity, Activity::Completed);
     assert!(status.unread);
+}
+
+#[test]
+fn child_metadata_is_ignored_but_a_named_root_agent_still_reports() {
+    let bridge = Bridge::start(Arc::new(|| {})).unwrap();
+    for child_agent in [true, false] {
+        let mut child = Command::new(env!("CARGO_BIN_EXE_ai-terminal-hook"))
+            .env("AI_TERMINAL_ENDPOINT", &bridge.endpoint)
+            .env("AI_TERMINAL_TOKEN", &bridge.token)
+            .env("AI_TERMINAL_SESSION", "local")
+            .env("AI_TERMINAL_GENERATION", "launch")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .spawn()
+            .unwrap();
+        let payload = serde_json::json!({"hook_event_name":"PreToolUse","session_id":"main","tool_name":"AskUserQuestion","agent_type":"reviewer","agent_id":if child_agent {Some("child-id")}else{None}});
+        child
+            .stdin
+            .take()
+            .unwrap()
+            .write_all(payload.to_string().as_bytes())
+            .unwrap();
+        let result = child.wait_with_output().unwrap();
+        assert!(result.status.success());
+        if child_agent {
+            assert!(bridge.receiver.try_recv().is_err());
+        } else {
+            assert_eq!(
+                bridge
+                    .receiver
+                    .recv_timeout(Duration::from_secs(3))
+                    .unwrap()
+                    .name,
+                "PreToolUse"
+            );
+        }
+    }
 }

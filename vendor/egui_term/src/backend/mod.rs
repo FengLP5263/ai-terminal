@@ -33,6 +33,7 @@ pub type SelectionType = AlacrittySelectionType;
 pub enum BackendCommand {
     Write(Vec<u8>),
     Scroll(i32),
+    MouseWheel(i32, Modifiers, Point),
     Resize(Size, Size, f32),
     SelectStart(SelectionType, f32, f32),
     SelectUpdate(f32, f32),
@@ -281,6 +282,29 @@ impl TerminalBackend {
             BackendCommand::Scroll(delta) => {
                 self.scroll(&mut term, delta);
             }
+            BackendCommand::MouseWheel(delta, modifiers, point) => {
+                if modifiers.ctrl || modifiers.command {
+                    return;
+                }
+                if !modifiers.shift && term.mode().intersects(TermMode::MOUSE_MODE) {
+                    let button = if delta > 0 {
+                        MouseButton::ScrollUp
+                    } else {
+                        MouseButton::ScrollDown
+                    };
+                    for _ in 0..delta.unsigned_abs().min(32) {
+                        self.process_mouse_report(
+                            *term.mode(),
+                            button.clone(),
+                            modifiers,
+                            point,
+                            true,
+                        );
+                    }
+                } else {
+                    self.scroll(&mut term, delta);
+                }
+            }
             BackendCommand::Resize(layout_size, font_size, pixels_per_point) => {
                 self.resize(&mut term, layout_size, font_size, pixels_per_point);
             }
@@ -294,7 +318,7 @@ impl TerminalBackend {
                 self.process_link_action(&term, link_action, point);
             }
             BackendCommand::MouseReport(button, modifiers, point, pressed) => {
-                self.process_mouse_report(button, modifiers, point, pressed);
+                self.process_mouse_report(*term.mode(), button, modifiers, point, pressed);
             }
         };
     }
@@ -418,6 +442,7 @@ impl TerminalBackend {
 
     fn process_mouse_report(
         &self,
+        terminal_mode: TermMode,
         button: MouseButton,
         modifiers: Modifiers,
         point: Point,
@@ -434,7 +459,7 @@ impl TerminalBackend {
             mods += 16;
         }
 
-        match MouseMode::from(self.last_content().terminal_mode) {
+        match MouseMode::from(terminal_mode) {
             MouseMode::Sgr => self.sgr_mouse_report(point, button as u8 + mods, pressed),
             MouseMode::Normal(is_utf8) => {
                 if pressed {

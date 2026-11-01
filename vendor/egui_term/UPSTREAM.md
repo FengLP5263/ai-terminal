@@ -52,3 +52,7 @@ galleys reused across ANSI colors. Application embeds licensed Hack faces.
 0.3.2：为宿主名称／编辑器暴露 TerminalFont::emoji_shape，复用同一引擎与有界图集，以系统 Segoe UI Emoji 完整布局组合序列。UI 图块保留 PBGRA 透明度并按预乘颜色上传；终端的不透明背景保持相同语义。没有额外的字体引擎缓存或后台轮询。
 
 0.3.3：普通滚轮始终调用 Term::scroll_display，不再为 ALTERNATE_SCROLL＋ALT_SCREEN 生成 ESC OA／OB 方向键；保留真实键盘、指针与 Ctrl 缩放处理。宿主的 Codex 入口同时使用公开的 --no-alt-screen 保留正常网格滚动历史。
+
+0.3.6：滚轮改为独立 MouseWheel 命令，在后端当前模式下路由：应用启用 MOUSE_MODE 时发送标准 SGR／传统鼠标滚轮事件，普通终端使用本地历史。Shift 强制本地历史，Ctrl／Command 留给宿主缩放。鼠标位置采用屏幕网格，单事件最多发送 32 次；仍不合成方向键。保留平滑点滚动的余量和有界历史，鼠标协议按实时模式选择。
+
+0.3.7：TerminalView 可由宿主为已识别的编码 CLI 开启 native_image_paste。收到 Paste 时仅查询 Windows 图片格式；图片转发 Alt+V，CLI 自行读取与附加，文本继续使用原有的 bracketed paste 和换行规则。没有像素复制、临时图片、剪贴板写入或后台查询。Codex 宿主已恢复默认全屏 TUI，不再强制 --no-alt-screen。

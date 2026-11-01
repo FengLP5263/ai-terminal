@@ -85,7 +85,7 @@ impl eframe::App for Probe {
             .iter()
             .map(|id| {
                 let (name, agent, activity, unread) = match *id {
-                    "codex" => ("接口联调 👩🏽‍💻", Agent::Codex, Activity::Idle, true),
+                    "codex" => ("接口联调 👩🏽‍💻", Agent::Codex, Activity::Completed, true),
                     "claude" => ("AI 终端 ❤️🚀", Agent::Claude, Activity::Working, false),
                     "cmd" => ("CMD", Agent::Cmd, Activity::Idle, false),
                     "bash" => ("Bash", Agent::Bash, Activity::Idle, false),

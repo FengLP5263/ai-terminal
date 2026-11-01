@@ -20,3 +20,9 @@ hook 协议由 src/status.rs、bridge.rs、launch.rs 维护：事件带本地会
 不存在跨仓库部署顺序；未来若建立服务／仓库关系再补相应契约及独立发布授权。
 
 0.3.0 终端会话只通过本会话的 codex/claude 入口转发真实 CLI，启动／退出与任务状态协议分开。CLI 始终沿用已有认证、模型和信任；未支持的入口不猜测图标或工作状态。
+
+Codex 的会话级 hook 以固定命令读取 AI_TERMINAL_HELPER，不将安装目录写进可信定义。用户／项目 hook 与信任记录不由管理器修改。状态恢复允许前台调用内显式 resume／clear／fork 切换，不以输出文本猜测会话身份。
+
+0.3.6：agent_id 标识的子 Agent hook 不参与根会话状态，agent_type 本身不代表子会话。Claude 全屏的滚动通过其请求的终端鼠标协议传输，不解析绘制文字作为任务状态，不修改用户 renderer 偏好。
+
+0.3.7：Codex 默认 TUI 与独立引擎均保留 CLI 自有逻辑。其 SessionStart 可能延迟到首轮任务；使用真实 CLI＋loopback 模拟 Responses 验证 hook 时，必须明确标识为离线假模型回合，不称为真实模型验收。Codex 与 Claude 的 Windows 图片粘贴交由原生 Alt+V；管理器只查图片格式并传递快捷键，不代理附件或模型请求。

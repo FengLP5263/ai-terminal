@@ -39,3 +39,9 @@ target/、output/、.runtime/、runtime/、.tools/、参考交接文件、数据
 `design/icon-concepts/` 保存 4 份原创 SVG 与离线 HTML 选择页；0.3.4 起已选定 B；正式资产位于 assets/branding，构建时嵌入，不在运行时读取候选页。
 
 制品源码身份包含 build.rs 和 assets/branding；两个 EXE 已含所需图标，不需要另放 ICO／PNG 文件。
+
+
+0.3.7 的 egui-winit 本地补丁固定于 0.35.0，保留原始归档 SHA-256、上游 commit 及 MIT/Apache-2.0 许可证。制品源码身份纳入该补丁的 manifest 和 Rust 源码；许可证由 Cargo metadata 归集。图片粘贴仅转发原生快捷键，图片数据仍归 CLI 管理，不写入 sessions.json。
+
+
+打包从 Cargo metadata 的 target_directory 读取本次 release 二进制，遵循标准 CARGO_TARGET_DIR／build.target-dir。默认构建目录的 EXE 被正在运行的预览占用时，可在当前命令环境设置 CARGO_TARGET_DIR 为另一个忽略的构建目录再执行相同 package 入口；不会覆盖已打开的程序，也不会从旧默认目录误取 EXE。

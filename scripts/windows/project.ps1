@@ -72,8 +72,8 @@ try {
         'governance' {Invoke-ProjectPython -Parameters @('scripts/check-repository.py')}
         'format-check' {Invoke-ProjectDev 'format-check'}
         'check' {Invoke-ProjectDev 'check'}
-        'test' {Invoke-ProjectDev 'test';Invoke-ProjectPython -Parameters @('-m','unittest','discover','-s','tests','-p','test_*.py')}
-        'ci' {Invoke-ProjectPython -Parameters @('scripts/check-repository.py');Invoke-ProjectDev 'check';Invoke-ProjectDev 'test';Invoke-ProjectPython -Parameters @('-m','unittest','discover','-s','tests','-p','test_*.py')}
+        'test' {Invoke-ProjectDev 'test'; & cargo test --offline --locked -p egui-winit --lib paste_tests; if($LASTEXITCODE -ne 0){throw 'egui-winit paste regression failed.'};Invoke-ProjectPython -Parameters @('-m','unittest','discover','-s','tests','-p','test_*.py')}
+        'ci' {Invoke-ProjectPython -Parameters @('scripts/check-repository.py');Invoke-ProjectDev 'check';Invoke-ProjectDev 'test'; & cargo test --offline --locked -p egui-winit --lib paste_tests; if($LASTEXITCODE -ne 0){throw 'egui-winit paste regression failed.'};Invoke-ProjectPython -Parameters @('-m','unittest','discover','-s','tests','-p','test_*.py')}
         'build' {Invoke-ProjectDev 'build'}
         'run' {Invoke-ProjectDev 'run'}
         'release' {Invoke-ProjectDev 'release'}

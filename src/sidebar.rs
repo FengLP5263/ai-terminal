@@ -221,7 +221,9 @@ pub fn show(
                             Stroke::new(1.5, Color32::from_rgb(136, 180, 246)),
                         ));
                         ui.ctx().request_repaint_after(Duration::from_millis(80));
-                    } else if entry.activity == Activity::Waiting || entry.unread {
+                    } else if matches!(entry.activity, Activity::Waiting | Activity::Completed)
+                        || entry.unread
+                    {
                         ui.painter().circle_filled(indicator, 5.5, surface);
                         ui.painter().circle_filled(
                             indicator,

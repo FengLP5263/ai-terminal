@@ -4,7 +4,7 @@
 
 A lightweight Windows-native terminal workspace for managing multiple AI coding agents.
 
-**当前开发版本：0.3.4 · Windows x64 · MIT**
+**当前开发版本：0.3.7 · Windows x64 · MIT**
 
 已发布的预览版及 Windows ZIP 见 [GitHub Releases](https://github.com/FengLP5263/ai-terminal/releases)。
 
@@ -13,7 +13,7 @@ A lightweight Windows-native terminal workspace for managing multiple AI coding 
 ## 核心功能
 
 - **集中管理会话**：新建 PowerShell、CMD 或 Git Bash，在终端中运行你已安装的 CLI，保留各自的认证与权限操作。
-- **会话状态提示**：转圈表示工作中，黄点表示需要处理，绿点表示本轮完成未读；后台会话也会更新。
+- **会话状态提示**：转圈表示工作中，黄点表示需要处理，绿点表示本轮完成，查看后仍保留到下一轮；后台会话也会更新。
 - **整理工作区**：拖动排序、重命名、调整侧栏宽度，或收起为 Agent 头像栏。
 - **整体缩放**：Ctrl＋滚轮或 Ctrl＋加减缩放整个界面，Ctrl＋0 恢复 100%；终端随可用区域重排。普通滚轮滚动终端内容，Codex 以保留滚动历史的内联模式启动。
 - **原生文字显示**：内置 Hack 字体，Windows 原生文字绘制，支持中文、ANSI 颜色与系统彩色表情。
@@ -51,8 +51,9 @@ rustup component add rustfmt clippy
 2. 首次默认使用用户主目录；此后沿用当前会话最近所在目录。终端中正常 `cd` 即可切换，新会话会继承更新后的目录。
 3. 输入 `codex` 或 `claude` 启动已安装的 Agent，列表自动切换对应图标，退出后恢复终端图标；`echo codex` 等普通文本不会触发识别。
 4. 左侧可拖动排序、编辑名称、收起面板或调整宽度；右键会话 →「会话颜色」可选择或恢复颜色，当前会话会更亮。Ctrl＋滚轮缩放整个界面，Ctrl＋0 恢复默认。
-5. 信任、登录和权限仍由 CLI 处理。任务状态沿用生命周期通知；首次 Codex 可能需要在 `/hooks` 中审查状态 hook，未接通时不猜测任务是否正在工作。
-6. 打开窗口默认进入 PowerShell；恢复列表时直接打开上次选中的终端，其他标签单击即可进入。旧版 Codex／Claude 标签保留名称、目录与历史 ID，并通过 PowerShell 打开；需要恢复 AI 对话时，在命令行中使用 CLI 的恢复命令。Bash 当前使用 Windows 本机 Git Bash，WSL 后续再支持。
+5. 信任、登录和权限仍由 CLI 处理。任务状态沿用生命周期通知；点击顶部状态可查看连接说明并复制 `/hooks`；Codex 钩子未启用时，可在 `/hooks` 中审查状态 hook，首次通知前显示「等待任务通知」；Codex 欢迎页通常尚未创建任务，提交首轮任务后才开始回传。0.3.5 起状态命令不再包含安装路径，迁移目录不改变 hook 定义；从旧版升级后仍需审查一次新的定义。
+6. 普通滚轮查看终端历史；Claude 等全屏程序开启鼠标协议时，由程序处理滚轮翻看消息。Shift＋滚轮查看本地历史，Ctrl＋滚轮保持全窗口缩放。
+7. 打开窗口默认进入 PowerShell；恢复列表时直接打开上次选中的终端，其他标签单击即可进入。旧版 Codex／Claude 标签保留名称、目录与历史 ID，并通过 PowerShell 打开；需要恢复 AI 对话时，在命令行中使用 CLI 的恢复命令。Bash 当前使用 Windows 本机 Git Bash，WSL 后续再支持。
 
 ### 已安装 CLI 却提示找不到？
 
@@ -98,3 +99,5 @@ ai-terminal 不保存提示词、对话正文或 API Key；各 CLI 自己的数�
 ## 许可证
 
 项目代码使用 [MIT License](LICENSE)。字体、图标和其他第三方组件保留各自许可证，详见[第三方来源](THIRD_PARTY_NOTICES.md)。
+
+0.3.7 恢复 Codex 原生全屏 TUI（启动 Logo、底部输入框及应用内滚动），并为受管终端使用独立引擎以保留会话级状态环境。识别到 Codex／Claude 后，Ctrl+V 或 Shift+Insert 可将剪贴板图片交给 CLI 原生附件处理；普通文字粘贴、Shell 和会话命名仍按原方式处理。图片不会被管理器保存或发送。
