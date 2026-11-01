@@ -84,6 +84,10 @@ pub fn build(
         ("AI_TERMINAL_TOKEN".into(), bridge.token.clone()),
         ("AI_TERMINAL_SESSION".into(), spec.id.clone()),
         ("AI_TERMINAL_GENERATION".into(), generation.clone()),
+        (
+            "AI_TERMINAL_HELPER".into(),
+            helper.to_string_lossy().into_owned(),
+        ),
     ]);
     environment.insert(
         "PATH".into(),
@@ -143,9 +147,9 @@ pub fn agent_arguments(
             }
         }
         Agent::Codex => {
-            // Keep Codex output in the terminal's normal scrollback grid.
-            arguments.push("--no-alt-screen".into());
-            for setting in codex_hook_overrides(helper) {
+            // Keep this managed terminal's engine, environment and tasks in its own job.
+            arguments.push("--no-daemon".into());
+            for setting in codex_hook_overrides() {
                 arguments.extend(["-c".into(), setting]);
             }
             if let Some(id) = &spec.agent_session_id {
@@ -157,13 +161,12 @@ pub fn agent_arguments(
     Ok(arguments)
 }
 
-pub fn codex_hook_overrides(helper: &Path) -> Vec<String> {
-    let shell_command = format!(
-        "& '{}' --hook",
-        helper.to_string_lossy().replace('\'', "''")
-    );
-    let command = serde_json::to_string(&shell_command).expect("valid string");
-    ["SessionStart","UserPromptSubmit","PreToolUse","PermissionRequest","PostToolUse","Stop","Interrupt","SessionEnd"].into_iter().map(|event|format!("hooks.{event}=[{{hooks=[{{type=\"command\",command={command},command_windows={command},timeout=2}}]}}]")).collect()
+pub fn codex_hook_overrides() -> Vec<String> {
+    // Stable definition across install/preview paths; trust is reviewed by Codex.
+    // The actual executable is supplied only in this managed session's environment.
+    let shell_command = "& $env:AI_TERMINAL_HELPER --hook";
+    let command = serde_json::to_string(shell_command).expect("valid string");
+    ["SessionStart","UserPromptSubmit","PreToolUse","PermissionRequest","PostToolUse","Stop","Interrupt","SessionEnd"].into_iter().map(|event|format!("hooks.{event}=[{{hooks=[{{type=\"command\",command={command},command_windows={command},timeout=5}}]}}]")).collect()
 }
 
 /// Called at process entry, before our GUI or session threads exist. This is
@@ -187,9 +190,9 @@ mod tests {
     use super::*;
     use std::sync::Arc;
     #[test]
-    fn hook_config_quotes_paths_and_never_auto_trusts() {
-        let args = codex_hook_overrides(Path::new("C:/测试/it's a folder/ai-terminal.exe"));
-        assert!(args.iter().all(|s| s.contains("it''s a folder")));
+    fn hook_config_has_stable_identity_and_never_auto_trusts() {
+        let args = codex_hook_overrides();
+        assert!(args.iter().all(|s| s.contains("$env:AI_TERMINAL_HELPER")));
         assert!(
             !args
                 .iter()

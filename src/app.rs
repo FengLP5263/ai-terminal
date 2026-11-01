@@ -474,9 +474,10 @@ impl App {
                 hint: format!(
                     "{}{}",
                     match s.status.activity {
-                        Activity::Working => "正在工作",
+                        Activity::Working => "进行中",
+                        Activity::Completed => "已完成",
                         Activity::Waiting => "需要你处理",
-                        Activity::Unknown if s.backend.is_some() => "状态未连接",
+                        Activity::Unknown if s.backend.is_some() => "等待任务通知",
                         _ if s.status.unread => "本轮完成",
                         _ => "",
                     },
@@ -607,16 +608,11 @@ impl App {
                                 )
                                 .on_hover_text("Ctrl＋滚轮缩放整个界面 · 点击恢复 100%")
                                 .clicked();
-                            if session.status.activity == Activity::Unknown
-                                && session.backend.is_some()
-                                && !session.display_agent().is_shell()
-                            {
-                                ui.label(RichText::new("○").color(MUTED)).on_hover_text(
-                                    if session.display_agent() == Agent::Codex {
-                                        "状态未连接 · 请在 /hooks 中检查并启用状态钩子"
-                                    } else {
-                                        "状态未连接 · 等待 Agent 的会话事件"
-                                    },
+                            if session.backend.is_some() && !session.display_agent().is_shell() {
+                                ai_terminal::connection_ui::show(
+                                    ui,
+                                    session.display_agent(),
+                                    &session.status,
                                 );
                             }
                             ui.add(
@@ -640,8 +636,10 @@ impl App {
                 if let Some(error) = &session.error {
                     ui.colored_label(YELLOW, error);
                 }
+                let native_image_paste = !session.display_agent().is_shell();
                 if let Some(backend) = &mut session.backend {
                     let view = TerminalView::new(ui, backend)
+                        .set_native_image_paste(native_image_paste)
                         .set_theme(self.theme.clone())
                         .set_font(self.font.clone())
                         .set_focus(focus)
@@ -907,6 +905,7 @@ impl App {
             let sessions:Vec<_>=self.sessions.iter_mut().map(|s|serde_json::json!({"name":s.spec.name,"activity":format!("{:?}",s.status.activity),"unread":s.status.unread,"pty_pid":s.backend.as_ref().map(|b|b.pty_id()),"terminal_text":s.backend.as_mut().map(|b|b.plain_text())})).collect();
             let pass = self.sessions.len() == 3
                 && self.sessions[0].status.unread
+                && self.sessions[0].status.activity == Activity::Completed
                 && self.sessions[1].status.activity == Activity::Waiting
                 && self.sessions[2].status.activity == Activity::Working
                 && self.sessions.iter().all(|s| s.backend.is_some());
@@ -1061,7 +1060,7 @@ mod tests {
         app.background_tick(&ctx);
         let _ = ctx.end_pass();
         assert_eq!(app.frames, 0, "status must not depend on a paint");
-        assert_eq!(app.sessions[0].status.activity, Activity::Idle);
+        assert_eq!(app.sessions[0].status.activity, Activity::Completed);
         assert!(app.sessions[0].status.unread);
         assert!(!app.can_draw);
     }
@@ -1332,6 +1331,34 @@ mod tests {
             session.spec.name, "my terminal",
             "automatic icons must not overwrite user names"
         );
+    }
+    #[test]
+    fn shell_status_follows_in_process_resume_and_keeps_completion_after_selection() {
+        let root = tempfile::tempdir().unwrap();
+        let mut session = Session::new(SessionSpec {
+            id: "shell".into(),
+            name: "terminal".into(),
+            directory: root.path().into(),
+            agent: Agent::Shell,
+            agent_session_id: None,
+            color: None,
+        });
+        assert!(session.event(&shell_metadata("ShellAgentStarted", "run", "claude"), true));
+        let mut e = shell_metadata("SessionStart", "run", "startup");
+        e.session_id = "initial".into();
+        assert!(session.event(&e, true));
+        e.source = Some("resume".into());
+        e.session_id = "restored".into();
+        assert!(session.event(&e, true));
+        e.name = "UserPromptSubmit".into();
+        assert!(session.event(&e, true));
+        assert_eq!(session.status.activity, Activity::Working);
+        e.name = "Stop".into();
+        assert!(session.event(&e, true));
+        session.status.acknowledge();
+        assert_eq!(session.status.activity, Activity::Completed);
+        assert!(!session.status.unread);
+        assert_eq!(session.display_agent(), Agent::Claude);
     }
     #[test]
     fn new_terminals_use_active_cwd_and_keep_existing_agent_sessions() {

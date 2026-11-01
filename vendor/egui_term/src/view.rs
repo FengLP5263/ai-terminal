@@ -44,6 +44,7 @@ pub struct TerminalView<'a> {
     widget_id: Id,
     has_focus: bool,
     focus_requested: bool,
+    native_image_paste: bool,
     size: Vec2,
     backend: &'a mut TerminalBackend,
     font: TerminalFont,
@@ -83,6 +84,7 @@ impl<'a> TerminalView<'a> {
             widget_id,
             has_focus: false,
             focus_requested: false,
+            native_image_paste: false,
             size: ui.available_size(),
             backend,
             font: TerminalFont::default(),
@@ -111,6 +113,14 @@ impl<'a> TerminalView<'a> {
     #[inline]
     pub fn set_focus(mut self, has_focus: bool) -> Self {
         self.has_focus = has_focus;
+        self
+    }
+
+    /// Let Windows coding CLIs read clipboard images after a native Ctrl+V key.
+    /// The host keeps text paste for other terminals and UI editors.
+    #[inline]
+    pub fn set_native_image_paste(mut self, enabled: bool) -> Self {
+        self.native_image_paste = enabled;
         self
     }
 
@@ -211,15 +221,22 @@ impl<'a> TerminalView<'a> {
                     self.backend,
                     &self.bindings_layout,
                     modifiers,
+                    self.native_image_paste,
                 )),
-                egui::Event::MouseWheel { unit, delta, .. } if layout.contains_pointer() => {
-                    input_actions.push(process_mouse_wheel(
-                        state,
-                        self.font.font_type().size,
-                        unit,
-                        delta,
-                    ))
-                }
+                egui::Event::MouseWheel {
+                    unit,
+                    delta,
+                    modifiers: wheel_modifiers,
+                    ..
+                } if layout.contains_pointer() => input_actions.push(process_mouse_wheel(
+                    state,
+                    self.font.font_type().size,
+                    unit,
+                    delta,
+                    layout,
+                    self.backend,
+                    wheel_modifiers,
+                )),
                 egui::Event::PointerButton {
                     button,
                     pressed,
@@ -571,20 +588,19 @@ fn process_keyboard_event(
     backend: &TerminalBackend,
     bindings_layout: &BindingsLayout,
     modifiers: Modifiers,
+    native_image_paste: bool,
 ) -> InputAction {
     match event {
         egui::Event::Text(text) => process_text_event(&text, modifiers),
         egui::Event::Paste(text) => {
-            let text = if backend
+            let bracketed = backend
                 .last_content()
                 .terminal_mode
-                .contains(TermMode::BRACKETED_PASTE)
-            {
-                format!("\x1b[200~{}\x1b[201~", text.replace('\x1b', ""))
-            } else {
-                text.replace("\r\n", "\r").replace('\n', "\r")
-            };
-            InputAction::BackendCall(BackendCommand::Write(text.into_bytes()))
+                .contains(TermMode::BRACKETED_PASTE);
+            let image = native_image_paste && crate::paste::has_image();
+            InputAction::BackendCall(BackendCommand::Write(crate::paste::bytes(
+                &text, bracketed, image,
+            )))
         }
         egui::Event::Copy => {
             #[cfg(not(any(target_os = "ios", target_os = "macos")))]
@@ -658,24 +674,38 @@ fn process_mouse_wheel(
     font_size: f32,
     unit: MouseWheelUnit,
     delta: Vec2,
+    layout: &Response,
+    backend: &TerminalBackend,
+    modifiers: Modifiers,
 ) -> InputAction {
-    match unit {
-        MouseWheelUnit::Line => {
-            let lines = delta.y.signum() * delta.y.abs().ceil();
-            InputAction::BackendCall(BackendCommand::Scroll(lines as i32))
-        }
+    if modifiers.ctrl || modifiers.command {
+        return InputAction::Ignore;
+    }
+    let lines = match unit {
+        MouseWheelUnit::Line => delta.y.signum() * delta.y.abs().ceil(),
         MouseWheelUnit::Point => {
-            state.scroll_pixels -= delta.y;
+            state.scroll_pixels += delta.y;
             let lines = (state.scroll_pixels / font_size).trunc();
             state.scroll_pixels %= font_size;
-            if lines != 0.0 {
-                InputAction::BackendCall(BackendCommand::Scroll(-lines as i32))
-            } else {
-                InputAction::Ignore
-            }
+            lines
         }
-        MouseWheelUnit::Page => InputAction::Ignore,
+        MouseWheelUnit::Page => 0.0,
+    } as i32;
+    if lines == 0 {
+        return InputAction::Ignore;
     }
+    // Mouse protocols use screen coordinates, even when local scrollback is visible.
+    let position = layout
+        .ctx
+        .pointer_hover_pos()
+        .unwrap_or(layout.rect.center());
+    let point = TerminalBackend::selection_point(
+        position.x - layout.rect.min.x,
+        position.y - layout.rect.min.y,
+        &backend.last_content().terminal_size,
+        0,
+    );
+    InputAction::BackendCall(BackendCommand::MouseWheel(lines, modifiers, point))
 }
 
 // Keep the upstream input-handler interface intact.

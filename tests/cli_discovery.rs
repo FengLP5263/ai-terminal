@@ -37,9 +37,12 @@ fn custom_cmd_entry_preserves_complex_hook_args_and_the_child_exit_code() {
         .find(Agent::Codex)
         .expect("public cmd entry without any npm private layout");
     let helper = Path::new(env!("CARGO_BIN_EXE_ai-terminal-hook"));
-    let mut args =
-        launch::codex_hook_overrides(&script.with_file_name("it's %CLI_TEST_VAR% & hook.exe"));
+    let mut args = launch::codex_hook_overrides();
     args.extend([
+        script
+            .with_file_name("it's %CLI_TEST_VAR% & hook.exe")
+            .to_string_lossy()
+            .into_owned(),
         "空格 argument".into(),
         "literal %CLI_TEST_VAR% !CLI_TEST_VAR! & ^ < > |".into(),
         "a\"quoted\"value".into(),
@@ -130,4 +133,43 @@ fn cmd_entry_has_interactive_conpty_handles_and_stays_in_the_owned_process_tree(
             CloseHandle(process);
         }
     }
+}
+
+#[test]
+fn launching_from_another_managed_shell_resolves_the_real_cli_not_its_old_shim() {
+    const CHILD: &str = "AI_TERMINAL_DISCOVERY_CHILD";
+    if let Some(expected) = std::env::var_os(CHILD) {
+        let search = CliSearch::current();
+        assert_eq!(search.find(Agent::Codex), Some(PathBuf::from(expected)));
+        let old = PathBuf::from(std::env::var_os("AI_TERMINAL_SHIM_DIR").unwrap());
+        assert!(!std::env::split_paths(&search.child_path().unwrap()).any(|p| p == old));
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let old = dir.path().join("old shim");
+    let real = dir.path().join("real cli");
+    for p in [&old, &real] {
+        std::fs::create_dir(p).unwrap();
+        std::fs::write(p.join("codex.exe"), b"fixture").unwrap();
+    }
+    let mut paths = vec![old.clone(), real.clone()];
+    paths.extend(std::env::split_paths(
+        &std::env::var_os("PATH").unwrap_or_default(),
+    ));
+    let output = Command::new(std::env::current_exe().unwrap())
+        .args([
+            "--exact",
+            "launching_from_another_managed_shell_resolves_the_real_cli_not_its_old_shim",
+        ])
+        .env(CHILD, real.join("codex.exe"))
+        .env("AI_TERMINAL_SHIM_DIR", old)
+        .env("PATH", std::env::join_paths(paths).unwrap())
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{} {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
 }

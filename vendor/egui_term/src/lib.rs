@@ -3,6 +3,7 @@ mod bindings;
 mod font;
 #[cfg(windows)]
 mod native_text;
+mod paste;
 mod theme;
 mod types;
 mod view;

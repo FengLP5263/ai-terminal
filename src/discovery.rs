@@ -22,7 +22,12 @@ impl CliSearch {
             directories.extend(std::env::split_paths(&path));
         }
         directories.extend(common_directories(|name| std::env::var_os(name)));
-        Self::from_directories(directories)
+        let search = Self::from_directories(directories);
+        if let Some(inherited) = std::env::var_os("AI_TERMINAL_SHIM_DIR") {
+            search.excluding(&PathBuf::from(inherited))
+        } else {
+            search
+        }
     }
 
     pub fn excluding(mut self, directory: &std::path::Path) -> Self {

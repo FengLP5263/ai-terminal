@@ -318,3 +318,147 @@ fn alternate_screen_wheel_never_injects_up_or_down_arrow_sequences() {
     backend.process_command(egui_term::BackendCommand::Write(b"z".to_vec()));
     wait_text(&mut backend, "FIRST_INPUT_122");
 }
+
+fn mouse_terminal(ctx: &egui::Context, mode: &str) -> TerminalBackend {
+    static FIXTURE: std::sync::OnceLock<(tempfile::TempDir, std::path::PathBuf)> =
+        std::sync::OnceLock::new();
+    let binary = &FIXTURE
+        .get_or_init(|| {
+            let dir = tempfile::tempdir().unwrap();
+            let exe = dir.path().join("mouse-console.exe");
+            let result = std::process::Command::new("rustc")
+                .args(["--edition=2024", "--crate-name", "mouse_console"])
+                .arg(
+                    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                        .join("tests/fixtures/mouse_console.rs"),
+                )
+                .arg("-o")
+                .arg(&exe)
+                .output()
+                .unwrap();
+            assert!(
+                result.status.success(),
+                "{}",
+                String::from_utf8_lossy(&result.stderr)
+            );
+            (dir, exe)
+        })
+        .1;
+    let (tx, _) = mpsc::channel();
+    TerminalBackend::new(
+        735,
+        ctx.clone(),
+        tx,
+        BackendSettings {
+            shell: binary.to_string_lossy().into_owned(),
+            args: vec![mode.into()],
+            ..Default::default()
+        },
+    )
+    .unwrap()
+}
+#[test]
+fn application_mouse_tracking_receives_real_wheel_reports_in_both_directions() {
+    for mode in ["sgr", "legacy"] {
+        let ctx = egui::Context::default();
+        let mut backend = mouse_terminal(&ctx, mode);
+        frame(&ctx, &mut backend, vec![], false);
+        wait_text(&mut backend, "APP_WHEEL_READY");
+        for (i, delta) in [1.0, -1.0].into_iter().enumerate() {
+            frame(
+                &ctx,
+                &mut backend,
+                vec![
+                    Event::PointerMoved(egui::pos2(80.0, 140.0)),
+                    Event::MouseWheel {
+                        unit: egui::MouseWheelUnit::Line,
+                        delta: egui::vec2(0.0, delta),
+                        modifiers: Modifiers::NONE,
+                        phase: egui::TouchPhase::Move,
+                    },
+                ],
+                false,
+            );
+            let button = if i == 0 { "34" } else { "35" };
+            let prefix = if mode == "sgr" {
+                format!("REPORT_{i}_1B-5B-3C-36-{button}-3B")
+            } else {
+                format!("REPORT_{i}_1B-5B-4D-{}", if i == 0 { "60" } else { "61" })
+            };
+            wait_text(&mut backend, &prefix);
+        }
+    }
+}
+#[test]
+fn fullscreen_conversation_changes_page_on_point_wheel_without_local_history() {
+    let ctx = egui::Context::default();
+    let mut backend = mouse_terminal(&ctx, "pager");
+    frame(&ctx, &mut backend, vec![], false);
+    wait_text(&mut backend, "history offset 100");
+    frame(
+        &ctx,
+        &mut backend,
+        vec![
+            Event::PointerMoved(egui::pos2(80.0, 140.0)),
+            Event::MouseWheel {
+                unit: egui::MouseWheelUnit::Point,
+                delta: egui::vec2(0.0, 22.0),
+                modifiers: Modifiers::NONE,
+                phase: egui::TouchPhase::Move,
+            },
+        ],
+        false,
+    );
+    wait_text(&mut backend, "history offset 95");
+    assert_eq!(backend.sync().display_offset, 0);
+    frame(
+        &ctx,
+        &mut backend,
+        vec![Event::MouseWheel {
+            unit: egui::MouseWheelUnit::Point,
+            delta: egui::vec2(0.0, -22.0),
+            modifiers: Modifiers::NONE,
+            phase: egui::TouchPhase::Move,
+        }],
+        false,
+    );
+    wait_text(&mut backend, "history offset 100");
+}
+#[test]
+fn shift_wheel_uses_local_history_and_ctrl_wheel_sends_no_application_input() {
+    let ctx = egui::Context::default();
+    let mut backend = terminal(
+        &ctx,
+        "1..180 | ForEach-Object { [Console]::WriteLine(('LOCAL-'+$_)) }; $e=[char]27; [Console]::Write($e+'[?1000h'+$e+'[?1006h'+'OVERRIDE_READY'); $c=[Console]::ReadKey($true); [Console]::WriteLine(('FIRST_INPUT_'+[int]$c.KeyChar)); Start-Sleep -Seconds 20",
+    );
+    frame(&ctx, &mut backend, vec![], false);
+    wait_text(&mut backend, "OVERRIDE_READY");
+    frame(
+        &ctx,
+        &mut backend,
+        vec![
+            Event::PointerMoved(egui::pos2(80.0, 140.0)),
+            Event::MouseWheel {
+                unit: egui::MouseWheelUnit::Line,
+                delta: egui::vec2(0.0, 8.0),
+                modifiers: Modifiers::SHIFT,
+                phase: egui::TouchPhase::Move,
+            },
+        ],
+        false,
+    );
+    assert!(backend.sync().display_offset > 0);
+    frame(
+        &ctx,
+        &mut backend,
+        vec![Event::MouseWheel {
+            unit: egui::MouseWheelUnit::Line,
+            delta: egui::vec2(0.0, 1.0),
+            modifiers: Modifiers::CTRL,
+            phase: egui::TouchPhase::Move,
+        }],
+        false,
+    );
+    backend.process_command(egui_term::BackendCommand::Write(b"z".to_vec()));
+    wait_text(&mut backend, "FIRST_INPUT_122");
+}

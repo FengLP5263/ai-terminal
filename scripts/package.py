@@ -97,12 +97,14 @@ def build(allow_dirty=False):
     version=tomllib.loads((ROOT/'Cargo.toml').read_text(encoding='utf-8'))['package']['version']
     label=f"ai-terminal-v{version}-windows-x64-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}-{uuid.uuid4().hex[:6]}"
     folder=ROOT/'output/packages'/label;folder.mkdir(parents=True,exist_ok=False)
-    for name in ['ai-terminal.exe','ai-terminal-hook.exe']:shutil.copy2(ROOT/'target/release'/name,folder/name)
+    # Cargo metadata is authoritative, including CARGO_TARGET_DIR / build.target-dir.
+    target=Path(json.loads(command(cargo+['metadata','--no-deps','--locked','--offline','--format-version','1']).stdout)['target_directory'])/'release'
+    for name in ['ai-terminal.exe','ai-terminal-hook.exe']:shutil.copy2(target/name,folder/name)
     for source,destination in [('LICENSE','LICENSE.txt'),('vendor/egui_term/LICENSE','egui-term-LICENSE.txt'),('assets/fonts/LICENSE.md','Hack-LICENSE.txt'),('assets/icons/LICENSE-lobe-icons','Lobe-Icons-LICENSE.txt'),('THIRD_PARTY_NOTICES.md','THIRD_PARTY_NOTICES.md')]:shutil.copy2(ROOT/source,folder/destination)
-    (folder/'README.txt').write_text('ai-terminal '+version+'\n\n两个 exe 请放在同一目录。双击 ai-terminal.exe 默认进入 PowerShell；左上角＋可新建 PowerShell、CMD 或 Bash，在终端中输入 codex 或 claude。\n会话数据在 %LOCALAPPDATA%/ai-terminal；退出会回收本程序拥有的会话进程。\nCodex 首次在 /hooks 中审查状态 hook。版本与源码身份见 manifest.json；发行说明与更新见 GitHub 的 FengLP5263/ai-terminal 仓库。\n',encoding='utf-8')
+    (folder/'README.txt').write_text('ai-terminal '+version+'\n\n两个 exe 请放在同一目录。双击 ai-terminal.exe 默认进入 PowerShell；左上角＋可新建 PowerShell、CMD 或 Bash，在终端中输入 codex 或 claude。\n会话数据在 %LOCALAPPDATA%/ai-terminal；退出会回收本程序拥有的会话进程。\nCodex 欢迎页显示等待任务通知；首轮任务后仍无通知时，可在 /hooks 检查状态 hook，只有未启用时需要审查。版本与源码身份见 manifest.json；发行说明与更新见 GitHub 的 FengLP5263/ai-terminal 仓库。\n',encoding='utf-8')
     dependencies(cargo,folder)
     source_hash=hashlib.sha256()
-    inputs=[ROOT/'build.rs',ROOT/'Cargo.toml',ROOT/'Cargo.lock',ROOT/'vendor/egui_term/Cargo.toml']+list((ROOT/'src').rglob('*.rs'))+list((ROOT/'vendor/egui_term/src').rglob('*.rs'))+list((ROOT/'assets/fonts').iterdir())+list((ROOT/'assets/icons').iterdir())+list((ROOT/'assets/branding').iterdir())
+    inputs=[ROOT/'build.rs',ROOT/'Cargo.toml',ROOT/'Cargo.lock',ROOT/'vendor/egui_term/Cargo.toml',ROOT/'vendor/egui-winit/Cargo.toml']+list((ROOT/'src').rglob('*.rs'))+list((ROOT/'vendor/egui_term/src').rglob('*.rs'))+list((ROOT/'vendor/egui-winit/src').rglob('*.rs'))+list((ROOT/'assets/fonts').iterdir())+list((ROOT/'assets/icons').iterdir())+list((ROOT/'assets/branding').iterdir())
     for item in sorted(inputs,key=lambda p:p.relative_to(ROOT).as_posix()):
         source_hash.update(item.relative_to(ROOT).as_posix().encode());source_hash.update(b'\0');source_hash.update(item.read_bytes());source_hash.update(b'\0')
     head=command(['git','rev-parse','--verify','HEAD'],check=False)

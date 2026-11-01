@@ -5,6 +5,7 @@ pub enum Activity {
     #[default]
     Unknown,
     Idle,
+    Completed,
     Working,
     Waiting,
     Exited,
@@ -46,14 +47,17 @@ impl Status {
         if event.session_id.is_empty() {
             return false;
         }
-        // /clear creates a new main conversation. Child agents may inherit env.
+        // In-process /resume, /clear and /fork switch the foreground conversation.
+        // A nested agent's startup must still not steal the parent session.
+        let conversation_switch = event.name == "SessionStart"
+            && matches!(event.source.as_deref(), Some("resume" | "clear" | "fork"));
         if let Some(id) = &self.session_id
             && id != &event.session_id
-            && (event.name != "SessionStart" || event.source.as_deref() != Some("clear"))
+            && !conversation_switch
         {
             return false;
         }
-        if event.name != "UserPromptSubmit"
+        if !matches!(event.name.as_str(), "SessionStart" | "UserPromptSubmit")
             && event.turn_id.is_some()
             && self.turn_id.is_some()
             && event.turn_id != self.turn_id
@@ -68,6 +72,7 @@ impl Status {
                     self.activity = Activity::Idle;
                     self.turn_id = None;
                     self.waiting_tool = None;
+                    self.unread = false;
                 }
             }
             "UserPromptSubmit" => {
@@ -111,7 +116,7 @@ impl Status {
             "Stop" => {
                 // A dev server left running is not an actively processing agent turn.
                 // Autonomous wakeups report a new UserPromptSubmit when work resumes.
-                self.activity = Activity::Idle;
+                self.activity = Activity::Completed;
                 self.unread = !viewing;
                 self.waiting_tool = None;
             }
@@ -160,8 +165,20 @@ mod tests {
         let mut s = Status::default();
         s.apply(&event("UserPromptSubmit", "1"), false);
         s.apply(&event("Stop", "1"), false);
-        assert_eq!(s.activity, Activity::Idle);
+        assert_eq!(s.activity, Activity::Completed);
         assert!(s.unread);
+    }
+    #[test]
+    fn completion_stays_visible_when_viewed_and_clears_on_the_next_prompt() {
+        let mut s = Status::default();
+        s.apply(&event("UserPromptSubmit", "1"), true);
+        s.apply(&event("Stop", "1"), true);
+        assert_eq!(s.activity, Activity::Completed);
+        assert!(!s.unread);
+        s.acknowledge();
+        assert_eq!(s.activity, Activity::Completed);
+        s.apply(&event("UserPromptSubmit", "2"), true);
+        assert_eq!(s.activity, Activity::Working);
     }
     #[test]
     fn viewing_only_acknowledges_unread_not_execution() {
@@ -206,7 +223,7 @@ mod tests {
         let mut stop = event("Stop", "1");
         stop.background_running = true;
         s.apply(&stop, false);
-        assert_eq!(s.activity, Activity::Idle);
+        assert_eq!(s.activity, Activity::Completed);
         assert!(s.unread);
     }
     #[test]
@@ -217,6 +234,40 @@ mod tests {
         compact.source = Some("compact".into());
         s.apply(&compact, false);
         assert_eq!(s.activity, Activity::Working);
+    }
+    #[test]
+    fn resuming_a_conversation_reconnects_status_and_rejects_previous_turns() {
+        for source in ["resume", "clear", "fork"] {
+            let mut s = Status::default();
+            assert!(s.apply(&event("UserPromptSubmit", "old-turn"), false));
+            let mut start = event("SessionStart", "new-turn");
+            start.session_id = "resumed-main".into();
+            start.source = Some(source.into());
+            assert!(
+                s.apply(&start, true),
+                "{source} must change the foreground conversation"
+            );
+            let mut prompt = event("UserPromptSubmit", "new-turn");
+            prompt.session_id = start.session_id.clone();
+            assert!(s.apply(&prompt, true));
+            assert_eq!(s.activity, Activity::Working);
+            assert!(!s.apply(&event("Stop", "old-turn"), false));
+            assert_eq!(s.activity, Activity::Working);
+            prompt.name = "Stop".into();
+            assert!(s.apply(&prompt, false));
+            assert!(s.unread);
+        }
+    }
+    #[test]
+    fn a_child_start_cannot_replace_the_foreground_conversation() {
+        let mut s = Status::default();
+        s.apply(&event("UserPromptSubmit", "main-turn"), false);
+        let mut child = event("SessionStart", "child-turn");
+        child.source = Some("startup".into());
+        child.session_id = "child".into();
+        assert!(!s.apply(&child, false));
+        assert_eq!(s.activity, Activity::Working);
+        assert_eq!(s.session_id.as_deref(), Some("main"));
     }
     #[test]
     fn unrelated_notification_does_not_set_waiting() {

@@ -71,3 +71,24 @@ Claude 状态配置在同一终端启动代次内复用，仅内容变化时写�
 普通滚轮只滚动本地终端显示，不再因 ALTERNATE_SCROLL 与 ALT_SCREEN 合成上下方向键。Codex 的受管入口附加其公开参数 --no-alt-screen，以内联模式保留正常终端滚动历史；无需改用户 Codex 配置。已运行的旧 Codex 需自行退出并重新启动才使用新模式。键盘方向键、状态 hook 和 Ctrl＋滚轮整体缩放维持原行为。其他全屏程序若不提供滚动历史，本地滚轮不虚构历史内容。
 
 0.3.4 起窗口使用内嵌 256×256 RGBA B「会话叠窗」图标，EXE 包含 16–256 像素的 10 档 ICO 资源。图标无运行时外部文件依赖；hook helper 不链接 GUI 图标资源。
+
+## 0.3.5 状态恢复
+
+生命周期 Stop 对应 Completed，与未读分开；已读／当前会话仍显示绿点与「已完成」，下一轮 UserPromptSubmit 恢复 Working。Idle 表示会话就绪，不表示本轮完成。
+同一 Agent 调用内的 SessionStart（source 为 resume／clear／fork）可以更新主会话 ID 并清除旧回合；迟到的其他会话事件与子会话 startup 仍被过滤。compact 保持正在工作的状态。
+Codex 状态命令固定为 `& $env:AI_TERMINAL_HELPER --hook`，helper 路径从本次子进程环境读取。安装位置、预览目录和版本号不进入 hook 定义；没有写入 hooks.state，也不绕过 CLI 审查。旧版升级需由用户在 /hooks 审查新的定义；未连接时标题栏明确标识。
+
+## 0.3.6 状态接入与全屏滚轮
+
+顶部状态可点击查看 Agent 连接说明和复制 /hooks，不替用户输入、执行或信任命令。已识别 Agent 与已收到生命周期通知分别说明；状态仍只由任务事件驱动。
+从另一个受管终端启动管理器时，CLI 发现及子 PATH 会排除继承的 AI_TERMINAL_SHIM_DIR，避免把旧会话的 helper 当作真实 Agent。helper 忽略带非空 agent_id 的子 Agent 事件；单独 agent_type（根会话 --agent）仍保留。
+滚轮在应用明确开启 MOUSE_MODE 时使用真实鼠标滚轮协议，由 Claude 全屏界面等自行翻页；其余情况滚动本地历史。Shift 强制本地历史，Ctrl／Command 仍交给宿主整体缩放，不再模拟上下方向键。无需更改 Claude 用户配置或强制退出全屏。
+
+
+## 0.3.7 原生 Codex 与图片粘贴
+
+移除受管入口强制附加的 --no-alt-screen，让 Codex 保留默认全屏 TUI、启动 Logo、底部输入框和应用内部滚动。使用 --no-daemon 将引擎和其会话环境留在自身 Job 内，不操作用户已有的共享 daemon。当前在 Codex CLI 0.164.0 验证；用户主动传入的 CLI 参数仍由 CLI 解释。
+
+Codex 欢迎页通常到首次提交才产生 SessionStart。此前显示「等待任务通知」，不以进程存在伪造就绪、进行中或完成。只有任务后仍无通知时才建议检查 /hooks；已 Active 的 hook 无需反复授权。状态命令定义保持不变。
+
+Windows 的 egui-winit 补丁保留无文本剪贴板的 Paste 事件。只在已识别的 Codex／Claude 终端收到粘贴时查询图片格式元数据，存在图片时传递其共同支持的 Alt+V，由 CLI 读取与附加。Ctrl+V／Shift+Insert 是宿主入口，Alt+V 本身也继续按键盘协议传输。不读取像素、不生成图片文件、不轮询剪贴板；文字、Shell 与 UI 文本框不走图片快捷键。图片识别与编码错误仍由 CLI 显示。
