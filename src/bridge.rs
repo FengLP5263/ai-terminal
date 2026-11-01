@@ -146,6 +146,8 @@ pub fn report_hook() {
                 .map(|s| s.chars().take(200).collect::<String>())
         };
         let event = HookEvent {
+            invocation: std::env::var("AI_TERMINAL_INVOCATION").ok(),
+            process_id: None,
             event_id: uuid::Uuid::new_v4().to_string(),
             local_id,
             generation,
@@ -185,6 +187,8 @@ mod tests {
     use super::*;
     fn fixture() -> HookEvent {
         HookEvent {
+            invocation: None,
+            process_id: None,
             event_id: "id".into(),
             local_id: "one".into(),
             generation: "launch".into(),

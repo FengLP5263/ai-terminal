@@ -25,6 +25,12 @@ impl CliSearch {
         Self::from_directories(directories)
     }
 
+    pub fn excluding(mut self, directory: &std::path::Path) -> Self {
+        self.directories
+            .retain(|p| !p.as_os_str().eq_ignore_ascii_case(directory.as_os_str()));
+        self
+    }
+
     pub fn from_directories(directories: impl IntoIterator<Item = PathBuf>) -> Self {
         let mut seen = HashSet::new();
         let directories = directories
@@ -42,11 +48,27 @@ impl CliSearch {
             Agent::Codex => "codex",
             Agent::Claude => "claude",
             Agent::Shell => "powershell",
+            Agent::Cmd => "cmd",
+            Agent::Bash => "bash",
         };
         for directory in &self.directories {
             for extension in ["exe", "cmd", "bat"] {
                 let candidate = directory.join(format!("{stem}.{extension}"));
-                if candidate.is_file() {
+                let normalized = candidate
+                    .to_string_lossy()
+                    .replace('\\', "/")
+                    .to_ascii_lowercase();
+                let wsl_alias = agent == Agent::Bash
+                    && (std::env::var_os("SystemRoot").is_some_and(|root| {
+                        normalized.starts_with(&format!(
+                            "{}/system32/",
+                            PathBuf::from(root)
+                                .to_string_lossy()
+                                .replace('\\', "/")
+                                .to_ascii_lowercase()
+                        ))
+                    }) || normalized.contains("/microsoft/windowsapps/"));
+                if candidate.is_file() && !wsl_alias {
                     return Some(candidate);
                 }
             }
@@ -75,6 +97,9 @@ fn common_directories(mut env: impl FnMut(&str) -> Option<OsString>) -> Vec<Path
         ("USERPROFILE", ".volta/bin"),
         ("USERPROFILE", "scoop/shims"),
         ("ProgramFiles", "nodejs"),
+        ("ProgramFiles", "Git/bin"),
+        ("LOCALAPPDATA", "Programs/Git/bin"),
+        ("SystemRoot", "System32"),
         ("SystemRoot", "System32/WindowsPowerShell/v1.0"),
     ] {
         if let Some(root) = env(name).filter(|value| !value.is_empty()) {

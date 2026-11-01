@@ -15,7 +15,7 @@ import subprocess
 import sys
 
 ROOT=Path(__file__).resolve().parent.parent
-REQUIRED=['AGENTS.md','CLAUDE.md','README.md','Cargo.toml','Cargo.lock','rust-toolchain.toml','.gitignore','.gitattributes','THIRD_PARTY_NOTICES.md','scripts/README.md','scripts/windows/project.ps1','scripts/posix/project.sh','scripts/package.py']
+REQUIRED=['AGENTS.md','CLAUDE.md','README.md','Cargo.toml','Cargo.lock','build.rs','rust-toolchain.toml','.gitignore','.gitattributes','THIRD_PARTY_NOTICES.md','scripts/README.md','scripts/windows/project.ps1','scripts/posix/project.sh','scripts/package.py']
 REQUIRED += ['.agents/architecture/'+name+'.md' for name in ['overview','runtime','data-and-assets','integrations']]
 REQUIRED += ['.agents/skills/ai-terminal-'+name+'/SKILL.md' for name in ['development','testing','packaging']]
 
@@ -56,6 +56,11 @@ def check():
     for expected in icon_source['files']:
         data=(ROOT/'assets/icons'/expected['name']).read_bytes()
         if len(data)!=expected['bytes'] or hashlib.sha256(data).hexdigest()!=expected['sha256']:errors.append('icon identity mismatch: '+expected['name'])
+    branding=json.loads((ROOT/'assets/branding/SOURCE.json').read_text(encoding='utf-8'))
+    for name,expected in branding['files'].items():
+        data=(ROOT/'assets/branding'/name).read_bytes()
+        if len(data)!=expected['bytes'] or hashlib.sha256(data).hexdigest()!=expected['sha256']:errors.append('branding identity mismatch: '+name)
+    if (ROOT/'assets/branding/ai-terminal.svg').read_bytes() != (ROOT/branding['origin']).read_bytes():errors.append('approved B artwork mismatch')
     ignore=(ROOT/'.gitignore').read_text(encoding='utf-8')
     for rule in ['/target/','/output/','/.tools/','.env','*.zip','*.pem','sessions.json']:
         if rule not in ignore.splitlines():errors.append('missing ignore: '+rule)
@@ -66,7 +71,7 @@ def check():
 def main():
     argparse.ArgumentParser(description=__doc__,formatter_class=argparse.RawDescriptionHelpFormatter).parse_args()
     paths,errors=check()
-    report={'ok':not errors,'candidate_files':len(paths),'font_identities_checked':5,'icon_identities_checked':2,'errors':errors}
+    report={'ok':not errors,'candidate_files':len(paths),'font_identities_checked':5,'icon_identities_checked':2,'branding_identities_checked':3,'errors':errors}
     print(json.dumps(report,ensure_ascii=False,indent=2))
     return 1 if errors else 0
 

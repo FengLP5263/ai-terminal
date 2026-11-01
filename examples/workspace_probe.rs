@@ -27,6 +27,8 @@ struct Probe {
     pending: Option<&'static str>,
     terminal_rect: egui::Rect,
     wheel_sent: bool,
+    name: String,
+    selected_name: bool,
     zoom_verified: bool,
 }
 impl Probe {
@@ -83,13 +85,10 @@ impl eframe::App for Probe {
             .iter()
             .map(|id| {
                 let (name, agent, activity, unread) = match *id {
-                    "codex" => ("接口联调", Agent::Codex, Activity::Idle, true),
-                    "claude" => (
-                        "AI 终端 · 渲染样例",
-                        Agent::Claude,
-                        Activity::Working,
-                        false,
-                    ),
+                    "codex" => ("接口联调 👩🏽‍💻", Agent::Codex, Activity::Idle, true),
+                    "claude" => ("AI 终端 ❤️🚀", Agent::Claude, Activity::Working, false),
+                    "cmd" => ("CMD", Agent::Cmd, Activity::Idle, false),
+                    "bash" => ("Bash", Agent::Bash, Activity::Idle, false),
                     _ => ("PowerShell", Agent::Shell, Activity::Waiting, false),
                 };
                 Entry {
@@ -97,10 +96,15 @@ impl eframe::App for Probe {
                     name,
                     directory: std::path::Path::new("C:/Projects/ai-terminal"),
                     agent,
+                    color: match *id {
+                        "codex" => Some(model::SessionColor::Blue),
+                        "claude" => Some(model::SessionColor::Purple),
+                        "cmd" => Some(model::SessionColor::Green),
+                        "bash" => Some(model::SessionColor::Orange),
+                        _ => None,
+                    },
                     activity,
                     unread,
-                    running: true,
-                    resumable: false,
                     hint: "本地样例，状态为合成事件".into(),
                 }
             })
@@ -135,6 +139,22 @@ impl eframe::App for Probe {
                     ui.label("本地 ANSI / ConPTY 渲染样例");
                     ui.label(format!("{:.0}%", self.preferences.ui_scale * 100.0));
                 });
+                ai_terminal::ui_text::label(ui, &self.name, 14.0, egui::Color32::LIGHT_GRAY);
+                let editor_id = egui::Id::new("emoji-name-editor");
+                if self.stage == 1 && !self.selected_name {
+                    ctx.memory_mut(|m| m.request_focus(editor_id));
+                    if let Some(mut state) = egui::text_edit::TextEditState::load(&ctx, editor_id) {
+                        state
+                            .cursor
+                            .set_char_range(Some(egui::text::CCursorRange::two(
+                                egui::text::CCursor::new(0),
+                                egui::text::CCursor::new(self.name.chars().count()),
+                            )));
+                        state.store(&ctx, editor_id);
+                        self.selected_name = true;
+                    }
+                }
+                ai_terminal::ui_text::edit(ui, &mut self.name, editor_id);
                 ui.add_space(8.0);
                 self.terminal_rect =
                     egui::Rect::from_min_size(ui.cursor().min, ui.available_size());
@@ -204,11 +224,16 @@ fn main() -> eframe::Result {
             .expect("workspace_probe output-directory"),
     );
     std::fs::create_dir_all(&output).unwrap();
+    let width = std::env::args()
+        .nth(2)
+        .and_then(|v| v.parse::<f32>().ok())
+        .unwrap_or(1160.0)
+        .clamp(720.0, 1600.0);
     eframe::run_native(
         "ai-terminal workspace visual probe",
         eframe::NativeOptions {
             renderer: eframe::Renderer::Glow,
-            viewport: egui::ViewportBuilder::default().with_inner_size([1160.0, 760.0]),
+            viewport: egui::ViewportBuilder::default().with_inner_size([width, 760.0]),
             ..Default::default()
         },
         Box::new(move |cc| {
@@ -231,7 +256,7 @@ fn main() -> eframe::Result {
                 terminal,
                 icons: Icons::new(&cc.egui_ctx),
                 preferences: UiSettings::default(),
-                ids: vec!["codex", "claude", "shell"],
+                ids: vec!["codex", "claude", "shell", "cmd", "bash"],
                 active: "claude".into(),
                 output,
                 began: Instant::now(),
@@ -241,6 +266,8 @@ fn main() -> eframe::Result {
                 pending: None,
                 terminal_rect: egui::Rect::NOTHING,
                 wheel_sent: false,
+                name: "命名 😀 👋🏽 👩‍💻 ❤️ 🚀".into(),
+                selected_name: false,
                 zoom_verified: false,
             }))
         }),

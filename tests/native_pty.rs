@@ -23,7 +23,10 @@ fn conpty_accepts_input_drains_hidden_output_and_copies_only_viewport() {
     terminal.process_command(BackendCommand::Write(
         b"for /L %i in (1,1,12000) do @echo output-%i\r\necho NATIVE_PTY_DRAIN_OK\r\n".to_vec(),
     ));
-    let deadline = Instant::now() + Duration::from_secs(15);
+    let began = Instant::now();
+    // This verifies draining, not a CPU/console throughput SLA. CMD may take >15s
+    // to emit 12,000 individual lines on a loaded Windows desktop.
+    let deadline = began + Duration::from_secs(30);
     let mut found = false;
     while Instant::now() < deadline {
         if terminal.plain_text().contains("NATIVE_PTY_DRAIN_OK")
@@ -37,7 +40,9 @@ fn conpty_accepts_input_drains_hidden_output_and_copies_only_viewport() {
     }
     assert!(
         found,
-        "hidden session must keep draining a large output burst"
+        "hidden session did not finish draining after {:?}; viewport: {}",
+        began.elapsed(),
+        terminal.plain_text()
     );
     let snapshot = terminal.sync();
     assert!(

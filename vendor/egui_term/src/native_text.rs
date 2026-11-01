@@ -216,10 +216,20 @@ impl Engine {
             return Ok(format.clone());
         }
         unsafe {
-            let name: Vec<u16> = self.family.encode_utf16().chain(Some(0)).collect();
+            let emoji = style & 4 != 0;
+            let family = if emoji {
+                "Segoe UI Emoji"
+            } else {
+                &self.family
+            };
+            let name: Vec<u16> = family.encode_utf16().chain(Some(0)).collect();
             let format = self.factory.CreateTextFormat(
                 PCWSTR(name.as_ptr()),
-                self.collection.as_ref(),
+                if emoji {
+                    Some(&self.system_collection)
+                } else {
+                    self.collection.as_ref()
+                },
                 if style & 1 != 0 {
                     DWRITE_FONT_WEIGHT_BOLD
                 } else {
@@ -320,11 +330,15 @@ impl Engine {
             } else {
                 0.0
             };
+            let top = if key.style & 4 != 0 {
+                let mut metrics = DWRITE_TEXT_METRICS::default();
+                layout.GetMetrics(&mut metrics)?;
+                ((key.height as f32 - metrics.height) / 2.0).round()
+            } else {
+                key.baseline as f32 - baseline
+            };
             self.target.DrawTextLayout(
-                windows_numerics::Vector2 {
-                    X: left,
-                    Y: key.baseline as f32 - baseline,
-                },
+                windows_numerics::Vector2 { X: left, Y: top },
                 &layout,
                 &self.brush,
                 D2D1_DRAW_TEXT_OPTIONS_ENABLE_COLOR_FONT | D2D1_DRAW_TEXT_OPTIONS_CLIP,
@@ -344,7 +358,6 @@ impl Engine {
             )?;
             for pixel in bgra.as_chunks_mut::<4>().0 {
                 pixel.swap(0, 2);
-                pixel[3] = 255;
             }
             Ok(bgra)
         }
@@ -386,7 +399,7 @@ impl Engine {
         let pos = [page.x, page.y];
         page.texture.set_partial(
             pos,
-            egui::ColorImage::from_rgba_unmultiplied([width, height], &pixels),
+            egui::ColorImage::from_rgba_premultiplied([width, height], &pixels),
             TextureOptions::NEAREST,
         );
         let uv = Rect::from_min_max(
@@ -447,11 +460,48 @@ pub fn shape(
         fg: fg.to_srgba_unmultiplied(),
         bg: bg.to_srgba_unmultiplied(),
     };
+    cached_shape(ctx, font, key, rect.min)
+}
+
+pub fn emoji_shape(
+    ctx: &Context,
+    font: &NativeFont,
+    size: f32,
+    text: &str,
+    rect: Rect,
+) -> Option<Shape> {
+    let scale = ctx.pixels_per_point();
+    let width = (rect.width() * scale).round() as u16;
+    let height = (rect.height() * scale).round() as u16;
+    if width == 0 || height == 0 || width as u32 > SURFACE_W || height as u32 > SURFACE_H {
+        return None;
+    }
+    cached_shape(
+        ctx,
+        font,
+        Key {
+            text: text.into(),
+            pixels: (size * scale).round().clamp(1.0, 128.0) as u16,
+            style: 4,
+            width,
+            height,
+            baseline: 0,
+            fg: [255; 4],
+            bg: [0; 4],
+        },
+        rect.min,
+    )
+}
+
+fn cached_shape(ctx: &Context, font: &NativeFont, key: Key, position: Pos2) -> Option<Shape> {
+    let scale = ctx.pixels_per_point();
+    let width = key.width;
+    let height = key.height;
     with_engine(ctx, font, |engine| engine.tile(ctx, key)).map(|tile| {
         let mut mesh = egui::Mesh::with_texture(tile.texture);
         let min = Pos2::new(
-            (rect.min.x * scale).round() / scale,
-            (rect.min.y * scale).round() / scale,
+            (position.x * scale).round() / scale,
+            (position.y * scale).round() / scale,
         );
         mesh.add_rect_with_uv(
             Rect::from_min_size(min, egui::vec2(width as f32 / scale, height as f32 / scale)),
@@ -507,5 +557,36 @@ mod tests {
             engine.raster(&regular).unwrap(),
             engine.raster(&bold).unwrap()
         );
+    }
+    #[test]
+    fn ui_emoji_preserves_color_and_transparent_background() {
+        let mut engine = Engine::new(&native()).unwrap();
+        for text in ["😀", "👋🏽", "👩‍💻", "❤️"] {
+            let rgba = engine
+                .raster(&Key {
+                    text: text.into(),
+                    pixels: 28,
+                    style: 4,
+                    width: 42,
+                    height: 38,
+                    baseline: 0,
+                    fg: [255; 4],
+                    bg: [0; 4],
+                })
+                .unwrap();
+            let pixels = rgba.as_chunks::<4>().0;
+            assert!(
+                pixels.iter().filter(|p| p[3] == 0).count() > 100,
+                "opaque emoji rectangle: {text}"
+            );
+            assert!(
+                pixels
+                    .iter()
+                    .filter(|p| p[3] > 128 && p[0].abs_diff(p[2]) > 40)
+                    .count()
+                    > 30,
+                "missing color: {text}"
+            );
+        }
     }
 }

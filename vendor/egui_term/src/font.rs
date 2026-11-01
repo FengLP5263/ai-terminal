@@ -112,6 +112,22 @@ impl TerminalFont {
             (Size::new(width, height), baseline)
         })
     }
+    /// Color emoji for host UI text, sharing the terminal's bounded native atlas.
+    pub fn emoji_shape(
+        &self,
+        ctx: &Context,
+        size: f32,
+        text: &str,
+        rect: egui::Rect,
+    ) -> Option<egui::Shape> {
+        #[cfg(windows)]
+        if let Some(font) = &self.native {
+            return crate::native_text::emoji_shape(ctx, font, size, text, rect);
+        }
+        #[cfg(not(windows))]
+        let _ = (ctx, size, text, rect);
+        None
+    }
     pub fn font_measure(&self, ctx: &Context) -> Size {
         self.metrics(ctx).0
     }

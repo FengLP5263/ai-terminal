@@ -13,6 +13,10 @@ pub enum Activity {
 /// Only metadata crosses the bridge. Prompts, tool arguments and credentials do not.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HookEvent {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub invocation: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub process_id: Option<u32>,
     pub event_id: String,
     pub local_id: String,
     pub generation: String,
@@ -136,6 +140,8 @@ mod tests {
     use super::*;
     fn event(name: &str, turn: &str) -> HookEvent {
         HookEvent {
+            invocation: None,
+            process_id: None,
             event_id: uuid::Uuid::new_v4().to_string(),
             local_id: "one".into(),
             generation: "first".into(),

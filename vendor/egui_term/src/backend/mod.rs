@@ -237,6 +237,10 @@ impl TerminalBackend {
                                 .into_bytes(),
                             );
                         }
+                        Event::Title(title) if title.starts_with("ai-terminal-cwd;") => {
+                            let _ = pty_event_proxy_sender.send((id, Event::Title(title)));
+                            app_context.request_repaint();
+                        }
                         Event::Exit => {
                             let _ = pty_event_proxy_sender.send((id, Event::Exit));
                             app_context.request_repaint();
@@ -568,24 +572,7 @@ impl TerminalBackend {
 
     fn scroll(&mut self, terminal: &mut Term<EventProxy>, delta_value: i32) {
         if delta_value != 0 {
-            let scroll = Scroll::Delta(delta_value);
-            if terminal
-                .mode()
-                .contains(TermMode::ALTERNATE_SCROLL | TermMode::ALT_SCREEN)
-            {
-                let line_cmd = if delta_value > 0 { b'A' } else { b'B' };
-                let mut content = vec![];
-
-                for _ in 0..delta_value.abs() {
-                    content.push(0x1b);
-                    content.push(b'O');
-                    content.push(line_cmd);
-                }
-
-                self.notifier.notify(content);
-            } else {
-                terminal.grid_mut().scroll_display(scroll);
-            }
+            terminal.scroll_display(Scroll::Delta(delta_value));
         }
     }
 
