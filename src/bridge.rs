@@ -161,6 +161,10 @@ pub fn report_hook() {
             tool_use_id: field("tool_use_id"),
             notification_type: field("notification_type"),
             source: field("source"),
+            exit_code: value
+                .get("exit_code")
+                .and_then(|v| v.as_i64())
+                .and_then(|v| i32::try_from(v).ok()),
             background_running: value
                 .get("background_tasks")
                 .and_then(|v| v.as_array())
@@ -203,6 +207,7 @@ mod tests {
             notification_type: None,
             source: None,
             background_running: false,
+            exit_code: None,
         }
     }
     #[test]

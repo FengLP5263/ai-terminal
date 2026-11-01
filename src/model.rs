@@ -91,6 +91,10 @@ pub struct UiSettings {
     pub sidebar_width: f32,
     pub terminal_font_size: f32,
     pub ui_scale: f32,
+    pub language: crate::i18n::Language,
+    pub floating_enabled: bool,
+    pub floating_position: Option<[f32; 2]>,
+    pub floating_position_pixels: Option<[f32; 2]>,
 }
 impl Default for UiSettings {
     fn default() -> Self {
@@ -99,6 +103,10 @@ impl Default for UiSettings {
             sidebar_width: 238.0,
             terminal_font_size: 14.0,
             ui_scale: 1.0,
+            language: crate::i18n::Language::System,
+            floating_enabled: false,
+            floating_position: None,
+            floating_position_pixels: None,
         }
     }
 }
@@ -124,6 +132,12 @@ impl UiSettings {
         } else {
             14.0
         };
+        self.floating_position = self
+            .floating_position
+            .filter(|p| p.iter().all(|v| v.is_finite()));
+        self.floating_position_pixels = self
+            .floating_position_pixels
+            .filter(|p| p.iter().all(|v| v.is_finite()));
         self
     }
 }

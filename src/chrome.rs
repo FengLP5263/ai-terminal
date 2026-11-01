@@ -15,6 +15,8 @@ pub const NEW_TERMINAL_ID: &str = "new-terminal-sidebar";
 #[derive(Clone, Copy)]
 pub enum ActionIcon {
     Add,
+    Settings,
+    Close,
     Collapse,
     Expand,
     Edit,
@@ -26,6 +28,21 @@ pub fn paint_action(painter: &egui::Painter, rect: Rect, icon: ActionIcon, color
     let point = |x: f32, y: f32| center + egui::vec2(x, y) * scale;
     let stroke = Stroke::new(1.5 * scale, color);
     match icon {
+        ActionIcon::Settings => {
+            let teeth = (0..32)
+                .map(|i| {
+                    let angle = i as f32 * std::f32::consts::TAU / 32.0;
+                    let radius = if i % 4 < 2 { 6.8 } else { 5.0 };
+                    center + egui::vec2(angle.cos(), angle.sin()) * radius * scale
+                })
+                .collect();
+            painter.add(egui::Shape::closed_line(teeth, stroke));
+            painter.circle_stroke(center, 2.4 * scale, stroke);
+        }
+        ActionIcon::Close => {
+            painter.line_segment([point(-4.0, -4.0), point(4.0, 4.0)], stroke);
+            painter.line_segment([point(-4.0, 4.0), point(4.0, -4.0)], stroke);
+        }
         ActionIcon::Add => {
             painter.line_segment([point(-5.5, 0.0), point(5.5, 0.0)], stroke);
             painter.line_segment([point(0.0, -5.5), point(0.0, 5.5)], stroke);

@@ -1,6 +1,6 @@
 use egui::{Color32, FontData, FontDefinitions, FontFamily, FontId};
 use egui_term::{FontSettings, TerminalFont};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 pub const TERMINAL_BG: Color32 = Color32::BLACK;
 pub const SIDEBAR_BG: Color32 = Color32::from_gray(18);
@@ -160,4 +160,10 @@ pub fn app_icon() -> egui::IconData {
         width: info.width,
         height: info.height,
     }
+}
+
+/// Reuse the approved icon for application, floating, and developer windows.
+pub fn window_icon() -> Arc<egui::IconData> {
+    static ICON: OnceLock<Arc<egui::IconData>> = OnceLock::new();
+    ICON.get_or_init(|| Arc::new(app_icon())).clone()
 }

@@ -19,3 +19,5 @@ POSIX 对应 `sh scripts/posix/project.sh <action>`。Git Bash 可委托 Windows
 保留源码布局、独立 helper、字体来源和会话级 hook 语义。正常退出只管理自身会话；不杀用户已有 CLI。
 修改字体／输入／渲染时做真实截图与操作验收，测试计数不能证明观感或全部输入兼容。
 完成后走 testing 技能；架构／配置／命令变化同步 .agents/architecture 与 scripts/README.md，vendor 补丁更新 UPSTREAM.md。
+
+所有可见调试窗口、浮窗和调试示例 EXE 均使用 assets/branding 中用户选定的 B 图标；不要使用框架默认或早期图标。更新探针时验证窗口图标与 EXE 资源，保留 hook helper 不带 GUI 图标。

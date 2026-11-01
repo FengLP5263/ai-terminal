@@ -23,6 +23,7 @@ pub struct Entry<'a> {
 #[derive(Default, Debug)]
 pub struct Actions {
     pub create: Option<Agent>,
+    pub settings: bool,
     pub toggle: bool,
     pub select: Option<String>,
     pub rename: Option<String>,
@@ -35,6 +36,7 @@ pub struct Actions {
 #[derive(Clone)]
 struct DragSession(String);
 
+#[derive(Clone)]
 pub struct Icons {
     codex: egui::TextureHandle,
     claude: egui::TextureHandle,
@@ -72,7 +74,7 @@ impl Icons {
             ),
         }
     }
-    fn paint(&self, painter: &egui::Painter, rect: Rect, agent: Agent) {
+    pub fn paint(&self, painter: &egui::Painter, rect: Rect, agent: Agent) {
         painter.circle_filled(rect.center(), rect.width() / 2.0, Color32::from_gray(29));
         let icon = Rect::from_center_size(rect.center(), Vec2::splat(chrome::AVATAR_ICON));
         match agent {
@@ -91,6 +93,44 @@ impl Icons {
             }
             Agent::Shell | Agent::Cmd | Agent::Bash => chrome::paint_shell(painter, icon, agent),
         }
+    }
+}
+
+/// Shared status indicator used by the sidebar and floating session rail.
+pub fn paint_status(ui: &egui::Ui, avatar: Rect, activity: Activity, unread: bool, fill: Color32) {
+    let indicator = avatar.right_bottom() - egui::vec2(2.0, 2.0);
+    let surface = fill;
+    if activity == Activity::Working {
+        ui.painter().circle_filled(indicator, 5.5, surface);
+        let time = ui.input(|i| i.time as f32);
+        let points = (0..13)
+            .map(|i| {
+                let a = time * 4.0 + i as f32 / 12.0 * 4.6;
+                indicator + egui::vec2(a.cos(), a.sin()) * 4.0
+            })
+            .collect();
+        ui.painter().add(egui::Shape::line(
+            points,
+            Stroke::new(1.5, Color32::from_rgb(136, 180, 246)),
+        ));
+        ui.ctx().request_repaint_after(Duration::from_millis(80));
+    } else if matches!(
+        activity,
+        Activity::Waiting | Activity::Completed | Activity::Failed
+    ) || unread
+    {
+        ui.painter().circle_filled(indicator, 5.5, surface);
+        ui.painter().circle_filled(
+            indicator,
+            3.5,
+            if activity == Activity::Failed {
+                Color32::from_rgb(244, 117, 117)
+            } else if activity == Activity::Waiting {
+                Color32::from_rgb(235, 184, 82)
+            } else {
+                Color32::from_rgb(88, 191, 141)
+            },
+        );
     }
 }
 
@@ -122,39 +162,25 @@ pub fn show(
     );
     let response = panel.show(ui, |ui| {
         ui.horizontal(|ui| {
-            if collapsed {
-                ui.add_space(2.0);
-                actions.toggle = chrome::icon_button(
-                    ui,
-                    egui::Id::new("sidebar-toggle"),
-                    chrome::ActionIcon::Expand,
-                    "展开会话面板",
-                )
-                .clicked();
-            } else {
-                let title_width = (ui.available_width()
+            actions.settings = chrome::icon_button(
+                ui,
+                egui::Id::new("settings-button"),
+                chrome::ActionIcon::Settings,
+                crate::i18n::tr(ui.ctx(), "设置", "Settings"),
+            )
+            .clicked();
+            if !collapsed {
+                let space = (ui.available_width()
                     - 2.0 * chrome::CONTROL
                     - 2.0 * ui.spacing().item_spacing.x)
-                    .max(1.0);
-                let (rect, _) = ui
-                    .allocate_exact_size(egui::vec2(title_width, chrome::CONTROL), Sense::hover());
-                let title = ui.interact(rect, egui::Id::new("sidebar-title"), Sense::hover());
-                title.widget_info(|| {
-                    egui::WidgetInfo::labeled(egui::WidgetType::Label, ui.is_enabled(), "AI终端")
-                });
-                ui.painter().text(
-                    egui::pos2(rect.left(), rect.center().y),
-                    egui::Align2::LEFT_CENTER,
-                    "AI终端",
-                    egui::FontId::proportional(16.0),
-                    chrome::TEXT,
-                );
+                    .max(0.0);
+                ui.add_space(space);
                 actions.create = new_session_menu(ui);
                 actions.toggle = chrome::icon_button(
                     ui,
                     egui::Id::new("sidebar-toggle"),
                     chrome::ActionIcon::Collapse,
-                    "收起会话面板",
+                    crate::i18n::tr(ui.ctx(), "收起会话面板", "Collapse sidebar"),
                 )
                 .clicked();
             }
@@ -164,6 +190,16 @@ pub fn show(
             ui.horizontal(|ui| {
                 ui.add_space(2.0);
                 actions.create = new_session_menu(ui);
+            });
+            ui.horizontal(|ui| {
+                ui.add_space(2.0);
+                actions.toggle = chrome::icon_button(
+                    ui,
+                    egui::Id::new("sidebar-toggle"),
+                    chrome::ActionIcon::Expand,
+                    crate::i18n::tr(ui.ctx(), "展开会话面板", "Expand sidebar"),
+                )
+                .clicked();
             });
             ui.add_space(8.0);
         }
@@ -205,36 +241,7 @@ pub fn show(
                         Vec2::splat(chrome::AVATAR),
                     );
                     icons.paint(ui.painter(), avatar, entry.agent);
-                    let indicator = avatar.right_bottom() - egui::vec2(2.0, 2.0);
-                    let surface = fill;
-                    if entry.activity == Activity::Working {
-                        ui.painter().circle_filled(indicator, 5.5, surface);
-                        let time = ui.input(|i| i.time as f32);
-                        let points = (0..13)
-                            .map(|i| {
-                                let a = time * 4.0 + i as f32 / 12.0 * 4.6;
-                                indicator + egui::vec2(a.cos(), a.sin()) * 4.0
-                            })
-                            .collect();
-                        ui.painter().add(egui::Shape::line(
-                            points,
-                            Stroke::new(1.5, Color32::from_rgb(136, 180, 246)),
-                        ));
-                        ui.ctx().request_repaint_after(Duration::from_millis(80));
-                    } else if matches!(entry.activity, Activity::Waiting | Activity::Completed)
-                        || entry.unread
-                    {
-                        ui.painter().circle_filled(indicator, 5.5, surface);
-                        ui.painter().circle_filled(
-                            indicator,
-                            3.5,
-                            if entry.activity == Activity::Waiting {
-                                Color32::from_rgb(235, 184, 82)
-                            } else {
-                                Color32::from_rgb(88, 191, 141)
-                            },
-                        );
-                    }
+                    paint_status(ui, avatar, entry.activity, entry.unread, fill);
                     let mut edit = false;
                     if !collapsed {
                         let left = rect.left() + 52.0;
@@ -282,7 +289,7 @@ pub fn show(
                                 edit_rect,
                                 egui::Id::new(("edit-session", entry.id)),
                                 chrome::ActionIcon::Edit,
-                                "编辑会话名称",
+                                crate::i18n::tr(ui.ctx(), "编辑会话名称", "Edit session name"),
                             )
                             .clicked();
                         }
@@ -319,32 +326,46 @@ pub fn show(
                         entry.hint
                     ));
                     response.context_menu(|ui| {
-                        if ui.button("编辑名称").clicked() {
+                        if ui
+                            .button(crate::i18n::tr(ui.ctx(), "编辑名称", "Rename"))
+                            .clicked()
+                        {
                             actions.rename = Some(entry.id.into());
                             ui.close();
                         }
-                        ui.menu_button("会话颜色", |ui| {
-                            egui::Grid::new(("session-palette", entry.id))
-                                .num_columns(4)
-                                .spacing(egui::vec2(6.0, 6.0))
-                                .show(ui, |ui| {
-                                    for (index, color) in std::iter::once(None)
-                                        .chain(SessionColor::ALL.into_iter().map(Some))
-                                        .enumerate()
-                                    {
-                                        if color_swatch(ui, entry.id, color, entry.color == color)
-                                            .clicked()
+                        ui.menu_button(
+                            crate::i18n::tr(ui.ctx(), "会话颜色", "Session color"),
+                            |ui| {
+                                egui::Grid::new(("session-palette", entry.id))
+                                    .num_columns(4)
+                                    .spacing(egui::vec2(6.0, 6.0))
+                                    .show(ui, |ui| {
+                                        for (index, color) in std::iter::once(None)
+                                            .chain(SessionColor::ALL.into_iter().map(Some))
+                                            .enumerate()
                                         {
-                                            actions.color = Some((entry.id.into(), color));
-                                            ui.close();
+                                            if color_swatch(
+                                                ui,
+                                                entry.id,
+                                                color,
+                                                entry.color == color,
+                                            )
+                                            .clicked()
+                                            {
+                                                actions.color = Some((entry.id.into(), color));
+                                                ui.close();
+                                            }
+                                            if index % 4 == 3 {
+                                                ui.end_row();
+                                            }
                                         }
-                                        if index % 4 == 3 {
-                                            ui.end_row();
-                                        }
-                                    }
-                                });
-                        });
-                        if ui.button("关闭会话").clicked() {
+                                    });
+                            },
+                        );
+                        if ui
+                            .button(crate::i18n::tr(ui.ctx(), "关闭会话", "Close session"))
+                            .clicked()
+                        {
                             actions.close = Some(entry.id.into());
                             ui.close();
                         }
@@ -374,7 +395,11 @@ pub fn new_session_menu_with_id(ui: &mut egui::Ui, id: egui::Id) -> Option<Agent
         ui,
         id,
         chrome::ActionIcon::Add,
-        "新建终端 · Ctrl+Shift+N 打开 PowerShell",
+        crate::i18n::tr(
+            ui.ctx(),
+            "新建终端 · Ctrl+Shift+N 打开 PowerShell",
+            "New terminal · Ctrl+Shift+N opens PowerShell",
+        ),
     );
     let mut selected = None;
     egui::Popup::menu(&trigger).show(|ui| {
@@ -402,7 +427,10 @@ fn color_swatch(
         egui::Id::new(("session-color", session, color)),
         Sense::click(),
     );
-    let label = color.map(SessionColor::label).unwrap_or("默认");
+    let label =
+        color
+            .map(SessionColor::label)
+            .unwrap_or(crate::i18n::tr(ui.ctx(), "默认", "Default"));
     response.widget_info(|| {
         egui::WidgetInfo::labeled(egui::WidgetType::Button, ui.is_enabled(), label)
     });
