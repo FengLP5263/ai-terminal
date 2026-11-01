@@ -21,7 +21,8 @@ fn main() -> eframe::Result {
         .with_inner_size([1160.0, 760.0])
         .with_min_inner_size([720.0, 460.0])
         .with_app_id("ai-terminal")
-        .with_icon(std::sync::Arc::new(ai_terminal::appearance::app_icon()));
+        .with_transparent(true)
+        .with_icon(ai_terminal::appearance::window_icon());
     #[cfg(feature = "renderer-glow")]
     let options = eframe::NativeOptions {
         viewport,

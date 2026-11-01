@@ -4,45 +4,44 @@ use crate::{
     model::Agent,
     status::{Activity, Status},
 };
-use egui::{Color32, RichText};
+use egui::RichText;
 pub fn show(ui: &mut egui::Ui, agent: Agent, status: &Status) -> egui::Response {
-    let (label, color) = match status.activity {
-        Activity::Unknown => ("等待任务通知", Color32::from_rgb(235, 184, 82)),
-        Activity::Working => ("进行中", Color32::from_rgb(136, 180, 246)),
-        Activity::Completed => ("已完成", Color32::from_rgb(88, 191, 141)),
-        Activity::Waiting => ("需要处理", Color32::from_rgb(235, 184, 82)),
-        Activity::Idle => ("就绪", chrome::SECONDARY),
-        Activity::Exited => ("已退出", chrome::SECONDARY),
-    };
+    let locale = crate::i18n::locale(ui.ctx());
+    let label = crate::i18n::activity(locale, status.activity);
+    let color = crate::floating::status_color(status.activity);
     let control = ui
         .add(
             egui::Button::new(RichText::new(label).size(12.0).color(color))
                 .frame(false)
                 .min_size(egui::vec2(0.0, chrome::CONTROL)),
         )
-        .on_hover_text("查看状态连接");
+        .on_hover_text(crate::i18n::tr(
+            ui.ctx(),
+            "查看状态连接",
+            "View status connection",
+        ));
     egui::Popup::menu(&control).show(|ui| {
         ui.set_width(300.0);
         ui.with_layout(egui::Layout::top_down(egui::Align::Min), |ui| {
-            ui.strong("会话状态");
+            ui.strong(crate::i18n::tr(ui.ctx(),"会话状态","Session status"));
             let connected=status.last_event.is_some() && status.activity!=Activity::Unknown;
             if connected {
-                ui.label("已连接 Agent 的任务通知");
-                ui.label("进行中、需要处理与已完成随任务通知更新。");
+                ui.label(crate::i18n::tr(ui.ctx(),"已连接 Agent 的任务通知","Connected to agent task events"));
+                ui.label(crate::i18n::tr(ui.ctx(),"进行中、需要处理与已完成随任务通知更新。","Working, attention, failure and completion follow task events."));
             } else {
-                ui.label(format!("已识别 {}，尚未收到任务通知。",agent.label()));
+                ui.label(match locale {crate::i18n::Locale::ZhCn=>format!("已识别 {}，尚未收到任务通知。",agent.label()),crate::i18n::Locale::En=>format!("Recognized {}. No task event received yet.",agent.label())});
                 if agent==Agent::Codex {
-                    ui.label("Codex 通常在首次提交任务时连接通知；欢迎页尚未开始任务属于正常状态。");
-                    ui.label("如果提交任务后仍无变化，可用 /hooks 检查状态钩子；只有未启用时才需要审查确认。");
+                    ui.label(crate::i18n::tr(ui.ctx(),"Codex 通常在首次提交任务时连接通知；欢迎页尚未开始任务属于正常状态。","Codex usually connects when the first task is submitted. Its welcome screen has no task yet."));
+                    ui.label(crate::i18n::tr(ui.ctx(),"如果提交任务后仍无变化，可用 /hooks 检查状态钩子；只有未启用时才需要审查确认。","If task status never changes, use /hooks to check the hooks. Review only disabled definitions."));
                 } else {
-                    ui.label("在当前 Claude 输入 /hooks，检查状态钩子是否加载。手动指定配置文件时，请确认其中包含状态钩子。");
+                    ui.label(crate::i18n::tr(ui.ctx(),"在当前 Claude 输入 /hooks，检查状态钩子是否加载。手动指定配置文件时，请确认其中包含状态钩子。","Use /hooks in Claude to check the status hooks. Custom settings files must include them."));
                 }
             }
-            if ui.button("复制 /hooks").clicked() {
+            if ui.button(crate::i18n::tr(ui.ctx(),"复制 /hooks","Copy /hooks")).clicked() {
                 ui.ctx().copy_text("/hooks".into());
                 ui.close();
             }
-            ui.small("仅复制查看命令；信任操作由你在 Agent 内确认。");
+            ui.small(crate::i18n::tr(ui.ctx(),"仅复制查看命令；信任操作由你在 Agent 内确认。","Copies the view command only. You review trust within the agent."));
         });
     });
     control

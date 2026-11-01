@@ -5,7 +5,7 @@ Alacritty 0.26；默认 glow/OpenGL，可选 wgpu/DX12 用于本机对照。依�
 
 | 边界 | 职责 |
 | --- | --- |
-| build.rs | Windows 图标资源编译，仅链接主程序 |
+| build.rs | Windows 图标资源编译，链接主程序及调试示例，helper 保持独立 |
 | src/main.rs、app.rs | 原生窗口、会话列表、终端控件、后台事件归约 |
 | src/sidebar.rs、zoom.rs | UUID 会话导航、拖动排序、头像和全窗口缩放 |
 | src/appearance.rs、chrome.rs、ui_text.rs | 正式界面与探针共用字体／主题，以及统一的头像、矢量按钮、紧凑桌面尺寸和名称的彩色 emoji |
@@ -32,3 +32,6 @@ Claude fullscreen 已验证启动及其 MOUSE_MOTION／SGR 滚轮协议；完整
 源码托管于 [GitHub](https://github.com/FengLP5263/ai-terminal)，使用 MIT 许可证；贡献入口见 [CONTRIBUTING.md](../../CONTRIBUTING.md)。
 Windows 预览包通过 GitHub Releases 分发；尚无自动发布服务、云 CI 或产品服务器。
 详细选型历史保留在 docs/architecture.md，历史测量不能当作当前构建的性能证明。
+
+
+0.4.0：src/i18n.rs 管理系统／中文／英文偏好；settings.rs 提供设置窗口；floating.rs 使用同进程的 deferred viewport 构建透明、置顶、圆角胶囊。跨窗口仅共享会话元数据快照，通过有界 32 项消息通知根窗口，不共享或复制终端内容。根窗口在最小化时只执行 logic；所有 PTY 和桥通知明确唤醒 ROOT，避免子窗口活跃时任务事件无人归约。

@@ -26,3 +26,8 @@ Codex 的会话级 hook 以固定命令读取 AI_TERMINAL_HELPER，不将安装�
 0.3.6：agent_id 标识的子 Agent hook 不参与根会话状态，agent_type 本身不代表子会话。Claude 全屏的滚动通过其请求的终端鼠标协议传输，不解析绘制文字作为任务状态，不修改用户 renderer 偏好。
 
 0.3.7：Codex 默认 TUI 与独立引擎均保留 CLI 自有逻辑。其 SessionStart 可能延迟到首轮任务；使用真实 CLI＋loopback 模拟 Responses 验证 hook 时，必须明确标识为离线假模型回合，不称为真实模型验收。Codex 与 Claude 的 Windows 图片粘贴交由原生 Alt+V；管理器只查图片格式并传递快捷键，不代理附件或模型请求。
+
+
+0.4.0 HookEvent 新增可选 exit_code；旧发送端缺失时兼容 None，受管 ShellAgentEnded 传递真实退出码。StopFailure（现有 Claude 配置）和非中断的非零进程退出标记 Failed；工具失败但 Agent 继续恢复时仍保持 Working。用户中断退出码不当作失败。当前 Codex hook 接口没有 StopFailure，未被官方事件导出的 CLI 内部错误不会通过解析屏幕或静默超时猜为失败；具体状态仍应在原 CLI 中核实。
+
+原生浮窗只导航当前管理器的会话，不接管其他进程中的旧版会话，也不修改用户级 CLI 配置或信任。

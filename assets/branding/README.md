@@ -7,7 +7,7 @@
 - ai-terminal.ico：16、20、24、32、40、48、64、96、128、256 像素，各尺寸直接由矢量独立绘制，用于 Windows EXE 资源。
 - SOURCE.json：来源、导出方法、大小与 SHA-256。
 
-程序构建直接使用固定导出文件，无需浏览器或图片处理依赖。Windows 资源由 build.rs 调用 Windows SDK rc.exe 编译，只链接主程序，不链接 hook helper。图标内嵌于 EXE，不依赖外部文件或安装字体。
+程序构建直接使用固定导出文件，无需浏览器或图片处理依赖。Windows 资源由 build.rs 调用 Windows SDK rc.exe 编译，链接主程序和调试示例程序，不链接 hook helper；主窗口、浮窗及可见调试窗口共用相同图标。图标内嵌于 EXE，不依赖外部文件或安装字体。
 
 ## 0.3.4 验证
 

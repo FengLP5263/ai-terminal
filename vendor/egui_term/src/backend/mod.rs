@@ -240,18 +240,18 @@ impl TerminalBackend {
                         }
                         Event::Title(title) if title.starts_with("ai-terminal-cwd;") => {
                             let _ = pty_event_proxy_sender.send((id, Event::Title(title)));
-                            app_context.request_repaint();
+                            app_context.request_repaint_of(egui::ViewportId::ROOT);
                         }
                         Event::Exit => {
                             let _ = pty_event_proxy_sender.send((id, Event::Exit));
-                            app_context.request_repaint();
+                            app_context.request_repaint_of(egui::ViewportId::ROOT);
                             break;
                         }
                         Event::ChildExit(_) => {
                             if pty_event_proxy_sender.send((id, event)).is_err() {
                                 break;
                             }
-                            app_context.request_repaint();
+                            app_context.request_repaint_of(egui::ViewportId::ROOT);
                         }
                         _ => {}
                     }

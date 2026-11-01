@@ -166,19 +166,20 @@ fn new_session_is_a_shell_menu_without_directory_or_agent_selection() {
 }
 
 #[test]
-fn sidebar_title_shares_header_center_and_height_at_common_zoom_levels() {
+fn settings_replaces_title_and_aligns_with_header_controls_at_all_zoom_levels() {
     for zoom in [1.0, 1.5, 2.0] {
         let mut h = Harness::new();
         h.ctx.set_zoom_factor(zoom);
         h.frame(vec![], false);
         h.frame(vec![], false);
         let rects = [
-            "sidebar-title",
+            "settings-button",
             ai_terminal::chrome::NEW_TERMINAL_ID,
             "sidebar-toggle",
         ]
         .map(|id| h.ctx.read_response(egui::Id::new(id)).unwrap().rect);
-        assert!(text_rect(h.output.as_ref().unwrap(), "AI终端").is_some());
+        assert!(text_rect(h.output.as_ref().unwrap(), "AI终端").is_none());
+        assert!(h.click(rects[0].center(), false).settings);
         for rect in rects {
             assert!((rect.center().y - rects[0].center().y).abs() < 0.1);
             assert!((rect.height() - rects[0].height()).abs() < 0.1);

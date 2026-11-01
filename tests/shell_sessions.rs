@@ -126,7 +126,7 @@ fn agent_roundtrip(kind: Agent) {
     let fake = root.path().join("fake-agent.cmd");
     std::fs::write(
         &fake,
-        b"@echo off\r\n\"%~dp0cli-fixture.exe\" \"%~dp0args.txt\" %*\r\n",
+        b"@echo off\r\n\"%~dp0cli-fixture.exe\" \"%~dp0args.txt\" %*\r\nexit /b 23\r\n",
     )
     .unwrap();
     let bridge = Bridge::start(Arc::new(|| {})).unwrap();
@@ -200,6 +200,7 @@ fn agent_roundtrip(kind: Agent) {
             .recv_timeout(Duration::from_secs(8))
             .unwrap();
         assert_eq!(ended.name, "ShellAgentEnded");
+        assert_eq!(ended.exit_code, Some(23));
         assert_eq!(ended.invocation, began.invocation);
         wait_directory(&rx, &generation, root.path(), &mut terminal);
     }
