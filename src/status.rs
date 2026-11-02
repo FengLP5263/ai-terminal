@@ -19,6 +19,10 @@ pub struct HookEvent {
     pub invocation: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub process_id: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_invocation: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub console_processes: Option<Vec<u32>>,
     pub event_id: String,
     pub local_id: String,
     pub generation: String,
@@ -181,6 +185,8 @@ mod tests {
         HookEvent {
             invocation: None,
             process_id: None,
+            parent_invocation: None,
+            console_processes: None,
             event_id: uuid::Uuid::new_v4().to_string(),
             local_id: "one".into(),
             generation: "first".into(),

@@ -18,6 +18,8 @@ POSIX 配对入口见 scripts/README.md，macOS/Linux 只验证支持的静态�
 测试保留现有模块内和 tests/ 布局。常规 test 包括 Rust workspace 与 Python 包校验测试，不调用模型 API。
 Codex 配置测试在 CLI 未安装时可能跳过；Windows 的实际安装／真回合必须另行记录。
 smoke 使用三个真实 PowerShell PTY 和合成生命周期，隔离 output/ 唯一目录，验证 JSON、PNG、退出和自身 PTY 回收。
+Git Bash 原生回归使用临时 HOME 和合成启动文件，禁止执行开发者真实启动配置；覆盖登录文件优先级、PS1、别名、补全、标量／数组 PROMPT_COMMAND、目录跟踪和 Agent 入口。发现与回退测试覆盖便携路径、其他 Bash 的拒绝、缺少 Git／PowerShell 以及点击回退后的真实类型和数据保留。Git 未安装时原生 Bash 核查明确记录未运行，不宣称跨设备完全验证。
+嵌套 Shell 核查使用真实 CMD→PowerShell→CMD 和本地 Agent 样例，验证父调用、根控制台归属、逐层退出与原 PTY 保留；PowerShell 测试带 -NoProfile，Git Bash 使用临时 HOME。头像归约测试另覆盖脱离控制台、过期父调用和 Agent 优先级；不得将合成事件当作真实模型回合。
 异常时只停止本次创建的进程。性能记录应区分 manager 与 Agent 子进程、debug/release、GPU、测量窗口和当前版本。
 
 未提交文字的 TUI 探针仅在已信任目录运行，不自动通过信任／授权；CLI 仍可能执行自有启动行为。

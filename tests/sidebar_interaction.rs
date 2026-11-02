@@ -157,7 +157,7 @@ fn new_session_is_a_shell_menu_without_directory_or_agent_selection() {
         h.click(button.center(), collapsed);
         h.frame(vec![], collapsed);
         let output = h.output.as_ref().unwrap();
-        for label in ["PowerShell", "CMD", "Bash"] {
+        for label in ["PowerShell", "CMD", "Git Bash"] {
             assert!(text_rect(output, label).is_some(), "missing shell {label}");
         }
         assert!(text_rect(output, "工作目录").is_none());

@@ -75,11 +75,17 @@ Install and configure [Codex CLI](https://github.com/openai/codex) or [Claude Co
 
 Use the gear at the top left to set the language and floating bar. Hover over a session avatar for details and click it to switch sessions. Drag the floating bar to reposition it, and turn it off in settings. Hold <kbd>Ctrl</kbd> and scroll to scale the entire interface.
 
+Interactively launching `powershell`, `cmd` or `bash` through a managed entry updates the avatar to the current shell; `exit` restores each level. Codex/Claude take avatar priority while active, then return to the current shell. One-off scripts and tool commands inside Agents do not change shell identity.
+
 ## Frequently asked questions
 
 ### Why is an installed CLI not found?
 
 Make sure its Windows `.exe`, `.cmd`, or `.bat` launcher is available on the current, user, or system `PATH`. A program installed only in WSL or exposed only as a PowerShell alias is not a supported Windows entry point.
+
+### Can I use it without Git Bash?
+
+Yes, use PowerShell or CMD directly. Git Bash is optional; selecting it when unavailable offers a button to switch to an available shell. Portable Git needs its `cmd` or `bin` directory on `PATH`. Git Bash loads its system/user startup configuration, preserving prompts, aliases and completion.
 
 ### Why is there no Agent status?
 

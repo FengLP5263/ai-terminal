@@ -31,11 +31,18 @@ struct Session {
     job: Option<crate::platform::ProcessJob>,
     generation: String,
     error: Option<String>,
+    fallback_shell: Option<Agent>,
     last_event: Option<Instant>,
     seen: VecDeque<String>,
     detected_agent: Option<Agent>,
     invocation: Option<String>,
     agent_process: Option<crate::platform::ProcessWatch>,
+    shells: Vec<ShellFrame>,
+}
+struct ShellFrame {
+    agent: Agent,
+    invocation: String,
+    process: crate::platform::ProcessWatch,
 }
 impl Session {
     fn new(spec: SessionSpec) -> Self {
@@ -47,15 +54,26 @@ impl Session {
             job: None,
             generation: String::new(),
             error: None,
+            fallback_shell: None,
             last_event: None,
             seen: VecDeque::new(),
             detected_agent: None,
             invocation: None,
             agent_process: None,
+            shells: Vec::new(),
         }
     }
     fn display_agent(&self) -> Agent {
-        self.detected_agent.unwrap_or(self.spec.agent)
+        self.detected_agent.unwrap_or_else(|| {
+            self.shells
+                .last()
+                .map_or(self.spec.agent, |shell| shell.agent)
+        })
+    }
+    fn prune_shells(&mut self) {
+        if let Some(index) = self.shells.iter().position(|shell| shell.process.exited()) {
+            self.shells.truncate(index);
+        }
     }
     fn agent_ended(&mut self) {
         self.detected_agent = None;
@@ -76,7 +94,75 @@ impl Session {
     }
     fn event(&mut self, event: &HookEvent, viewing: bool) -> bool {
         if self.spec.agent.is_shell() {
+            self.prune_shells();
+            if event.name == "ShellStarted" {
+                let agent = match event.source.as_deref() {
+                    Some("powershell") => Agent::Shell,
+                    Some("cmd") => Agent::Cmd,
+                    Some("bash") => Agent::Bash,
+                    _ => return false,
+                };
+                if self.detected_agent.is_some()
+                    || self.shells.len() >= 32
+                    || event.parent_invocation.as_deref()
+                        != self.shells.last().map(|shell| shell.invocation.as_str())
+                    || !self.backend.as_ref().is_some_and(|backend| {
+                        event
+                            .console_processes
+                            .as_ref()
+                            .is_some_and(|pids| pids.contains(&backend.pty_id()))
+                    })
+                {
+                    return false;
+                }
+                let Some(invocation) = event.invocation.clone() else {
+                    return false;
+                };
+                if invocation.is_empty()
+                    || self
+                        .shells
+                        .iter()
+                        .any(|shell| shell.invocation == invocation)
+                {
+                    return false;
+                }
+                let Some(process) = event
+                    .process_id
+                    .and_then(crate::platform::ProcessWatch::open)
+                    .filter(|p| !p.exited())
+                else {
+                    return false;
+                };
+                self.shells.push(ShellFrame {
+                    agent,
+                    invocation,
+                    process,
+                });
+                return true;
+            }
+            if event.name == "ShellEnded" {
+                let Some(index) = self
+                    .shells
+                    .iter()
+                    .position(|shell| Some(&shell.invocation) == event.invocation.as_ref())
+                else {
+                    return false;
+                };
+                self.shells.truncate(index);
+                return true;
+            }
             if event.name == "ShellAgentStarted" {
+                if event.parent_invocation.as_deref()
+                    != self.shells.last().map(|shell| shell.invocation.as_str())
+                    || event.console_processes.as_ref().is_some_and(|pids| {
+                        !self
+                            .backend
+                            .as_ref()
+                            .is_some_and(|backend| pids.contains(&backend.pty_id()))
+                    })
+                {
+                    return false;
+                }
                 let agent = match event.source.as_deref() {
                     Some("codex") => Agent::Codex,
                     Some("claude") => Agent::Claude,
@@ -121,6 +207,7 @@ impl Session {
         self.status.apply(event, viewing)
     }
     fn take_resources(&mut self) -> Option<SessionResources> {
+        self.shells.clear();
         self.detected_agent = None;
         self.invocation = None;
         self.agent_process.take();
@@ -326,6 +413,7 @@ impl App {
         if session.backend.is_some() {
             return;
         }
+        session.fallback_shell = None;
         session.terminal_id = uuid::Uuid::new_v4().as_u128() as u64;
         let result =
             (|| -> Result<(TerminalBackend, crate::platform::ProcessJob, String), String> {
@@ -385,9 +473,21 @@ impl App {
                 self.terminal_focus_pending = true;
                 ctx.request_repaint_after(Duration::from_secs(2));
             }
-            Err(e) => {
-                session.error = Some(e);
+            Err(mut error) => {
                 session.status.activity = Activity::Failed;
+                if session.spec.agent == Agent::Bash
+                    && self.helper.as_ref().is_ok_and(|helper| helper.is_file())
+                {
+                    let search = ai_terminal::discovery::CliSearch::current();
+                    if search.find(Agent::Bash).is_none() {
+                        session.fallback_shell = search.bash_fallback();
+                        error = tr(ctx,
+                            "未找到 Git Bash。请安装 Git for Windows，或改用可用的终端。",
+                            "Git Bash was not found. Install Git for Windows or use an available shell.",
+                        ).into();
+                    }
+                }
+                session.error = Some(error);
             }
         }
         self.sync_visibility();
@@ -648,6 +748,7 @@ impl App {
                     }
                 }
                 PtyEvent::Title(title) if session.spec.agent.is_shell() => {
+                    session.prune_shells();
                     if let Some(path) =
                         ai_terminal::shell::directory_from_title(&title, &session.generation)
                     {
@@ -675,6 +776,7 @@ impl App {
                     }
                 }
                 PtyEvent::Exit => {
+                    session.shells.clear();
                     session.agent_ended();
                     session.status.activity = if session.error.is_some() {
                         Activity::Failed
@@ -805,6 +907,7 @@ impl App {
             .sessions
             .iter()
             .position(|s| Some(&s.spec.id) == self.active.as_ref());
+        let mut fallback = None;
         egui::CentralPanel::default()
             .frame(egui::Frame::new().fill(BG).inner_margin(12))
             .show(ui, |ui| {
@@ -815,7 +918,7 @@ impl App {
                             ui.add_space(10.0);
                             ui.label(
                                 RichText::new(
-                                    tr(&ctx,"选择 PowerShell、CMD 或 Bash，在终端中启动 codex 或 claude。","Choose PowerShell, CMD or Bash, then launch codex or claude."),
+                                    tr(&ctx,"选择 PowerShell、CMD 或 Git Bash，在终端中启动 codex 或 claude。","Choose PowerShell, CMD or Git Bash, then launch codex or claude."),
                                 )
                                 .color(MUTED),
                             );
@@ -888,6 +991,13 @@ impl App {
                 let session = &mut self.sessions[index];
                 if let Some(error) = &session.error {
                     ui.colored_label(YELLOW, error);
+                    if let Some(shell) = session.fallback_shell {
+                        ui.add_space(8.0);
+                        if ui.button(format!("{} {}", tr(&ctx, "改用", "Use"), shell.label())).clicked() {
+                            fallback = Some((index, shell));
+                        }
+                        ui.hyperlink_to("Git for Windows", "https://gitforwindows.org/");
+                    }
                 }
                 let native_image_paste = !session.display_agent().is_shell();
                 if let Some(backend) = &mut session.backend {
@@ -909,6 +1019,23 @@ impl App {
                     );
                 }
             });
+        if let Some((index, shell)) = fallback {
+            self.use_fallback_shell(index, shell, &ctx);
+        }
+    }
+    fn use_fallback_shell(&mut self, index: usize, shell: Agent, ctx: &egui::Context) {
+        let session = &mut self.sessions[index];
+        if session.backend.is_some() || session.fallback_shell != Some(shell) {
+            return;
+        }
+        if matches!(session.spec.name.as_str(), "Bash" | "Git Bash") {
+            session.spec.name = shell.label().into();
+        }
+        session.spec.agent = shell;
+        session.fallback_shell = None;
+        session.error = None;
+        self.dirty = true;
+        self.start_session(index, ctx);
     }
     fn new_shell(&mut self, shell: Agent, ctx: &egui::Context) {
         if !shell.is_shell() {
@@ -1097,6 +1224,8 @@ impl App {
                             let event = HookEvent {
                                 invocation: Some(format!("fixture-run-{index}")),
                                 process_id: Some(std::process::id()),
+                                parent_invocation: None,
+                                console_processes: None,
                                 event_id: uuid::Uuid::new_v4().to_string(),
                                 local_id: local_id.clone(),
                                 generation: generation.clone(),
@@ -1439,6 +1568,8 @@ mod tests {
             HookEvent {
                 invocation: None,
                 process_id: None,
+                parent_invocation: None,
+                console_processes: None,
                 event_id: "completion".into(),
                 local_id: id,
                 generation: "background-generation".into(),
@@ -1695,6 +1826,8 @@ mod tests {
             exit_code: None,
             invocation: Some(invocation.into()),
             process_id: Some(std::process::id()),
+            parent_invocation: None,
+            console_processes: None,
         }
     }
     #[test]
@@ -1734,6 +1867,51 @@ mod tests {
             session.spec.name, "my terminal",
             "automatic icons must not overwrite user names"
         );
+    }
+
+    #[test]
+    fn nested_shell_icons_restore_each_level_without_restarting_the_terminal() {
+        let root = tempfile::tempdir().unwrap();
+        let ctx = egui::Context::default();
+        let creation = eframe::CreationContext::_new_kittest(ctx.clone());
+        let mut app = App::new(&creation, root.path().join("data"), false, false);
+        use_built_helper(&mut app);
+        app.new_shell(Agent::Cmd, &ctx);
+        let session = &mut app.sessions[0];
+        let pid = session.backend.as_ref().unwrap().pty_id();
+        let mut powershell = shell_metadata("ShellStarted", "powershell-one", "powershell");
+        powershell.console_processes = Some(vec![pid]);
+        assert!(session.event(&powershell, true));
+        assert_eq!(session.display_agent(), Agent::Shell);
+        // A detached shell and an unrelated parent cannot steal the active icon.
+        let mut detached = shell_metadata("ShellStarted", "detached", "bash");
+        detached.parent_invocation = Some("powershell-one".into());
+        detached.console_processes = Some(vec![0]);
+        assert!(!session.event(&detached, true));
+        let mut cmd = shell_metadata("ShellStarted", "cmd-two", "cmd");
+        cmd.console_processes = Some(vec![pid]);
+        assert!(!session.event(&cmd, true));
+        cmd.parent_invocation = Some("powershell-one".into());
+        assert!(session.event(&cmd, true));
+        assert_eq!(session.display_agent(), Agent::Cmd);
+        let mut agent = shell_metadata("ShellAgentStarted", "agent-one", "codex");
+        assert!(!session.event(&agent, true));
+        agent.parent_invocation = Some("cmd-two".into());
+        assert!(session.event(&agent, true));
+        assert_eq!(session.display_agent(), Agent::Codex);
+        agent.name = "ShellAgentEnded".into();
+        assert!(session.event(&agent, true));
+        assert_eq!(session.display_agent(), Agent::Cmd);
+        cmd.name = "ShellEnded".into();
+        assert!(session.event(&cmd, true));
+        assert_eq!(session.display_agent(), Agent::Shell);
+        assert!(!session.event(&cmd, true));
+        powershell.name = "ShellEnded".into();
+        assert!(session.event(&powershell, true));
+        assert_eq!(session.display_agent(), Agent::Cmd);
+        assert_eq!(session.spec.agent, Agent::Cmd);
+        assert_eq!(session.backend.as_ref().unwrap().pty_id(), pid);
+        assert!(!session.status.unread);
     }
     #[test]
     fn shell_status_follows_in_process_resume_and_keeps_completion_after_selection() {
@@ -1800,6 +1978,61 @@ mod tests {
             .join("ai-terminal-hook.exe");
         assert!(helper.is_file(), "Cargo must build the companion binary");
         app.helper = Ok(helper);
+    }
+
+    #[test]
+    fn bash_fallback_preserves_session_identity_and_saves_the_actual_shell() {
+        for name in ["Git Bash", "我的会话 👩🏽‍💻"] {
+            let root = tempfile::tempdir().unwrap();
+            let ctx = egui::Context::default();
+            let creation = eframe::CreationContext::_new_kittest(ctx.clone());
+            let mut app = App::new(&creation, root.path().join("data"), false, false);
+            use_built_helper(&mut app);
+            app.startup_pending = false;
+            let mut session = Session::new(SessionSpec {
+                id: "missing-bash".into(),
+                name: name.into(),
+                directory: root.path().into(),
+                agent: Agent::Bash,
+                agent_session_id: Some("saved-conversation".into()),
+                color: Some(model::SessionColor::Blue),
+            });
+            session.error = Some("Git Bash was not found".into());
+            session.fallback_shell = Some(Agent::Cmd);
+            app.sessions.push(session);
+            app.active = Some("missing-bash".into());
+            app.use_fallback_shell(0, Agent::Cmd, &ctx);
+            let session = &app.sessions[0];
+            assert!(
+                session.backend.is_some(),
+                "{}",
+                session.error.as_deref().unwrap_or("")
+            );
+            assert_eq!(session.display_agent(), Agent::Cmd);
+            assert_eq!(
+                session.spec.name,
+                if name == "Git Bash" { "CMD" } else { name }
+            );
+            assert_eq!(session.spec.id, "missing-bash");
+            assert_eq!(session.spec.directory, root.path());
+            assert_eq!(session.spec.color, Some(model::SessionColor::Blue));
+            assert_eq!(
+                session.spec.agent_session_id.as_deref(),
+                Some("saved-conversation")
+            );
+            let pid = session.backend.as_ref().unwrap().pty_id();
+            // A stale/double click must keep the existing shell process.
+            app.use_fallback_shell(0, Agent::Cmd, &ctx);
+            assert_eq!(app.sessions[0].backend.as_ref().unwrap().pty_id(), pid);
+            app.persist();
+            assert_eq!(
+                model::load(&root.path().join("data/sessions.json"))
+                    .unwrap()
+                    .sessions[0]
+                    .agent,
+                Agent::Cmd
+            );
+        }
     }
 
     #[test]

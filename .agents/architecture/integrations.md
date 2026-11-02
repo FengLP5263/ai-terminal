@@ -7,6 +7,7 @@
 | Codex CLI | 当前／持久 PATH 与用户安装目录 | CLI 自有认证、信任和 hook schema；管理器只注入本次参数 | 升级后重新验证配置解析、/hooks 审查及实际生命周期 |
 | Claude Code | 当前／持久 PATH 与用户安装目录 | CLI 自有认证、模型、插件和权限；--settings 仅会话级 | 模型请求必须显式授权；CLI 可自行保存它自己的运行状态 |
 | PowerShell | Windows 系统组件 | 普通交互 shell，无 AI 工作状态推断 | 管理器负责本会话进程树，不修改用户 profile |
+| Git Bash | 可选的 Git for Windows 安装 | 加载系统／用户启动配置后追加本会话目录通知与入口，不修改用户文件 | 无 Git Bash 时明确提示，允许改用可用的 PowerShell／CMD；WSL 和其他 Bash 不代替 Git Bash |
 | 用户工作目录 | 用户主目录、最近目录或终端 cd 后的目录 | 被打开的项目仍归用户和其项目规范管理 | 选择目录不授权管理器／开发者修改其中代码 |
 | Warp | 仅手动参考／REA 静态对比 | 不属于运行依赖，无代码／数据接口 | 不修改或注入其运行进程，不复制其私有实现 |
 
@@ -14,6 +15,7 @@
 统一仓库位置通过相对路径或 REPO_ROOT 表示，个人工作区和会话 ID 留在忽略的本机台账。
 
 hook 协议由 src/status.rs、bridge.rs、launch.rs 维护：事件带本地会话、代次、Agent session、turn 等元数据。
+可选 parent_invocation 和 console_processes 关联嵌套 Shell 的父调用与所属控制台；旧发送端缺失时兼容 None。ShellStarted／ShellEnded 仅更新临时头像，不推断任务状态，进程 ID 列表不持久化。
 只传 reducer 所需字段，不转发输入／输出正文；helper 返回空结果，不作权限决定。
 旧代次／旧回合／子会话过滤与重试去重须保持。CLI 版本变动可能使 hook 失效，不能仅依赖静态配置解析判定联调通过。
 

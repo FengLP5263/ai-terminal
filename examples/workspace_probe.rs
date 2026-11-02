@@ -88,7 +88,7 @@ impl eframe::App for Probe {
                     "codex" => ("接口联调 👩🏽‍💻", Agent::Codex, Activity::Completed, true),
                     "claude" => ("AI 终端 ❤️🚀", Agent::Claude, Activity::Working, false),
                     "cmd" => ("CMD", Agent::Cmd, Activity::Idle, false),
-                    "bash" => ("Bash", Agent::Bash, Activity::Idle, false),
+                    "bash" => ("Git Bash", Agent::Bash, Activity::Idle, false),
                     _ => ("PowerShell", Agent::Shell, Activity::Waiting, false),
                 };
                 Entry {

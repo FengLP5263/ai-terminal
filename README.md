@@ -75,11 +75,17 @@ codex
 
 在左上角齿轮中设置语言和浮窗；悬停会话头像可查看信息，点击即可切换。浮窗可拖动位置，并可在设置中关闭。按住 <kbd>Ctrl</kbd> 滚动鼠标滚轮可缩放整个界面。
 
+在受管终端里交互式启动 `powershell`、`cmd` 或 `bash` 时，头像会跟随当前 Shell；`exit` 逐层恢复。启动 Codex／Claude 时优先显示 Agent 头像，退出后恢复当前 Shell。单次脚本命令和 Agent 内部的工具命令不会因此改变 Shell 头像。
+
 ## 常见问题
 
 ### 已经安装 CLI，为什么提示找不到命令？
 
 请确认 Windows 可从当前或用户／系统 `PATH` 找到对应的 `.exe`、`.cmd` 或 `.bat` 启动器。仅安装在 WSL 中的程序或 PowerShell 别名不属于受支持的 Windows 入口。
+
+### 没有安装 Git Bash 也能使用吗？
+
+可以直接使用 PowerShell 或 CMD。Git Bash 是可选依赖；选择后若未找到安装，界面会提供切换到可用 Shell 的按钮。便携版 Git 需将 `cmd` 或 `bin` 目录加入 `PATH`。Git Bash 会加载其系统／用户启动配置，保留提示符、别名和补全。
 
 ### 为什么 Agent 没有显示状态？
 

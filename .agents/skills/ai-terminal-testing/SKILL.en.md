@@ -13,6 +13,10 @@ See [scripts](../../../scripts/README.en.md) for the POSIX counterpart and platf
 
 Native smoke runs three real PowerShell PTYs with synthetic lifecycle events in a unique isolated `output/` directory. Verify JSON, PNG, exit, and cleanup of the PTYs it owns. On failure, stop only processes started by that test. Distinguish manager from Agent subprocesses, debug from release, GPU, measurement window, and version when reporting performance.
 
+Native Git Bash regressions use a temporary HOME and synthetic startup files, never the developer's real profiles. Cover login-file precedence, PS1, aliases, completion, scalar/array PROMPT_COMMAND, directory tracking and Agent entries. Discovery/fallback checks cover portable paths, rejection of unrelated Bash, missing Git/PowerShell, actual fallback shell identity and retained session data. If Git is absent, explicitly record that native Bash checks did not run; do not claim all-device validation.
+
+Nested-shell checks use real CMD→PowerShell→CMD and a local Agent fixture, verifying parent correlation, root console membership, per-level return and retention of the original PTY. PowerShell tests use -NoProfile and Git Bash uses a temporary HOME. Identity reduction tests separately cover detached consoles, stale parents and Agent priority; synthetic events are not real model turns.
+
 Run TUI probes with unsubmitted text only in a previously trusted directory; never automatically accept CLI trust or authorization. Real model turns use the user's account and can incur charges: they require explicit authorization and `verify-claude -AllowModelRequest`, with a $0.15 limit and tools disabled. They are not default CI.
 
 Run screenshots and idle measurements after optimized builds complete. `terminal_probe` and `workspace_probe` must wait for real CLI or sample content; blank screenshots do not pass. Check native probe exit codes and release `TextRendererSession` in `on_exit`. Text changes cover color emoji, modifiers/ZWJ, caret, and terminal boundaries at multiple zoom levels.

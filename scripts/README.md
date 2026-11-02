@@ -58,3 +58,7 @@ Git Bash governance/format-check。verify-package 与失败路径以最终验收
 缩放回归另运行 `cargo build --offline --locked --example island_zoom_probe` 和 `target/debug/examples/island_zoom_probe.exe output/<unique-zoom-probe>`，核验真实原生视口在 50%、71%、100% 和 150% 下的物理尺寸、屏幕居中、垂直位置与截图；探针只读取自身窗口并使用合成会话；可附加目标显示器的物理 X 坐标来验证不同 DPI 的屏幕。
 
 制品源码身份还包含本地 egui_glow 的 Cargo 清单、Rust 源码和 GLSL 着色器，避免遗漏图形补丁。
+
+Git Bash 原生启动与截图核查（仅 Windows，PowerShell 或 Git Bash 均可执行）：`cargo build --offline --locked --bins --example bash_probe`，再运行 `target/debug/examples/bash_probe.exe output/<unique-bash-probe>`。探针使用真实 Git Bash、临时 HOME 与合成用户启动文件，核验目录元数据、配置／Agent 入口及 PNG 后退出；不读取真实用户配置、不启动模型。Git 缺失或验证失败会明确返回非零。缺失回退的合成测试与已安装 Git 的原生验收分开记录。
+
+Shell 头像的原生截图核查（仅 Windows，PowerShell／Git Bash）：`cargo build --offline --locked --release --bins --example shell_switch_probe`，再运行 `target/release/examples/shell_switch_probe.exe output/<unique-shell-switch-probe>`。使用正式 App 控件和 B 图标、隔离会话与系统目录，不读取用户 profile、不启动 Agent／模型；只向自身窗口注入 CMD→PowerShell→CMD→逐层 exit 的输入，生成五张截图并正常退出。capture.json 仅说明截图已生成，必须人工确认内容、头像和正常退出，不能当作自动视觉验收。

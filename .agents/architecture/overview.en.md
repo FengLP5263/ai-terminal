@@ -17,6 +17,8 @@ The current version is in `Cargo.toml`; the initial baseline was 0.1.2. Windows 
 | `vendor/egui_term`, `vendor/egui-winit` | Alacritty/ConPTY and native text/input rendering; pinned egui-winit 0.35.0 paste patch. |
 | `assets/fonts`, `assets/icons`, `assets/branding` | Pinned Hack fonts, Agent icons, and the selected original B application icon. |
 | `examples/terminal_probe.rs`, `workspace_probe.rs` | Real TUI or local ANSI probes, controlled input, GPU screenshots and exit. |
+| `examples/bash_probe.rs` | Real Git Bash and isolated HOME: startup configuration, directory notifications, Agent entries and native screenshots; no model request. |
+| `examples/shell_switch_probe.rs` | Production App screenshots of nested-shell avatars and per-level return; isolated sessions, input only into its own window, no Agent/model startup. |
 
 Data flow: ConPTY I/O thread → Alacritty grid → active viewport → GPU. A separate path carries session CLI events and Agent hooks → independent helper → authenticated TCP → bounded queue → `App::logic` → sidebar status. Shell prompts report directories through an OSC title with generation and sequence; there are no disk, process-list, or terminal-history scans. Event reduction must not depend on drawing or selection.
 

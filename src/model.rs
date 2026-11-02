@@ -23,7 +23,7 @@ impl Agent {
             Self::Claude => "Claude Code",
             Self::Shell => "PowerShell",
             Self::Cmd => "CMD",
-            Self::Bash => "Bash",
+            Self::Bash => "Git Bash",
         }
     }
 }

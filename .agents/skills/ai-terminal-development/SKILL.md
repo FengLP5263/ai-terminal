@@ -19,6 +19,7 @@ description: 在 ai-terminal 仓库进行 Windows 原生终端的本地开发、
 POSIX 对应 `sh scripts/posix/project.sh <action>`。Git Bash 可委托 Windows；macOS/Linux 原生动作明确不支持。
 默认渲染 OpenGL，替代 DX12 仅用于明确的 A/B 验证，不混用旧二进制结果。
 保留源码布局、独立 helper、字体来源和会话级 hook 语义。正常退出只管理自身会话；不杀用户已有 CLI。
+Git Bash 加载系统／用户登录配置后再追加会话集成，保留提示符与 PROMPT_COMMAND；不修改用户文件。发现 Git 时支持 PATH、安装记录和环境目录，缺失时显式提供可用 Shell 的回退；测试使用临时 HOME。
 修改字体／输入／渲染时做真实截图与操作验收，测试计数不能证明观感或全部输入兼容。
 完成后走 testing 技能；架构／配置／命令变化同步 .agents/architecture 与 scripts/README.md，vendor 补丁更新 UPSTREAM.md。
 

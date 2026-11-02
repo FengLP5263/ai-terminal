@@ -20,6 +20,8 @@ Alacritty 0.26；默认 glow/OpenGL，可选 wgpu/DX12 用于本机对照。依�
 | vendor/egui-winit | 与 eframe 相同的 0.35.0；仅保留无文本剪贴板的粘贴请求 |
 | assets/fonts、assets/icons、assets/branding | 固定来源的 Hack 字体、Agent 图标，以及原创 B 方案程序图标和来源校验 |
 | examples/terminal_probe.rs、workspace_probe.rs | 开发核查：真实 TUI 或本地 ANSI 样例、受控输入、GPU 截图后退出 |
+| examples/bash_probe.rs | 真实 Git Bash 与隔离 HOME，启动配置、目录通知、Agent 入口和原生截图核查；不请求模型 |
+| examples/shell_switch_probe.rs | 正式 App 控件的嵌套 Shell 头像与逐层返回截图；隔离会话，仅向自身窗口输入，不启动 Agent／模型 |
 
 数据流：ConPTY I/O 线程 → Alacritty 网格 → 活动 viewport → GPU。
 另一条独立路径为会话级 CLI 启停／Agent hook → 独立 helper → 认证 TCP → 有界队列 → App::logic → 侧栏提示。
