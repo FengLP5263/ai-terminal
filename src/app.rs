@@ -120,15 +120,37 @@ impl Session {
         }
         self.status.apply(event, viewing)
     }
-    fn shutdown(&mut self) {
+    fn take_resources(&mut self) -> Option<SessionResources> {
         self.detected_agent = None;
         self.invocation = None;
         self.agent_process.take();
-        self.job.take();
-        self.backend.take();
+        if let Some(backend) = &self.backend {
+            backend.set_visible(false);
+        }
+        let resources = SessionResources {
+            job: self.job.take(),
+            backend: self.backend.take(),
+        };
         self.status.activity = Activity::Exited;
+        (resources.job.is_some() || resources.backend.is_some()).then_some(resources)
+    }
+    fn shutdown(&mut self) {
+        drop(self.take_resources());
     }
 }
+
+struct SessionResources {
+    job: Option<crate::platform::ProcessJob>,
+    backend: Option<TerminalBackend>,
+}
+impl Drop for SessionResources {
+    fn drop(&mut self) {
+        // Preserve the existing ownership order: close the job before PTY teardown.
+        self.job.take();
+        self.backend.take();
+    }
+}
+
 impl Drop for Session {
     fn drop(&mut self) {
         self.shutdown();
@@ -158,6 +180,8 @@ pub struct App {
     close_session: Option<String>,
     confirm_exit: bool,
     allow_exit: bool,
+    closing: Option<crate::shutdown::ShutdownTask>,
+    shutdown_saved: bool,
     theme: TerminalTheme,
     font: TerminalFont,
     preferences: model::UiSettings,
@@ -254,6 +278,8 @@ impl App {
             close_session: None,
             confirm_exit: false,
             allow_exit: false,
+            closing: None,
+            shutdown_saved: false,
             theme: TerminalTheme::default(),
             font: ai_terminal::appearance::terminal_font(14.0),
             preferences,
@@ -369,7 +395,12 @@ impl App {
     fn sync_visibility(&self) {
         for s in &self.sessions {
             if let Some(b) = &s.backend {
-                b.set_visible(self.can_draw && self.active.as_deref() == Some(&s.spec.id));
+                b.set_visible(
+                    self.can_draw
+                        && !self.confirm_exit
+                        && self.closing.is_none()
+                        && self.active.as_deref() == Some(&s.spec.id),
+                );
             }
         }
     }
@@ -386,7 +417,77 @@ impl App {
         self.sync_visibility();
         // Selection is persisted on exit; switching terminals never writes to disk.
     }
+    fn begin_shutdown(&mut self, ctx: &egui::Context) {
+        if self.closing.is_some() {
+            return;
+        }
+        let workspace = Workspace {
+            sessions: self.sessions.iter().map(|s| s.spec.clone()).collect(),
+            active: self.active.clone(),
+            last_directory: self.last_directory.clone(),
+            ui: self.preferences,
+        };
+        let path = self.directory.join("sessions.json");
+        let skip_save = self.load_failed || self.smoke;
+        let resources: Vec<_> = self
+            .sessions
+            .iter_mut()
+            .filter_map(Session::take_resources)
+            .collect();
+        let wake_context = ctx.clone();
+        let wake = Arc::new(move || wake_context.request_repaint_of(egui::ViewportId::ROOT));
+        let save = move || {
+            if skip_save {
+                Ok(())
+            } else {
+                model::save(&path, &workspace)
+            }
+        };
+        match crate::shutdown::ShutdownTask::start(resources, save, wake) {
+            Ok(task) => {
+                self.confirm_exit = false;
+                self.dirty = false;
+                self.closing = Some(task);
+                ctx.request_repaint();
+            }
+            Err(error) => {
+                self.save_error = Some(format!(
+                    "{}: {error}",
+                    tr(ctx, "无法启动退出任务", "Unable to start shutdown")
+                ));
+                self.confirm_exit = true;
+            }
+        }
+    }
+
+    fn poll_shutdown(&mut self, ctx: &egui::Context) -> bool {
+        let Some(task) = &self.closing else {
+            return false;
+        };
+        if let Some(result) = task.poll() {
+            self.closing = None;
+            match result {
+                Ok(()) => {
+                    self.shutdown_saved = true;
+                    self.dirty = false;
+                    self.allow_exit = true;
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                }
+                Err(error) => {
+                    self.save_error = Some(error);
+                    self.dirty = false;
+                    self.confirm_exit = true;
+                    ctx.request_repaint();
+                }
+            }
+        }
+        true
+    }
+
     fn background_tick(&mut self, ctx: &egui::Context) {
+        if self.poll_shutdown(ctx) || self.shutdown_saved {
+            return;
+        }
         let can_draw = !ctx.input(|input| input.viewport().minimized.unwrap_or(false));
         if self.can_draw != can_draw {
             self.can_draw = can_draw;
@@ -794,6 +895,7 @@ impl App {
                         .set_native_image_paste(native_image_paste)
                         .set_theme(self.theme.clone())
                         .set_font(self.font.clone())
+                        .set_snapshot_only(self.confirm_exit)
                         .set_focus(focus)
                         .request_focus(focus && std::mem::take(&mut self.terminal_focus_pending))
                         .set_size(ui.available_size());
@@ -839,29 +941,9 @@ impl App {
             ctx.request_repaint();
         }
         if let Some(id) = self.rename.clone() {
-            let mut done = false;
             let mut open = true;
-            egui::Window::new(tr(ctx, "重命名", "Rename"))
-                .open(&mut open)
-                .collapsible(false)
-                .resizable(false)
-                .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
-                .show(ctx, |ui| {
-                    let input = ai_terminal::ui_text::edit(
-                        ui,
-                        &mut self.rename_text,
-                        egui::Id::new("session-rename-input"),
-                    )
-                    .response;
-                    done = input.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
-                    done |= ui
-                        .add_enabled(
-                            !self.rename_text.trim().is_empty(),
-                            egui::Button::new(tr(ctx, "保存", "Save")),
-                        )
-                        .clicked();
-                });
-            if done && !self.rename_text.trim().is_empty() {
+            let done = ai_terminal::dialogs::rename(ctx, &mut open, &mut self.rename_text);
+            if done {
                 if let Some(s) = self.sessions.iter_mut().find(|s| s.spec.id == id) {
                     s.spec.name = self.rename_text.trim().into();
                 }
@@ -931,11 +1013,13 @@ impl App {
                     });
                 });
             if exit {
-                self.allow_exit = true;
-                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                self.begin_shutdown(ctx);
             }
             if cancel {
                 self.confirm_exit = false;
+                self.terminal_focus_pending = true;
+                self.sync_visibility();
+                ctx.request_repaint();
             }
         }
     }
@@ -1114,12 +1198,42 @@ impl eframe::App for App {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let began = Instant::now();
         let ctx = ui.ctx().clone();
+        if let Some(task) = &self.closing {
+            if ctx.input(|i| i.viewport().close_requested()) {
+                ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
+            }
+            let (done, total) = task.progress();
+            egui::CentralPanel::default()
+                .frame(egui::Frame::new().fill(BG))
+                .show(ui, |ui| {
+                    ui.centered_and_justified(|ui| {
+                        ui.vertical_centered(|ui| {
+                            ui.spinner();
+                            ui.label(format!(
+                                "{} {done}/{total}",
+                                tr(&ctx, "正在关闭会话", "Closing sessions")
+                            ));
+                            ui.label(tr(
+                                &ctx,
+                                "正在保存会话设置，请稍候。",
+                                "Saving session settings. Please wait.",
+                            ));
+                        });
+                    });
+                });
+            ctx.request_repaint_after(Duration::from_millis(100));
+            return;
+        }
+        if self.shutdown_saved {
+            return;
+        }
         if ctx.input(|i| i.viewport().close_requested())
             && !self.allow_exit
             && self.sessions.iter().any(|s| s.backend.is_some())
         {
             ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
             self.confirm_exit = true;
+            self.sync_visibility();
             if !self.can_draw {
                 ai_terminal::floating::restore_main(&ctx);
             }
@@ -1143,14 +1257,18 @@ impl eframe::App for App {
         self.sidebar(ui);
         self.terminal(ui);
         self.dialogs(&ctx);
-        self.persist();
+        if self.closing.is_none() {
+            self.persist();
+        }
         self.ui_micros += began.elapsed().as_micros();
     }
 }
 impl Drop for App {
     fn drop(&mut self) {
-        self.dirty = true;
-        self.persist();
+        if !self.shutdown_saved && self.closing.is_none() {
+            self.dirty = true;
+            self.persist();
+        }
         for session in &mut self.sessions {
             session.shutdown();
         }
@@ -1178,6 +1296,110 @@ fn renderer_info(cc: &eframe::CreationContext<'_>) -> serde_json::Value {
 #[cfg(all(test, windows))]
 mod tests {
     use super::*;
+    #[test]
+    fn confirmed_shutdown_closes_only_owned_terminals_and_saves_workspace() {
+        struct ChildGuard(std::process::Child);
+        impl Drop for ChildGuard {
+            fn drop(&mut self) {
+                let _ = self.0.kill();
+                let _ = self.0.wait();
+            }
+        }
+        use std::os::windows::process::CommandExt;
+        let mut unrelated = ChildGuard(
+            std::process::Command::new("powershell.exe")
+                .args([
+                    "-NoLogo",
+                    "-NoProfile",
+                    "-Command",
+                    "Start-Sleep -Seconds 30",
+                ])
+                .creation_flags(0x08000000)
+                .spawn()
+                .unwrap(),
+        );
+        let directory = tempfile::tempdir().unwrap();
+        let ctx = egui::Context::default();
+        let creation = eframe::CreationContext::_new_kittest(ctx.clone());
+        let mut app = App::new(&creation, directory.path().to_owned(), false, false);
+        app.startup_pending = false;
+        let mut watches = Vec::new();
+        for index in 0..6 {
+            let mut session = Session::new(SessionSpec {
+                id: format!("owned-{index}"),
+                name: format!("Session {index}"),
+                directory: directory.path().into(),
+                agent: Agent::Shell,
+                agent_session_id: None,
+                color: None,
+            });
+            let backend = TerminalBackend::new(
+                30_000 + index,
+                ctx.clone(),
+                app.pty_sender.clone(),
+                egui_term::BackendSettings {
+                    shell: "cmd.exe".into(),
+                    args: vec!["/D".into(), "/Q".into()],
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+            watches.push(crate::platform::ProcessWatch::open(backend.pty_id()).unwrap());
+            session.job = Some(crate::platform::ProcessJob::attach(backend.pty_id()).unwrap());
+            session.backend = Some(backend);
+            app.sessions.push(session);
+        }
+        app.active = Some("owned-3".into());
+        app.confirm_exit = true;
+        app.begin_shutdown(&ctx);
+        assert!(app.closing.is_some());
+        assert!(
+            app.sessions
+                .iter()
+                .all(|s| s.backend.is_none() && s.job.is_none())
+        );
+        let deadline = Instant::now() + Duration::from_secs(15);
+        while app.closing.is_some() {
+            let _ = ctx.run_ui(egui::RawInput::default(), |_| app.background_tick(&ctx));
+            assert!(Instant::now() < deadline, "shutdown did not finish");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert!(app.allow_exit && app.shutdown_saved);
+        let restored = model::load(&directory.path().join("sessions.json")).unwrap();
+        assert_eq!(restored.sessions.len(), 6);
+        assert_eq!(restored.active.as_deref(), Some("owned-3"));
+        while watches.iter().any(|watch| !watch.exited()) {
+            assert!(Instant::now() < deadline, "an owned session remained alive");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert!(
+            unrelated.0.try_wait().unwrap().is_none(),
+            "unrelated process was stopped"
+        );
+    }
+
+    #[test]
+    fn failed_shutdown_save_keeps_the_window_open_for_retry() {
+        let directory = tempfile::tempdir().unwrap();
+        let invalid = directory.path().join("not-a-directory");
+        std::fs::write(&invalid, b"keep").unwrap();
+        let ctx = egui::Context::default();
+        let creation = eframe::CreationContext::_new_kittest(ctx.clone());
+        let mut app = App::new(&creation, invalid.clone(), false, false);
+        app.startup_pending = false;
+        app.confirm_exit = true;
+        app.begin_shutdown(&ctx);
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while app.closing.is_some() {
+            let _ = ctx.run_ui(egui::RawInput::default(), |_| app.background_tick(&ctx));
+            assert!(Instant::now() < deadline, "save failure was not reported");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert!(!app.allow_exit && !app.shutdown_saved);
+        assert!(app.confirm_exit && app.save_error.is_some());
+        assert_eq!(std::fs::read(&invalid).unwrap(), b"keep");
+    }
+
     #[test]
     fn completion_updates_while_minimized_without_any_paint() {
         let directory = tempfile::tempdir().unwrap();

@@ -42,3 +42,9 @@ Input/display repair: stable widget identity; request focus only when needed (re
 0.4.0: PTY metadata, exit and redraw events explicitly request ROOT viewport repaint. With a deferred floating status window, waking root logic cannot depend on the viewport currently being painted. Terminal I/O, hidden-output draining, mouse protocol and bounded history remain unchanged.
 
 Managed Codex invocations: a bounded, session-scoped OSC 9 observer forwards only recognized attention-notification metadata; content is discarded. The read/write wrapper preserves the PTY stream and coalesces repeated notices. No ordinary output or bell is used to infer completion.
+
+Input responsiveness: avoid duplicate grid snapshots on frames without input and skip unchanged resize locks. Queue input before waiting for the grid, and coalesce adjacent keyboard bytes within a bounded 64 KiB batch while preserving action order.
+
+During the application exit confirmation, TerminalView can paint its last snapshot without acquiring the active terminal grid lock. Output continues to drain and the normal live view resumes if the user cancels.
+
+IME focus recovery: clear unfinished composition when the native window or terminal loses focus, or focus is explicitly restored. Cancellation received while unfocused must not leave later keyboard input suppressed. Ordinary repaints preserve active composition. A real ConPTY regression covers cancellation during focus loss and typing/submission after returning.

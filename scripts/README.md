@@ -56,3 +56,5 @@ Git Bash governance/format-check。verify-package 与失败路径以最终验收
 0.4.0 多窗口开发验收：先用现有工具链运行 `cargo build --offline --locked --example island_probe`，再运行 `target/debug/examples/island_probe.exe output/<unique-island-probe>`。探针只使用合成状态和自身窗口，生成中英文 PNG／JSON 后退出；与真实 Agent 回合分开记录。浮窗默认关闭，性能核查需要明确记录是否开启以及任务状态。
 
 缩放回归另运行 `cargo build --offline --locked --example island_zoom_probe` 和 `target/debug/examples/island_zoom_probe.exe output/<unique-zoom-probe>`，核验真实原生视口在 50%、71%、100% 和 150% 下的物理尺寸、屏幕居中、垂直位置与截图；探针只读取自身窗口并使用合成会话；可附加目标显示器的物理 X 坐标来验证不同 DPI 的屏幕。
+
+制品源码身份还包含本地 egui_glow 的 Cargo 清单、Rust 源码和 GLSL 着色器，避免遗漏图形补丁。

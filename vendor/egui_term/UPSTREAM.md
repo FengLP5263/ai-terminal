@@ -63,3 +63,9 @@ galleys reused across ANSI colors. Application embeds licensed Hack faces.
 0.4.0：PTY 元数据／退出与重绘事件明确请求 ROOT viewport 重绘；管理器新增独立 deferred 状态浮窗后，不能依赖当前正在绘制的 viewport 来唤醒根 logic。终端 I/O、隐藏输出排空、鼠标协议与有界历史保持原有实现。
 
 Managed Codex invocations: a bounded, session-scoped OSC 9 observer forwards only recognized attention-notification metadata; content is discarded. The read/write wrapper preserves the PTY stream and coalesces repeated notices. No ordinary output or bell is used to infer completion.
+
+输入响应优化：无输入的帧不再重复复制网格快照，尺寸不变时不获取网格锁；输入先入 PTY 队列，相邻键盘字节按顺序合并为有界批次。
+
+应用退出确认期间允许绘制最近的终端快照而不等待网格锁，后台输出继续排空；取消后恢复实时画面。
+
+输入法焦点恢复：窗口或终端失去焦点、显式恢复焦点时清理未提交的组合状态，避免失焦期间的取消事件被跳过后吞掉后续按键；普通重绘保留正在输入的候选。真实 ConPTY 回归覆盖失焦时取消、返回后输入与提交。

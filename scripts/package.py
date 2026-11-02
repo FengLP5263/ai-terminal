@@ -26,6 +26,13 @@ ROOT=Path(__file__).resolve().parent.parent
 
 def sha(path):return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
+def source_identity(root=ROOT):
+    inputs=[root/'build.rs',root/'Cargo.toml',root/'Cargo.lock',root/'vendor/egui_term/Cargo.toml',root/'vendor/egui-winit/Cargo.toml',root/'vendor/egui_glow/Cargo.toml']+list((root/'src').rglob('*.rs'))+list((root/'vendor/egui_term/src').rglob('*.rs'))+list((root/'vendor/egui-winit/src').rglob('*.rs'))+[p for p in (root/'vendor/egui_glow/src').rglob('*') if p.is_file()]+list((root/'assets/fonts').iterdir())+list((root/'assets/icons').iterdir())+list((root/'assets/branding').iterdir())
+    digest=hashlib.sha256()
+    for item in sorted(inputs,key=lambda p:p.relative_to(root).as_posix()):
+        digest.update(item.relative_to(root).as_posix().encode());digest.update(b'\0');digest.update(item.read_bytes());digest.update(b'\0')
+    return digest.hexdigest()
+
 def command(args,check=True):
     return subprocess.run(args,cwd=ROOT,capture_output=True,text=True,encoding='utf-8',errors='replace',check=check)
 
@@ -103,12 +110,8 @@ def build(allow_dirty=False):
     for source,destination in [('LICENSE','LICENSE.txt'),('vendor/egui_term/LICENSE','egui-term-LICENSE.txt'),('assets/fonts/LICENSE.md','Hack-LICENSE.txt'),('assets/icons/LICENSE-lobe-icons','Lobe-Icons-LICENSE.txt'),('THIRD_PARTY_NOTICES.md','THIRD_PARTY_NOTICES.md')]:shutil.copy2(ROOT/source,folder/destination)
     (folder/'README.txt').write_text('ai-terminal '+version+'\n\n两个 exe 请放在同一目录。双击 ai-terminal.exe 默认进入 PowerShell；左上角＋可新建 PowerShell、CMD 或 Bash，在终端中输入 codex 或 claude。\n会话数据在 %LOCALAPPDATA%/ai-terminal；退出会回收本程序拥有的会话进程。\nCodex 欢迎页显示等待任务通知；首轮任务后仍无通知时，可在 /hooks 检查状态 hook，只有未启用时需要审查。版本与源码身份见 manifest.json；发行说明与更新见 GitHub 的 FengLP5263/ai-terminal 仓库。\n',encoding='utf-8')
     dependencies(cargo,folder)
-    source_hash=hashlib.sha256()
-    inputs=[ROOT/'build.rs',ROOT/'Cargo.toml',ROOT/'Cargo.lock',ROOT/'vendor/egui_term/Cargo.toml',ROOT/'vendor/egui-winit/Cargo.toml']+list((ROOT/'src').rglob('*.rs'))+list((ROOT/'vendor/egui_term/src').rglob('*.rs'))+list((ROOT/'vendor/egui-winit/src').rglob('*.rs'))+list((ROOT/'assets/fonts').iterdir())+list((ROOT/'assets/icons').iterdir())+list((ROOT/'assets/branding').iterdir())
-    for item in sorted(inputs,key=lambda p:p.relative_to(ROOT).as_posix()):
-        source_hash.update(item.relative_to(ROOT).as_posix().encode());source_hash.update(b'\0');source_hash.update(item.read_bytes());source_hash.update(b'\0')
     head=command(['git','rev-parse','--verify','HEAD'],check=False)
-    manifest={'format_version':1,'version':version,'platform':'windows-x64','git_commit':head.stdout.strip() if head.returncode==0 else None,'dirty':dirty,'rustc':command(['rustc','-V']).stdout.strip(),'source_sha256':source_hash.hexdigest(),'source_scope':'Cargo manifests/lock, build.rs, production Rust, font/icon/branding assets','build':'cargo build --locked --release','published':False,'files':{}}
+    manifest={'format_version':1,'version':version,'platform':'windows-x64','git_commit':head.stdout.strip() if head.returncode==0 else None,'dirty':dirty,'rustc':command(['rustc','-V']).stdout.strip(),'source_sha256':source_identity(),'source_scope':'Cargo manifests/lock, build.rs, production Rust, local egui_glow sources and shaders, font/icon/branding assets','build':'cargo build --locked --release','published':False,'files':{}}
     for item in sorted(folder.rglob('*')):
         if item.is_file():manifest['files'][item.relative_to(folder).as_posix()]={'bytes':item.stat().st_size,'sha256':sha(item)}
     (folder/'manifest.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2),encoding='utf-8')

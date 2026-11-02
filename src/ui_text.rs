@@ -142,15 +142,38 @@ pub fn label_with_width(
 }
 
 pub fn edit(ui: &mut Ui, text: &mut String, id: egui::Id) -> egui::text_edit::TextEditOutput {
+    edit_impl(ui, text, id, None)
+}
+
+pub fn edit_sized(
+    ui: &mut Ui,
+    text: &mut String,
+    id: egui::Id,
+    width: f32,
+) -> egui::text_edit::TextEditOutput {
+    edit_impl(ui, text, id, Some(width))
+}
+
+fn edit_impl(
+    ui: &mut Ui,
+    text: &mut String,
+    id: egui::Id,
+    width: Option<f32>,
+) -> egui::text_edit::TextEditOutput {
     let size = egui::TextStyle::Body.resolve(ui.style()).size;
     let color = ui.visuals().text_color();
     let mut layouter = |ui: &Ui, text: &dyn egui::TextBuffer, _: f32| {
         layout(ui, text.as_str(), size, color, f32::INFINITY)
     };
-    let output = egui::TextEdit::singleline(text)
+    let mut edit = egui::TextEdit::singleline(text)
         .id(id)
-        .layouter(&mut layouter)
-        .show(ui);
+        .layouter(&mut layouter);
+    if let Some(width) = width {
+        edit = edit
+            .desired_width(width)
+            .margin(egui::Margin::symmetric(10, 8));
+    }
+    let output = edit.show(ui);
     paint_emoji(
         &ui.painter().with_clip_rect(output.text_clip_rect),
         output.galley_pos,

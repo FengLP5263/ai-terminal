@@ -20,3 +20,5 @@ OpenAI and Claude icons are from [Lobe Icons](https://github.com/lobehub/lobe-ic
 See assets/icons/SOURCE.json and assets/icons/LICENSE-lobe-icons. Brand names and marks belong to their respective owners.
 
 - egui-winit 0.35.0: local paste-event compatibility patch, MIT OR Apache-2.0. See vendor/egui-winit/UPSTREAM.md and its included license files. The packaged dependency inventory includes this patched crate.
+
+- egui_glow 0.35.0：本地 OpenGL 缓冲区复用补丁，MIT OR Apache-2.0。见 vendor/egui_glow/UPSTREAM.zh.md 及随附许可证；制品依赖清单记录该补丁。
