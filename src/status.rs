@@ -85,8 +85,21 @@ impl Status {
                 self.waiting_tool = None;
             }
             "PermissionRequest" | "Elicitation" => {
-                self.activity = Activity::Waiting;
-                self.waiting_tool = event.tool_use_id.clone();
+                // These fire before other hooks or automatic review may decide.
+                // Wait for a user-facing notification instead.
+            }
+            "PostToolBatch" => {
+                self.activity = Activity::Working;
+                self.waiting_tool = None;
+            }
+            "PermissionDenied" | "PostToolUse" | "PostToolUseFailure" | "ElicitationResult" => {
+                if self.activity != Activity::Waiting
+                    || self.waiting_tool.is_none()
+                    || self.waiting_tool == event.tool_use_id
+                {
+                    self.activity = Activity::Working;
+                    self.waiting_tool = None;
+                }
             }
             "PreToolUse" => {
                 if matches!(
@@ -99,19 +112,15 @@ impl Status {
                     self.activity = Activity::Working;
                 }
             }
-            "PostToolUse" | "PostToolUseFailure" | "ElicitationResult" => {
-                if self.activity != Activity::Waiting
-                    || self.waiting_tool.is_none()
-                    || self.waiting_tool == event.tool_use_id
-                {
-                    self.activity = Activity::Working;
-                    self.waiting_tool = None;
-                }
-            }
             "Notification" => {
                 if matches!(
                     event.notification_type.as_deref(),
-                    Some("permission_prompt" | "elicitation_dialog" | "agent_needs_input")
+                    Some(
+                        "permission_prompt"
+                            | "elicitation_dialog"
+                            | "elicitation_url_dialog"
+                            | "agent_needs_input"
+                    )
                 ) {
                     self.activity = Activity::Waiting;
                 }
@@ -140,6 +149,24 @@ impl Status {
             _ => return false,
         }
         true
+    }
+
+    /// The managed Codex TUI emitted a user-facing attention notification.
+    pub fn codex_attention(&mut self, question: bool) {
+        // A late approval notice must not revive an already ended turn. A plan
+        // question can legitimately be shown after the normal Stop hook.
+        if !question
+            && matches!(
+                self.activity,
+                Activity::Completed | Activity::Failed | Activity::Exited
+            )
+        {
+            return;
+        }
+        if self.activity != Activity::Waiting {
+            self.waiting_tool = None;
+        }
+        self.activity = Activity::Waiting;
     }
 
     pub fn acknowledge(&mut self) {
@@ -177,7 +204,7 @@ mod tests {
         assert!(s.unread);
     }
     #[test]
-    fn completion_stays_visible_when_viewed_and_clears_on_the_next_prompt() {
+    fn viewed_completion_remains_in_status_without_becoming_unread() {
         let mut s = Status::default();
         s.apply(&event("UserPromptSubmit", "1"), true);
         s.apply(&event("Stop", "1"), true);
@@ -194,6 +221,69 @@ mod tests {
         s.apply(&event("UserPromptSubmit", "1"), false);
         s.acknowledge();
         assert_eq!(s.activity, Activity::Working);
+    }
+    #[test]
+    fn codex_automatic_permission_review_does_not_imply_user_attention() {
+        let mut s = Status::default();
+        assert!(s.apply(&event("UserPromptSubmit", "1"), false));
+        assert!(s.apply(&event("PermissionRequest", "1"), false));
+        assert_eq!(s.activity, Activity::Working);
+        s.codex_attention(false);
+        assert_eq!(s.activity, Activity::Waiting);
+        assert!(s.apply(&event("PostToolUse", "1"), false));
+        assert_eq!(s.activity, Activity::Working);
+    }
+    #[test]
+    fn codex_notification_preserves_correlated_question_during_parallel_work() {
+        let mut s = Status::default();
+        let mut question = event("PreToolUse", "1");
+        question.tool_name = Some("request_user_input".into());
+        question.tool_use_id = Some("question".into());
+        assert!(s.apply(&question, false));
+        s.codex_attention(true);
+        let mut other = event("PostToolUse", "1");
+        other.tool_use_id = Some("unrelated".into());
+        assert!(s.apply(&other, false));
+        assert_eq!(s.activity, Activity::Waiting);
+        other.tool_use_id = Some("question".into());
+        assert!(s.apply(&other, false));
+        assert_eq!(s.activity, Activity::Working);
+    }
+    #[test]
+    fn claude_waits_only_for_a_visible_permission_prompt_and_recovers_after_batch() {
+        let mut s = Status::default();
+        s.apply(&event("UserPromptSubmit", "1"), false);
+        s.apply(&event("PermissionRequest", "1"), false);
+        assert_eq!(s.activity, Activity::Working);
+        let mut notification = event("Notification", "1");
+        notification.notification_type = Some("permission_prompt".into());
+        s.apply(&notification, false);
+        assert_eq!(s.activity, Activity::Waiting);
+        s.apply(&event("PostToolBatch", "1"), false);
+        assert_eq!(s.activity, Activity::Working);
+    }
+    #[test]
+    fn claude_url_elicitation_is_not_confused_with_pre_dialog_event() {
+        let mut s = Status::default();
+        s.apply(&event("UserPromptSubmit", "1"), false);
+        s.apply(&event("Elicitation", "1"), false);
+        assert_eq!(s.activity, Activity::Working);
+        let mut notification = event("Notification", "1");
+        notification.notification_type = Some("elicitation_url_dialog".into());
+        s.apply(&notification, false);
+        assert_eq!(s.activity, Activity::Waiting);
+        s.apply(&event("ElicitationResult", "1"), false);
+        assert_eq!(s.activity, Activity::Working);
+    }
+    #[test]
+    fn stale_approval_does_not_revive_completion_but_a_new_plan_question_can() {
+        let mut s = Status::default();
+        s.apply(&event("UserPromptSubmit", "1"), false);
+        s.apply(&event("Stop", "1"), false);
+        s.codex_attention(false);
+        assert_eq!(s.activity, Activity::Completed);
+        s.codex_attention(true);
+        assert_eq!(s.activity, Activity::Waiting);
     }
     #[test]
     fn old_turn_stop_cannot_finish_new_turn() {
@@ -214,7 +304,8 @@ mod tests {
     #[test]
     fn parallel_tool_completion_does_not_clear_other_permission() {
         let mut s = Status::default();
-        let mut wait = event("PermissionRequest", "1");
+        let mut wait = event("PreToolUse", "1");
+        wait.tool_name = Some("AskUserQuestion".into());
         wait.tool_use_id = Some("approval".into());
         s.apply(&wait, false);
         let mut done = event("PostToolUse", "1");
@@ -305,6 +396,10 @@ mod failure_tests {
         state.apply(&event, false);
         assert_eq!(state.activity, Activity::Working);
         event.name = "PermissionRequest".into();
+        state.apply(&event, false);
+        assert_eq!(state.activity, Activity::Working);
+        event.name = "Notification".into();
+        event.notification_type = Some("permission_prompt".into());
         state.apply(&event, false);
         assert_eq!(state.activity, Activity::Waiting);
         event.name = "StopFailure".into();

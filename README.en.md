@@ -1,36 +1,105 @@
-# ai-terminal
+<div align="center">
+
+<img src="assets/branding/ai-terminal.png" width="96" alt="AI Terminal icon">
+
+# AI Terminal
+
+**A calmer workspace for your AI sessions.**
+
+Use Codex and Claude Code in a familiar terminal, keep an eye on their status, and return to any session in a click.
+
+[![GitHub Release](https://img.shields.io/github/v/release/FengLP5263/ai-terminal?label=release)](https://github.com/FengLP5263/ai-terminal/releases/latest)
+[![Platform](https://img.shields.io/badge/platform-Windows%20x64-0078D4)](#platform-support)
+[![License](https://img.shields.io/badge/license-MIT-5c8a66)](LICENSE)
+
+[Get started](#quick-start) · [Features](#built-for-multiple-sessions) · [FAQ](#frequently-asked-questions) · [Contribute](CONTRIBUTING.en.md)
 
 [简体中文](README.md) | English
 
-A Windows-native terminal for managing multiple AI coding sessions. Keep Codex, Claude Code, and ordinary shells in one window, switch between them, and monitor task status.
+</div>
 
-**Version: 0.4.0 · Windows x64 · MIT** · [Download releases](https://github.com/FengLP5263/ai-terminal/releases) · [Documentation](docs/README.en.md) · [Contribute](CONTRIBUTING.en.md)
+## Why AI Terminal?
 
-## Features
+AI tasks can run for a long time. When several windows are open, repeatedly checking which session is working or needs attention can interrupt your focus. AI Terminal brings terminal sessions and their status together so you can keep using your familiar Shell and Agent, and return when needed.
 
-- **Terminal sessions:** Create a PowerShell, CMD, or Git Bash session and run an installed CLI with `codex` or `claude`. The corresponding avatar is detected automatically.
-- **Task status:** Supported lifecycle notifications and process exits indicate working, waiting, completed, or failed. Silence is not interpreted as completion. A green dot means a turn ended; it is not project acceptance.
-- **Session management:** Reorder, rename, color, resize, or collapse the sidebar. Zoom the whole UI with Ctrl+wheel or Ctrl+plus/minus; Ctrl+0 resets it.
-- **Settings and floating monitor:** Follow the system language or select Simplified Chinese or English. An optional always-on-top avatar bar shows up to 10 sessions at once; drag the avatar area for more. Click an avatar to return to its existing session. The bar follows UI zoom and recenters horizontally when zoom or session count changes.
-- **Native rendering:** Rust, egui, Alacritty, and Windows ConPTY provide Chinese text, ANSI colors, and system color emoji without a browser runtime. Codex keeps its native TUI, including full-screen scrolling and the bottom input area.
+It is a native Windows terminal workspace. It does not bundle a model service or require you to change your CLI login, permissions, or workflow.
 
-## Install and use
+## A look inside
 
-Download the Windows x64 ZIP from [GitHub Releases](https://github.com/FengLP5263/ai-terminal/releases), extract it completely, and run `ai-terminal.exe`. Keep `ai-terminal-hook.exe` in the same directory. The release does not require Rust, Python, or Electron. Install and configure Codex CLI or Claude Code separately; the app uses each CLI's existing login, model, trust, and permissions.
+![AI Terminal workspace with several sessions in the sidebar and a terminal on the right](assets/readme/workspace.png)
 
-1. Click **+** at the upper left to choose a shell, or use Ctrl+Shift+N for PowerShell. New sessions use the current or most recent valid directory; use `cd` in the shell to change it.
-2. Run `codex` or `claude`. Switching an active session does not restart its terminal. Restarting the app restores the session list, not running processes or screen contents; use the CLI's own resume command to resume a conversation.
-3. Use the upper-left gear to select a language and enable the floating monitor. Hover over an avatar for details, drag the bar's edge to move it, and disable it in settings.
-4. Task status uses supported CLI hooks. Codex normally sends its first notification after the first task begins. If status is still absent after submission, review `/hooks` in the CLI. The app never trusts hooks on your behalf or alters user-level CLI configuration.
-5. The wheel scrolls terminal history; a full-screen application handles it when it enables the mouse protocol. Shift+wheel uses local history. In recognized Codex or Claude sessions, Ctrl+V or Shift+Insert passes clipboard images to the CLI's native attachment handling.
+Enable the floating bar to see session avatars and status above other windows. Click an avatar to return to that session:
 
-If an installed CLI is not found, ensure its public `.exe`, `.cmd`, or `.bat` launcher is on the current or Windows user/system PATH. Commands available only through WSL or PowerShell aliases are not supported Windows launchers.
+![AI Terminal floating session bar](assets/readme/floating.png)
 
-Session data defaults to `%LOCALAPPDATA%/ai-terminal` and contains only session metadata, UI preferences, and temporary hook configuration, not prompts, transcripts, or API keys. Closing the app reaps its own session processes; save active work first.
+> Screenshots show a development build with synthetic session content and simulated status; they contain no real conversations. See the release notes for the features and appearance of a particular release.
+
+## Built for multiple sessions
+
+| Feature | What you can do |
+| --- | --- |
+| **A real terminal** | Open PowerShell, CMD, or Git Bash and run your installed command-line tools directly. |
+| **Agent recognition** | Starting Codex or Claude Code displays the corresponding avatar; other commands still work as ordinary terminal sessions. |
+| **Task status** | See working, needs attention, completed, or failed states for supported Agents in the sidebar and floating bar. Status comes from supported lifecycle notifications and process exits; it is not a universal inference for every CLI. |
+| **Always-on-top bar** | Show only session avatars and status, up to 10 at a time. Drag the avatar area to see more, and click an avatar to return to its session. |
+| **Your workspace** | Drag to reorder, rename or color sessions, collapse the sidebar, and scale the entire interface with Ctrl + mouse wheel. |
+| **Familiar terminal behavior** | Use Chinese text, ANSI colors, and system color emoji; pass clipboard images to Codex or Claude Code for the CLI to handle. |
+| **Chinese and English** | Follow the system language or choose Simplified Chinese or English in settings. |
+
+## Platform support
+
+| Platform | Status |
+| --- | --- |
+| Windows x64 | Supported |
+| macOS / Linux | Native GUI not currently supported |
+
+## Quick start
+
+### 1. Download and run
+
+Download the Windows x64 ZIP from [GitHub Releases](https://github.com/FengLP5263/ai-terminal/releases/latest), **extract the entire archive**, and run `ai-terminal.exe`. Keep `ai-terminal-hook.exe` in the same directory. Rust, Python, and Electron are not required to run the release package.
+
+### 2. Open a terminal and start an Agent
+
+Select a Shell with the **+** button at the top left, or press <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>N</kbd> for a new PowerShell session. Change to your project directory and run an installed CLI (replace the example path with your own):
+
+```powershell
+cd 'C:\path\to\your-project'
+codex
+# or run claude
+```
+
+Install and configure [Codex CLI](https://github.com/openai/codex) or [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview) separately. AI Terminal respects the CLI's own login, model, trust, and permission settings.
+
+### 3. Make it yours
+
+Use the gear at the top left to set the language and floating bar. Hover over a session avatar for details and click it to switch sessions. Drag the floating bar to reposition it, and turn it off in settings. Hold <kbd>Ctrl</kbd> and scroll to scale the entire interface.
+
+## Frequently asked questions
+
+### Why is an installed CLI not found?
+
+Make sure its Windows `.exe`, `.cmd`, or `.bat` launcher is available on the current, user, or system `PATH`. A program installed only in WSL or exposed only as a PowerShell alias is not a supported Windows entry point.
+
+### Why is there no Agent status?
+
+Status depends on lifecycle notifications supported by the CLI. Codex usually sends its first notification after a task is submitted; if status is still missing, inspect `/hooks` in the CLI. No status does not mean a task has finished. AI Terminal does not trust hooks on your behalf or change user-level CLI configuration.
+
+### Can I continue a conversation after restarting?
+
+The app restores the session list and interface settings, not running processes or terminal screen contents. To continue an AI conversation, use the CLI's own session recovery feature. Exiting the app ends the session processes it manages, so save active work first.
+
+### How do I scroll terminal history or paste an image?
+
+Use the mouse wheel for history. When a full-screen app takes over the wheel, use <kbd>Shift</kbd> + wheel for local history. When Codex or Claude Code is recognized, <kbd>Ctrl</kbd> + <kbd>V</kbd> or <kbd>Shift</kbd> + <kbd>Insert</kbd> passes a clipboard image to the CLI.
+
+### Are conversations or API keys saved?
+
+The default data directory is `%LOCALAPPDATA%/ai-terminal`. It stores session metadata, interface preferences, and temporary hook configuration, not prompts, conversation text, or API keys. Each CLI manages its own data and configuration.
 
 ## Develop from source
 
-Requires Windows x64, Rust stable MSVC, Visual Studio C++ Build Tools, the Windows SDK (including `rc.exe`), and Python 3.11+. See [development scripts](scripts/README.en.md) for verified toolchains and platform limits.
+You will need Windows x64, Rust stable MSVC, Visual Studio C++ Build Tools, the Windows SDK with `rc.exe`, and Python 3.11+.
 
 ```powershell
 git clone https://github.com/FengLP5263/ai-terminal.git
@@ -40,10 +109,14 @@ rustup component add rustfmt clippy
 .\scripts\windows\project.ps1 run
 ```
 
-`ci` runs governance, formatting, Clippy, Rust, and Python checks without model API calls. Native macOS/Linux GUI builds are not supported yet. See the [documentation index](docs/README.en.md) for commands, packaging, and verification.
+`ci` runs governance, formatting, Clippy, Rust, and Python checks without calling model APIs. See the [documentation](docs/README.en.md) and [development scripts](scripts/README.en.md) for development, testing, and packaging details.
 
-## Contributing and license
+## Contribute
 
-Issues and contributions covering input, rendering, status, performance, and documentation are welcome. Read the [contribution guide](CONTRIBUTING.en.md) and [collaboration rules](AGENTS.en.md); omit credentials and private conversations from reports.
+Issues, ideas, terminal improvements, and documentation contributions are welcome! Please read the [contributing guide](CONTRIBUTING.en.md) and [collaboration guidelines](AGENTS.en.md) first. Do not include credentials or private conversations in reports.
 
-Project code is under the [MIT License](LICENSE). Third-party components retain their own licenses; see [third-party notices](THIRD_PARTY_NOTICES.en.md).
+[Open an issue](https://github.com/FengLP5263/ai-terminal/issues) · [Contributing guide](CONTRIBUTING.en.md) · [Documentation](docs/README.en.md)
+
+## License
+
+Project code is available under the [MIT License](LICENSE). Third-party components retain their own licenses; see [third-party notices](THIRD_PARTY_NOTICES.en.md).

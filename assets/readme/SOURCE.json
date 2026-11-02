@@ -1,0 +1,13 @@
+{
+  "description": "Native application captures with synthetic session content and status. No real model requests or private conversations.",
+  "files": {
+    "workspace.png": {
+      "sha256": "fd52e9e155ac322cd23891533310416945a9b4337ddbeae881290535f1d7a9bb",
+      "source": "Isolated application screenshot with synthetic session data"
+    },
+    "floating.png": {
+      "sha256": "8a249ea0295dc27af63007fb1c7a42f92192e4a31327d12c486b176f0ffe6c6d",
+      "source": "Isolated application screenshot with synthetic session data"
+    }
+  }
+}
