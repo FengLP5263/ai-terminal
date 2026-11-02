@@ -33,7 +33,18 @@ fn frame(
     events: Vec<Event>,
     discard: bool,
 ) -> egui::FullOutput {
+    frame_with_window_focus(ctx, backend, events, discard, true)
+}
+
+fn frame_with_window_focus(
+    ctx: &egui::Context,
+    backend: &mut TerminalBackend,
+    events: Vec<Event>,
+    discard: bool,
+    focused: bool,
+) -> egui::FullOutput {
     let input = egui::RawInput {
+        focused,
         screen_rect: Some(egui::Rect::from_min_size(
             egui::Pos2::ZERO,
             egui::vec2(800.0, 500.0),
@@ -97,6 +108,14 @@ fn repaint_preserves_chinese_composition() {
             .should_interrupt_composition,
         "a normal repaint must not cancel the native Chinese candidate window"
     );
+    let repainted = frame(&ctx, &mut backend, vec![], false);
+    assert!(
+        repainted.shapes.iter().any(|shape| matches!(
+            &shape.shape,
+            egui::Shape::Text(text) if text.galley.job.text == "nihao"
+        )),
+        "a normal repaint must retain the pending composition preview"
+    );
 }
 
 #[test]
@@ -129,6 +148,34 @@ fn chinese_commit_and_enter_reach_real_conpty_once() {
     assert!(
         text.contains("INPUT_HEX:61-62-63-E4-BD-A0-E5-A5-BD"),
         "input was dropped or duplicated: {text}"
+    );
+}
+
+#[test]
+fn queued_text_and_editing_keys_keep_order_in_a_real_conpty() {
+    let ctx = egui::Context::default();
+    let mut backend = terminal(
+        &ctx,
+        "[Console]::InputEncoding=[Text.UTF8Encoding]::new($false); [Console]::Write('BATCH_READY'); $line=[Console]::ReadLine(); [Console]::Write('BATCH_HEX:'+ [BitConverter]::ToString([Text.Encoding]::UTF8.GetBytes($line))); Start-Sleep -Seconds 20",
+    );
+    frame(&ctx, &mut backend, vec![], false);
+    wait_text(&mut backend, "BATCH_READY");
+    frame(
+        &ctx,
+        &mut backend,
+        vec![
+            Event::Text("a".into()),
+            Event::Text("b".into()),
+            key(Key::Backspace),
+            Event::Text("你好".into()),
+            key(Key::Enter),
+        ],
+        false,
+    );
+    let text = wait_text(&mut backend, "BATCH_HEX:");
+    assert!(
+        text.contains("BATCH_HEX:61-E4-BD-A0-E5-A5-BD"),
+        "queued input changed order or was lost: {text}"
     );
 }
 
@@ -461,4 +508,45 @@ fn shift_wheel_uses_local_history_and_ctrl_wheel_sends_no_application_input() {
     );
     backend.process_command(egui_term::BackendCommand::Write(b"z".to_vec()));
     wait_text(&mut backend, "FIRST_INPUT_122");
+}
+
+#[test]
+fn focus_loss_during_composition_does_not_block_input() {
+    let ctx = egui::Context::default();
+    let mut backend = terminal(
+        &ctx,
+        "[Console]::InputEncoding=[Text.UTF8Encoding]::new($false); [Console]::Write('FOCUS_RECOVERY_READY'); $line=[Console]::ReadLine(); [Console]::Write('FOCUS_RECOVERY_HEX:'+ [BitConverter]::ToString([Text.Encoding]::UTF8.GetBytes($line))); Start-Sleep -Seconds 20",
+    );
+    frame(&ctx, &mut backend, vec![], false);
+    wait_text(&mut backend, "FOCUS_RECOVERY_READY");
+    frame(&ctx, &mut backend, vec![Event::Text("kept-".into())], false);
+    frame(
+        &ctx,
+        &mut backend,
+        vec![Event::Ime(ImeEvent::Preedit {
+            text: "pin".into(),
+            active_range_chars: None,
+        })],
+        false,
+    );
+    // Native IME cancellation can arrive in the unfocused frame. It must not
+    // leave the terminal suppressing all subsequent keyboard input.
+    frame_with_window_focus(
+        &ctx,
+        &mut backend,
+        vec![Event::Ime(ImeEvent::Preedit {
+            text: String::new(),
+            active_range_chars: None,
+        })],
+        false,
+        false,
+    );
+    frame(&ctx, &mut backend, vec![], false);
+    frame(&ctx, &mut backend, vec![Event::Text("ok".into())], false);
+    frame(&ctx, &mut backend, vec![key(Key::Enter)], false);
+    let text = wait_text(&mut backend, "FOCUS_RECOVERY_HEX:");
+    assert!(
+        text.contains("FOCUS_RECOVERY_HEX:6B-65-70-74-2D-6F-6B"),
+        "focus recovery dropped input or submitted unfinished composition: {text}"
+    );
 }

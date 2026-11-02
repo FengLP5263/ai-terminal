@@ -25,3 +25,5 @@ package 会调用 Cargo release 构建，生成独立版本目录和 ZIP，记�
 
 
 打包从 Cargo metadata 的 target_directory 读取本次 release 二进制，遵循标准 CARGO_TARGET_DIR／build.target-dir。默认构建目录的 EXE 被正在运行的预览占用时，可在当前命令环境设置 CARGO_TARGET_DIR 为另一个忽略的构建目录再执行相同 package 入口；不会覆盖已打开的程序，也不会从旧默认目录误取 EXE。
+
+制品源码身份还须覆盖本地 egui_glow 的 Cargo 清单、Rust 源码与 GLSL 着色器；相关许可证通过 Cargo metadata 收集。

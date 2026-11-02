@@ -1,6 +1,6 @@
 [package]
 name = "ai-terminal"
-version = "0.4.1"
+version = "0.4.2"
 edition = "2024"
 rust-version = "1.92"
 description = "A small native workspace for coding-agent terminals"
@@ -9,10 +9,11 @@ default-run = "ai-terminal"
 
 [workspace]
 members = ["vendor/egui_term"]
-exclude = ["vendor/egui-winit"]
+exclude = ["vendor/egui-winit", "vendor/egui_glow"]
 
 [patch.crates-io]
 egui-winit = { path = "vendor/egui-winit" }
+egui_glow = { path = "vendor/egui_glow" }
 
 [features]
 default = ["renderer-glow"]

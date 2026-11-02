@@ -50,3 +50,5 @@ target/、output/、.runtime/、runtime/、.tools/、参考交接文件、数据
 
 
 0.4.0 在 ui 中新增 language（system／zh_cn／en，默认 system）、floating_enabled（默认 false）、floating_position（旧版可选逻辑坐标）以及 floating_position_pixels（按显示器物理像素保存，首次从旧坐标迁移）。旧文件通过 serde 默认值继续加载；切换语言与浮窗选项沿用 400ms 延迟原子保存，退出时立即保存。浮窗快照仅包含 ID、名称、Agent、颜色、状态和未读，不持久化任务正文。背景透明胶囊与齿轮都是代码绘制，没有新增图片、系统字体副本或浏览器依赖。
+
+0.4.2 的 egui_glow 本地补丁记录上游来源和许可证；制品源码摘要包含其 Cargo 清单、Rust 源码及 GLSL 着色器。

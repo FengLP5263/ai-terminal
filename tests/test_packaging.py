@@ -26,6 +26,19 @@ class ArchiveVerification(unittest.TestCase):
             self.assertTrue(packaging.verify_archive(good)['ok'])
             with self.assertRaisesRegex(ValueError,'checksum mismatch'):packaging.verify_archive(bad)
 
+    def test_source_identity_covers_glow_patch_and_shaders(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder)
+            names=['build.rs','Cargo.toml','Cargo.lock','vendor/egui_term/Cargo.toml','vendor/egui-winit/Cargo.toml','vendor/egui_glow/Cargo.toml','vendor/egui_glow/src/painter.rs','vendor/egui_glow/src/shader/fragment.glsl']
+            for name in names:
+                path=root/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(b'original')
+            for name in ['src','vendor/egui_term/src','vendor/egui-winit/src','assets/fonts','assets/icons','assets/branding']:(root/name).mkdir(parents=True,exist_ok=True)
+            original=packaging.source_identity(root)
+            for name in names[-3:]:
+                path=root/name;path.write_bytes(b'changed')
+                self.assertNotEqual(original,packaging.source_identity(root),name)
+                path.write_bytes(b'original')
+
     def test_path_traversal_member_is_rejected_without_extraction(self):
         with tempfile.TemporaryDirectory() as folder:
             nested=Path(folder)/'nested';nested.mkdir();path=nested/'unsafe.zip';self.fixture(path,unsafe=True)

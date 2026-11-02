@@ -31,3 +31,5 @@ Do not commit `target/`, `output/`, `.runtime/`, `runtime/`, `.tools/`, handoff 
 Packaging obtains `target_directory` from Cargo metadata and honors `CARGO_TARGET_DIR` / `build.target-dir`; use a separate ignored target directory when a running preview locks the default release EXE.
 
 0.4.0 adds UI `language` (`system`/`zh_cn`/`en`, default `system`), `floating_enabled` (default false), old optional logical `floating_position`, and physical-pixel `floating_position_pixels` (migrated from the old field). Old data uses defaults; language/float settings use delayed atomic persistence. Floating snapshots contain only ID, name, Agent, color, status, and unread state, never task text. The capsule and gear are drawn in code without new image/font/browser dependencies.
+
+The 0.4.2 local egui_glow patch records upstream provenance and licenses; artifact source identity includes its Cargo manifest, Rust sources, and GLSL shaders.
