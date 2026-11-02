@@ -14,3 +14,5 @@ The POSIX companion can verify a ZIP cross-platform; native build/package requir
 Do not overwrite a running preview, alter user data, create tags, or publish without authorization. Missing collected dependency licenses must be recorded; automated collection is not a complete legal review. Signing, public releases, and auto-update are not automatic. When packaging rules change, update Python regressions, both platform entry points, script documentation, README, and the data/asset record.
 
 Packaging reads Cargo metadata's `target_directory`, respecting `CARGO_TARGET_DIR` / `build.target-dir`. If a running preview locks the default EXE, set a separate ignored target directory for the package command; never use an old binary by mistake.
+
+Artifact source identity must also cover the local egui_glow Cargo manifest, Rust sources, and GLSL shaders; licenses are gathered through Cargo metadata.

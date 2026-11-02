@@ -321,13 +321,27 @@ impl TerminalBackend {
     }
 
     pub fn process_command(&mut self, cmd: BackendCommand) {
+        // Queue user input before waiting for the emulator grid, which can be
+        // busy parsing output from the child process.
+        if let BackendCommand::Write(input) = cmd {
+            self.write(input);
+            self.term.lock().scroll_display(Scroll::Bottom);
+            return;
+        }
+        // A view is laid out on every frame, but the grid rarely changes size.
+        if let BackendCommand::Resize(layout, font, scale) = &cmd {
+            if *layout == self.size.layout_size
+                && font.width == self.size.cell_width
+                && font.height == self.size.cell_height
+                && *scale == self.size.pixels_per_point
+            {
+                return;
+            }
+        }
         let term = self.term.clone();
         let mut term = term.lock();
         match cmd {
-            BackendCommand::Write(input) => {
-                self.write(input);
-                term.scroll_display(Scroll::Bottom);
-            }
+            BackendCommand::Write(_) => unreachable!("input is handled before the grid lock"),
             BackendCommand::Scroll(delta) => {
                 self.scroll(&mut term, delta);
             }
@@ -735,5 +749,67 @@ impl EventListener for EventProxy {
         if self.sender.send(event).is_err() {
             self.wake_pending.store(false, Ordering::Release);
         }
+    }
+}
+
+#[cfg(all(test, windows))]
+mod confirmation_snapshot_tests {
+    use super::*;
+    use crate::TerminalView;
+    use std::time::Duration;
+
+    #[test]
+    fn confirmation_snapshot_does_not_wait_for_a_busy_terminal_grid() {
+        let ctx = egui::Context::default();
+        let (tx, _rx) = mpsc::channel();
+        let mut backend = TerminalBackend::new(
+            91_273,
+            ctx.clone(),
+            tx,
+            BackendSettings {
+                shell: "powershell.exe".into(),
+                args: vec![
+                    "-NoLogo".into(),
+                    "-NoProfile".into(),
+                    "-Command".into(),
+                    "Start-Sleep -Seconds 3".into(),
+                ],
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        backend.sync();
+        let term = backend.term.clone();
+        let (locked_tx, locked_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
+        let holder = std::thread::spawn(move || {
+            let _guard = term.lock();
+            locked_tx.send(()).unwrap();
+            let _ = release_rx.recv_timeout(Duration::from_secs(5));
+        });
+        locked_rx.recv_timeout(Duration::from_secs(3)).unwrap();
+        let (done_tx, done_rx) = mpsc::channel();
+        let render = std::thread::spawn(move || {
+            let input = egui::RawInput {
+                screen_rect: Some(egui::Rect::from_min_size(
+                    egui::Pos2::ZERO,
+                    egui::vec2(800.0, 500.0),
+                )),
+                ..Default::default()
+            };
+            let _ = ctx.run_ui(input, |ui| {
+                let view = TerminalView::new(ui, &mut backend).set_snapshot_only(true);
+                ui.add(view);
+            });
+            let _ = done_tx.send(());
+        });
+        let completed = done_rx.recv_timeout(Duration::from_secs(2)).is_ok();
+        let _ = release_tx.send(());
+        holder.join().unwrap();
+        render.join().unwrap();
+        assert!(
+            completed,
+            "exit confirmation waited for the locked terminal grid"
+        );
     }
 }

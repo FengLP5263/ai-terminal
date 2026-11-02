@@ -14,6 +14,7 @@ ORIGINAL_TEXT = {'CLAUDE.md', 'assets/fonts/LICENSE.md'}
 VENDOR_PAIRS = (
     ('vendor/egui_term/UPSTREAM.zh.md', 'vendor/egui_term/UPSTREAM.en.md'),
     ('vendor/egui-winit/UPSTREAM.zh.md', 'vendor/egui-winit/UPSTREAM.md'),
+    ('vendor/egui_glow/UPSTREAM.zh.md', 'vendor/egui_glow/UPSTREAM.md'),
 )
 
 

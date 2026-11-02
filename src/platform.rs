@@ -1,6 +1,11 @@
 #[cfg(windows)]
 pub struct ProcessJob(windows_sys::Win32::Foundation::HANDLE);
 
+// SAFETY: a job handle is owned exclusively by this value; Windows handles may
+// be closed from another thread, and no borrowed handle escapes this type.
+#[cfg(windows)]
+unsafe impl Send for ProcessJob {}
+
 #[cfg(windows)]
 impl ProcessJob {
     pub fn attach(pid: u32) -> std::io::Result<Self> {

@@ -45,6 +45,7 @@ pub struct TerminalView<'a> {
     has_focus: bool,
     focus_requested: bool,
     native_image_paste: bool,
+    snapshot_only: bool,
     size: Vec2,
     backend: &'a mut TerminalBackend,
     font: TerminalFont,
@@ -65,10 +66,14 @@ impl Widget for TerminalView<'_> {
                 .unwrap_or_default()
         });
 
-        self.focus(&layout, &mut state)
-            .resize(&layout)
-            .process_input(&layout, &mut state)
-            .show(&mut state, &layout, &painter);
+        let view = self.focus(&layout, &mut state);
+        if view.snapshot_only {
+            view.show(&mut state, &layout, &painter);
+        } else {
+            view.resize(&layout)
+                .process_input(&layout, &mut state)
+                .show(&mut state, &layout, &painter);
+        }
 
         ui.memory_mut(|m| m.data.insert_temp(widget_id, state));
         layout
@@ -85,6 +90,7 @@ impl<'a> TerminalView<'a> {
             has_focus: false,
             focus_requested: false,
             native_image_paste: false,
+            snapshot_only: false,
             size: ui.available_size(),
             backend,
             font: TerminalFont::default(),
@@ -121,6 +127,13 @@ impl<'a> TerminalView<'a> {
     #[inline]
     pub fn set_native_image_paste(mut self, enabled: bool) -> Self {
         self.native_image_paste = enabled;
+        self
+    }
+
+    /// Paint the most recent snapshot without waiting for terminal output.
+    #[inline]
+    pub fn set_snapshot_only(mut self, enabled: bool) -> Self {
+        self.snapshot_only = enabled;
         self
     }
 
@@ -170,6 +183,17 @@ impl<'a> TerminalView<'a> {
             layout.surrender_focus();
             state.preedit.clear();
         }
+        // IME cancellation can arrive after the native window loses focus,
+        // when process_input intentionally skips key events. Clear its local
+        // composition on focus transitions so stale preedit cannot swallow
+        // every key after the user returns to this terminal.
+        if !layout.ctx.input(|input| input.focused)
+            || !layout.has_focus()
+            || self.focus_requested
+            || layout.gained_focus()
+        {
+            state.preedit.clear();
+        }
         state.input_enabled = self.has_focus;
         self
     }
@@ -180,7 +204,6 @@ impl<'a> TerminalView<'a> {
             self.font.font_measure(&layout.ctx),
             layout.ctx.pixels_per_point(),
         ));
-        self.backend.sync();
 
         self
     }
@@ -192,12 +215,33 @@ impl<'a> TerminalView<'a> {
 
         let modifiers = layout.ctx.input(|i| i.modifiers);
         let events = layout.ctx.input(|i| i.events.clone());
+        if events.is_empty() {
+            return self;
+        }
+        // Input routing needs current terminal mode and coordinates. Repaints
+        // without input take just the single snapshot in `show`.
+        self.backend.sync();
+        let mut pending_input = Vec::new();
         let ime_composing = !state.preedit.is_empty()
             || events
                 .iter()
                 .any(|event| matches!(event,
                     egui::Event::Ime(egui::ImeEvent::Preedit { text, .. } | egui::ImeEvent::Commit(text)) if !text.is_empty()));
         for event in events {
+            // Mouse, clipboard, and modified-key actions can consult terminal
+            // state while being interpreted. Send earlier text first.
+            let flush_before = match &event {
+                egui::Event::Key { modifiers, .. } => !modifiers.is_none(),
+                egui::Event::Copy
+                | egui::Event::Paste(_)
+                | egui::Event::MouseWheel { .. }
+                | egui::Event::PointerButton { .. }
+                | egui::Event::PointerMoved(_) => true,
+                _ => false,
+            };
+            if flush_before {
+                flush_pending_input(self.backend, &mut pending_input);
+            }
             let mut input_actions = vec![];
 
             match event {
@@ -263,16 +307,30 @@ impl<'a> TerminalView<'a> {
 
             for action in input_actions {
                 match action {
+                    InputAction::BackendCall(BackendCommand::Write(bytes)) => {
+                        const MAX_INPUT_BATCH: usize = 64 * 1024;
+                        if pending_input.len().saturating_add(bytes.len()) > MAX_INPUT_BATCH {
+                            flush_pending_input(self.backend, &mut pending_input);
+                        }
+                        if bytes.len() > MAX_INPUT_BATCH {
+                            self.backend.process_command(BackendCommand::Write(bytes));
+                        } else {
+                            pending_input.extend(bytes);
+                        }
+                    }
                     InputAction::BackendCall(cmd) => {
+                        flush_pending_input(self.backend, &mut pending_input);
                         self.backend.process_command(cmd);
                     }
                     InputAction::WriteToClipboard(data) => {
+                        flush_pending_input(self.backend, &mut pending_input);
                         layout.ctx.copy_text(data);
                     }
                     InputAction::Ignore => {}
                 }
             }
         }
+        flush_pending_input(self.backend, &mut pending_input);
 
         self
     }
@@ -281,7 +339,11 @@ impl<'a> TerminalView<'a> {
         let (_, baseline) = self.font.metrics(&layout.ctx);
         let scale = layout.ctx.pixels_per_point();
         let snap = |value: f32| (value * scale).round() / scale;
-        let content = self.backend.sync();
+        let content = if self.snapshot_only {
+            self.backend.last_content()
+        } else {
+            self.backend.sync()
+        };
         let origin = Pos2::new(snap(layout.rect.min.x), snap(layout.rect.min.y));
         let cell_height = content.terminal_size.cell_height;
         let cell_width = content.terminal_size.cell_width;
@@ -509,6 +571,12 @@ impl<'a> TerminalView<'a> {
                 );
             }
         }
+    }
+}
+
+fn flush_pending_input(backend: &mut TerminalBackend, pending: &mut Vec<u8>) {
+    if !pending.is_empty() {
+        backend.process_command(BackendCommand::Write(std::mem::take(pending)));
     }
 }
 

@@ -2,6 +2,7 @@
 
 mod app;
 mod platform;
+mod shutdown;
 mod window_geometry;
 
 fn main() -> eframe::Result {

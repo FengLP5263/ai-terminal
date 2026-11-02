@@ -109,7 +109,7 @@ rustup component add rustfmt clippy
 .\scripts\windows\project.ps1 run
 ```
 
-`ci` 包含治理、格式、Clippy、Rust 和 Python 检查，不调用模型 API。开发、测试和打包的详细说明见[文档目录](docs/README.md)及[开发脚本](scripts/README.md)。
+`ci` 包含治理、格式、Clippy、Rust 和 Python 检查，不调用模型 API。发行包的源码摘要覆盖本地图形补丁与着色器。开发、测试和打包的详细说明见[文档目录](docs/README.md)及[开发脚本](scripts/README.md)。
 
 ## 一起完善
 

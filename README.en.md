@@ -109,7 +109,7 @@ rustup component add rustfmt clippy
 .\scripts\windows\project.ps1 run
 ```
 
-`ci` runs governance, formatting, Clippy, Rust, and Python checks without calling model APIs. See the [documentation](docs/README.en.md) and [development scripts](scripts/README.en.md) for development, testing, and packaging details.
+`ci` runs governance, formatting, Clippy, Rust, and Python checks without calling model APIs. Artifact source identity covers the local graphics patch and its shaders. See the [documentation](docs/README.en.md) and [development scripts](scripts/README.en.md) for development, testing, and packaging details.
 
 ## Contribute
 
