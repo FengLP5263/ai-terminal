@@ -2,6 +2,7 @@
 
 mod app;
 mod platform;
+mod window_geometry;
 
 fn main() -> eframe::Result {
     ai_terminal::launch::prepare_gui_environment();

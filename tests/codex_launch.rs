@@ -14,7 +14,10 @@ fn installed_codex_accepts_scoped_hook_toml_without_auth_or_trust_changes() {
         .env("CODEX_HOME", isolated_home.path())
         .env("AI_TERMINAL_HELPER", helper)
         .current_dir(isolated_home.path());
-    for setting in launch::codex_hook_overrides() {
+    for setting in launch::codex_hook_overrides()
+        .into_iter()
+        .chain(launch::codex_notification_overrides())
+    {
         command.args(["-c", &setting]);
     }
     let output = command
@@ -51,5 +54,10 @@ fn codex_keeps_native_tui_and_uses_an_owned_engine_for_scoped_state() {
     )
     .unwrap();
     assert!(args.iter().any(|arg| arg == "--no-daemon"));
+    assert!(args.iter().any(|arg| arg.contains("tui.notifications")));
+    assert!(
+        args.iter()
+            .any(|arg| arg.contains("tui.notification_method='osc9'"))
+    );
     assert!(!args.iter().any(|arg| arg == "--no-alt-screen"));
 }

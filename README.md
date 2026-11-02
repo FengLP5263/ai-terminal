@@ -1,36 +1,105 @@
-# ai-terminal
+<div align="center">
+
+<img src="assets/branding/ai-terminal.png" width="96" alt="AI Terminal 图标">
+
+# AI Terminal
+
+**给多个 AI 会话，一个清爽的工作空间。**
+
+在熟悉的终端里使用 Codex 和 Claude Code，随时查看会话状态，需要时一键返回。
+
+[![GitHub Release](https://img.shields.io/github/v/release/FengLP5263/ai-terminal?label=release)](https://github.com/FengLP5263/ai-terminal/releases/latest)
+[![Platform](https://img.shields.io/badge/platform-Windows%20x64-0078D4)](#平台支持)
+[![License](https://img.shields.io/badge/license-MIT-5c8a66)](LICENSE)
+
+[下载使用](#快速开始) · [功能介绍](#为多会话而设计) · [常见问题](#常见问题) · [参与贡献](CONTRIBUTING.md)
 
 简体中文 | [English](README.en.md)
 
-一个用于管理多个 AI 编程会话的 Windows 原生终端。将 Codex、Claude Code 和普通 Shell 集中在一个窗口中，快速切换并查看任务状态。
+</div>
 
-**版本：0.4.0 · Windows x64 · MIT** · [下载发行版](https://github.com/FengLP5263/ai-terminal/releases) · [文档](docs/README.md) · [参与贡献](CONTRIBUTING.md)
+## 为什么做 AI Terminal？
 
-## 功能
+AI 任务可能运行很久。打开多个窗口后，来回确认哪个会话还在工作、哪个需要处理，很容易打断手头的事。AI Terminal 把终端会话和状态集中起来，让你继续使用自己熟悉的 Shell 和 Agent，需要时再回到对应会话。
 
-- **终端会话**：新建 PowerShell、CMD 或 Git Bash；在终端中输入 `codex` 或 `claude` 启动已安装的 CLI，自动显示对应头像。
-- **任务状态**：通过支持的生命周期通知和进程退出显示进行中、等待处理、完成或失败；不会根据输出静默推测完成。绿点表示本轮结束，不代表项目已验收。
-- **会话管理**：拖动排序、重命名、设置颜色、调整或收起侧栏；界面整体支持 Ctrl＋滚轮、Ctrl＋加减缩放，Ctrl＋0 恢复。
-- **设置与浮窗**：可跟随系统语言或选择简体中文、English；可开启置顶头像栏，最多同时显示 10 个会话，拖动头像区查看更多。点击头像返回原会话，浮窗跟随界面缩放，并在缩放或会话数量变化时水平居中。
-- **原生显示**：采用 Rust、egui、Alacritty 和 Windows ConPTY，支持中文、ANSI 颜色和系统彩色 emoji，不包含浏览器运行时。Codex 使用原生 TUI；支持其全屏滚动和底部输入区。
+它是一个 Windows 原生终端工作区，不内置模型服务，也不要求你改变现有 CLI 的登录、权限或工作习惯。
 
-## 安装与使用
+## 看看界面
 
-从 [GitHub Releases](https://github.com/FengLP5263/ai-terminal/releases) 下载 Windows x64 ZIP，完整解压后运行 `ai-terminal.exe`；请将 `ai-terminal-hook.exe` 保留在同一目录。运行发行包不需要安装 Rust、Python 或 Electron。先自行安装和配置要使用的 Codex CLI 或 Claude Code，程序沿用其登录、模型、信任和权限设置。
+![AI Terminal 多会话工作区：侧栏显示多个会话，右侧是终端](assets/readme/workspace.png)
 
-1. 点击左上角 **＋** 选择 Shell，或用 Ctrl＋Shift＋N 新建 PowerShell。新会话使用当前或最近使用的有效工作目录；可在 Shell 中用 `cd` 更换。
-2. 输入 `codex` 或 `claude` 启动 Agent。切换已运行会话不会重启其终端；重启程序只恢复会话列表，不恢复运行中的进程和屏幕内容。恢复 AI 对话请使用 CLI 自己的恢复命令。
-3. 左上角齿轮可设置语言和浮窗。鼠标悬停头像可查看会话信息；拖动浮窗边缘可调整位置，在设置中关闭浮窗。
-4. 任务状态来自 CLI 支持的 hook。Codex 通常在首轮任务后才发送通知；如提交任务后仍无状态，可在 CLI 中使用 `/hooks` 自行审查。程序不会替用户信任 hook 或修改用户级 CLI 配置。
-5. 普通滚轮查看终端历史；全屏应用启用鼠标协议时由应用处理滚轮，Shift＋滚轮查看本地历史。识别到 Codex／Claude 时，Ctrl＋V 或 Shift＋Insert 可把剪贴板图片交给 CLI 原生处理。
+开启浮窗后，可以在其他工作窗口上方查看会话头像和状态，点击头像回到对应会话：
 
-如果已安装 CLI 却找不到，请确认公开的 `.exe`、`.cmd` 或 `.bat` 启动器在当前或 Windows 用户／系统 PATH 中；仅在 WSL 或 PowerShell 别名中可用的命令不属于受支持的 Windows 入口。
+![AI Terminal 浮窗示意](assets/readme/floating.png)
 
-默认会话数据位于 `%LOCALAPPDATA%/ai-terminal`，只保存会话元数据、界面偏好及临时 hook 配置；不保存提示词、对话正文或 API Key。退出时回收本程序管理的会话进程；关闭活动任务前请保存工作。
+> 截图取自开发中的程序，使用合成会话内容和模拟状态，不包含真实对话。发行版的功能与界面请以对应版本说明为准。
+
+## 为多会话而设计
+
+| 功能 | 你可以做什么 |
+| --- | --- |
+| **真正的终端** | 新建 PowerShell、CMD 或 Git Bash，在里面直接运行已安装的命令行工具。 |
+| **Agent 会话识别** | 启动 Codex 或 Claude Code 后显示对应头像；其他命令仍可作为普通终端使用。 |
+| **任务状态** | 在侧栏和浮窗中查看支持的 Agent 的进行中、需要处理、完成或失败状态。状态来自支持的生命周期通知和进程退出，并非对所有 CLI 的通用推断。 |
+| **置顶浮窗** | 只显示会话头像和状态，一次最多显示 10 个；拖动头像区域可查看其余会话，点击头像回到会话。 |
+| **整理自己的工作区** | 拖动会话排序、重命名、设置颜色、收起侧栏；使用 Ctrl + 滚轮调整整个界面大小。 |
+| **熟悉的终端体验** | 支持中文、ANSI 颜色和系统彩色 emoji；Codex／Claude Code 可使用剪贴板图片，具体交互由对应 CLI 处理。 |
+| **中英双语** | 自动跟随系统语言，也可在设置中手动选择简体中文或 English。 |
+
+## 平台支持
+
+| 平台 | 状态 |
+| --- | --- |
+| Windows x64 | 支持 |
+| macOS / Linux | 暂不支持原生 GUI |
+
+## 快速开始
+
+### 1. 下载并启动
+
+从 [GitHub Releases](https://github.com/FengLP5263/ai-terminal/releases/latest) 下载 Windows x64 ZIP，**完整解压**后运行 `ai-terminal.exe`。请保持 `ai-terminal-hook.exe` 与它位于同一目录。运行发行包不需要安装 Rust、Python 或 Electron。
+
+### 2. 创建终端，启动 Agent
+
+点击左上角 **＋** 选择 Shell，或按 <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>N</kbd> 新建 PowerShell。在终端中进入项目目录，输入已安装的 CLI 命令（将示例路径替换为自己的路径）：
+
+```powershell
+cd 'C:\path\to\your-project'
+codex
+# 或运行 claude
+```
+
+请事先自行安装并配置 [Codex CLI](https://github.com/openai/codex) 或 [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview)。AI Terminal 沿用 CLI 自己的登录、模型、信任和权限设置。
+
+### 3. 按自己的方式管理
+
+在左上角齿轮中设置语言和浮窗；悬停会话头像可查看信息，点击即可切换。浮窗可拖动位置，并可在设置中关闭。按住 <kbd>Ctrl</kbd> 滚动鼠标滚轮可缩放整个界面。
+
+## 常见问题
+
+### 已经安装 CLI，为什么提示找不到命令？
+
+请确认 Windows 可从当前或用户／系统 `PATH` 找到对应的 `.exe`、`.cmd` 或 `.bat` 启动器。仅安装在 WSL 中的程序或 PowerShell 别名不属于受支持的 Windows 入口。
+
+### 为什么 Agent 没有显示状态？
+
+状态依赖 CLI 支持的生命周期通知。Codex 通常在首次提交任务后才发送通知；如仍无状态，可在 CLI 中使用 `/hooks` 自行审查。没有状态不代表任务已经结束。AI Terminal 不会替你信任 hook 或修改用户级 CLI 配置。
+
+### 重启后可以继续之前的对话吗？
+
+程序恢复的是会话列表和界面设置，不会恢复原先运行的进程或终端屏幕内容。要继续 AI 对话，请使用对应 CLI 自带的会话恢复功能。退出程序会结束由它管理的会话进程，关闭活动任务前请保存工作。
+
+### 怎么查看终端历史和粘贴图片？
+
+普通滚轮用于查看历史；全屏应用接管鼠标滚轮时可用 <kbd>Shift</kbd> + 滚轮查看本地历史。识别到 Codex／Claude Code 时，可通过 <kbd>Ctrl</kbd> + <kbd>V</kbd> 或 <kbd>Shift</kbd> + <kbd>Insert</kbd> 将剪贴板图片交给 CLI 处理。
+
+### 会保存我的对话或 API Key 吗？
+
+默认数据位于 `%LOCALAPPDATA%/ai-terminal`，保存会话元数据、界面偏好及临时 hook 配置；不保存提示词、对话正文或 API Key。各 CLI 自己的数据和配置由其各自管理。
 
 ## 从源码开发
 
-需要 Windows x64、Rust stable MSVC 工具链、Visual Studio C++ Build Tools、Windows SDK（含 `rc.exe`）及 Python 3.11+。已验证的工具链与平台边界见[开发脚本](scripts/README.md)。
+需要 Windows x64、Rust stable MSVC、Visual Studio C++ Build Tools、包含 `rc.exe` 的 Windows SDK 和 Python 3.11+。
 
 ```powershell
 git clone https://github.com/FengLP5263/ai-terminal.git
@@ -40,10 +109,14 @@ rustup component add rustfmt clippy
 .\scripts\windows\project.ps1 run
 ```
 
-`ci` 包含治理、格式、Clippy、Rust 和 Python 检查，不调用模型 API。macOS／Linux 原生 GUI 尚不支持；详细命令、打包和验证见[文档目录](docs/README.md)。
+`ci` 包含治理、格式、Clippy、Rust 和 Python 检查，不调用模型 API。开发、测试和打包的详细说明见[文档目录](docs/README.md)及[开发脚本](scripts/README.md)。
 
-## 参与与许可证
+## 一起完善
 
-欢迎报告问题、改善输入、渲染、状态、性能和文档。提交前请读[贡献指南](CONTRIBUTING.md)和[协作规范](AGENTS.md)，报告中不要包含凭据或私人对话。
+欢迎反馈问题、分享想法、改进终端体验和文档！提交之前，请先阅读[贡献指南](CONTRIBUTING.md)和[协作规范](AGENTS.md)。反馈问题时请勿包含凭据或私人对话。
 
-项目代码使用 [MIT 许可证](LICENSE)；第三方组件保留各自许可，见[第三方声明](THIRD_PARTY_NOTICES.md)。
+[提交 Issue](https://github.com/FengLP5263/ai-terminal/issues) · [查看贡献指南](CONTRIBUTING.md) · [浏览文档](docs/README.md)
+
+## 许可证
+
+项目代码使用 [MIT License](LICENSE)。第三方组件保留各自的许可证，详见[第三方声明](THIRD_PARTY_NOTICES.md)。

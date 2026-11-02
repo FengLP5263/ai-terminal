@@ -40,3 +40,5 @@ Input/display repair: stable widget identity; request focus only when needed (re
 0.3.7: The host can enable `native_image_paste` for recognized coding CLIs. On Paste query only Windows image formats; forward Alt+V for CLI-owned image attachment. Text keeps bracketed paste/newline behavior. No pixel copy, temporary image, clipboard writes, or background query. Codex restored default fullscreen TUI without forced `--no-alt-screen`.
 
 0.4.0: PTY metadata, exit and redraw events explicitly request ROOT viewport repaint. With a deferred floating status window, waking root logic cannot depend on the viewport currently being painted. Terminal I/O, hidden-output draining, mouse protocol and bounded history remain unchanged.
+
+Managed Codex invocations: a bounded, session-scoped OSC 9 observer forwards only recognized attention-notification metadata; content is discarded. The read/write wrapper preserves the PTY stream and coalesces repeated notices. No ordinary output or bell is used to infer completion.

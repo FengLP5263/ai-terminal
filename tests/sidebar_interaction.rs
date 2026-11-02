@@ -13,6 +13,7 @@ struct Harness {
     output: Option<egui::FullOutput>,
     color: Option<SessionColor>,
     activity: Activity,
+    unread: bool,
 }
 impl Harness {
     fn new() -> Self {
@@ -26,6 +27,7 @@ impl Harness {
             output: None,
             color: None,
             activity: Activity::Idle,
+            unread: false,
         }
     }
     fn frame(&mut self, events: Vec<Event>, collapsed: bool) -> Actions {
@@ -53,7 +55,7 @@ impl Harness {
             } else {
                 Activity::Idle
             },
-            unread: false,
+            unread: id == "a" && self.unread,
             hint: String::new(),
         })
         .collect();
@@ -239,7 +241,7 @@ fn right_click_palette_sets_and_resets_color_without_selecting_another_tab() {
 }
 
 #[test]
-fn completed_indicator_stays_visible_on_the_active_read_tab_in_both_sidebar_sizes() {
+fn completion_indicator_disappears_after_reading_in_both_sidebar_sizes() {
     fn green_dot(shape: &egui::Shape) -> bool {
         match shape {
             egui::Shape::Circle(circle) => circle.fill == egui::Color32::from_rgb(88, 191, 141),
@@ -250,6 +252,7 @@ fn completed_indicator_stays_visible_on_the_active_read_tab_in_both_sidebar_size
     for collapsed in [false, true] {
         let mut h = Harness::new();
         h.activity = Activity::Completed;
+        h.unread = true;
         h.frame(vec![], collapsed);
         assert!(
             h.output
@@ -259,7 +262,7 @@ fn completed_indicator_stays_visible_on_the_active_read_tab_in_both_sidebar_size
                 .iter()
                 .any(|s| green_dot(&s.shape))
         );
-        h.activity = Activity::Working;
+        h.unread = false;
         h.frame(vec![], collapsed);
         assert!(
             !h.output
@@ -267,7 +270,8 @@ fn completed_indicator_stays_visible_on_the_active_read_tab_in_both_sidebar_size
                 .unwrap()
                 .shapes
                 .iter()
-                .any(|s| green_dot(&s.shape))
+                .any(|s| green_dot(&s.shape)),
+            "a viewed completion must not retain a green dot"
         );
     }
 }

@@ -10,6 +10,7 @@ alacritty_terminal = "0.26"
 anyhow = "1"
 open = "5"
 unicode-segmentation = "1.13"
+polling = "3"
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.62.2", features = ["Win32_Graphics_Direct2D", "Win32_Graphics_Direct2D_Common", "Win32_Graphics_DirectWrite", "Win32_Graphics_Dxgi_Common", "Win32_Graphics_Imaging", "Win32_System_Com"] }

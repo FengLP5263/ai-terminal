@@ -422,3 +422,52 @@ fn many_sessions_stay_still_and_only_drag_scrolls_without_opening_a_session() {
     let (_, action) = frame(pointer(last.center(), false));
     assert_eq!(action, Some(Action::Activate("39".into())));
 }
+
+#[test]
+fn floating_completion_dot_disappears_when_the_session_is_read() {
+    fn has_green(shape: &egui::Shape) -> bool {
+        match shape {
+            egui::Shape::Circle(circle) => circle.fill == egui::Color32::from_rgb(88, 191, 141),
+            egui::Shape::Vec(shapes) => shapes.iter().any(has_green),
+            _ => false,
+        }
+    }
+    let ctx = egui::Context::default();
+    appearance::setup(&ctx);
+    let icons = Icons::new(&ctx);
+    let mut snapshot = Snapshot {
+        items: vec![Item {
+            id: "one".into(),
+            name: "Session".into(),
+            agent: Agent::Codex,
+            color: None,
+            activity: Activity::Completed,
+            unread: true,
+        }],
+        active: None,
+        locale: Locale::En,
+    };
+    let frame = |snapshot: &Snapshot| {
+        ctx.run_ui(
+            egui::RawInput {
+                screen_rect: Some(Rect::from_min_size(Pos2::ZERO, egui::vec2(300.0, 48.0))),
+                ..Default::default()
+            },
+            |ui| {
+                floating::body(ui, snapshot, &icons);
+            },
+        )
+    };
+    let output = frame(&snapshot);
+    assert!(
+        output.shapes.iter().any(|shape| has_green(&shape.shape)),
+        "unread completion must be visible"
+    );
+    snapshot.items[0].unread = false;
+    let output = frame(&snapshot);
+    assert!(
+        !output.shapes.iter().any(|shape| has_green(&shape.shape)),
+        "read completion must not retain a green dot"
+    );
+    assert_eq!(snapshot.items[0].activity, Activity::Completed);
+}

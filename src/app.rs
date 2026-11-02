@@ -59,6 +59,9 @@ impl Session {
     }
     fn agent_ended(&mut self) {
         self.detected_agent = None;
+        if let Some(backend) = &self.backend {
+            backend.set_codex_notifications(false);
+        }
         self.invocation = None;
         self.agent_process.take();
         let unread = self.status.unread;
@@ -92,6 +95,9 @@ impl Session {
                     return false;
                 }
                 self.detected_agent = Some(agent);
+                if let Some(backend) = &self.backend {
+                    backend.set_codex_notifications(agent == Agent::Codex);
+                }
                 self.invocation = Some(invocation);
                 self.agent_process = Some(process);
                 self.status = Status::default();
@@ -136,6 +142,7 @@ pub struct App {
     active: Option<String>,
     last_directory: Option<PathBuf>,
     can_draw: bool,
+    monitor_transition: crate::window_geometry::MonitorTransition,
     terminal_focus_pending: bool,
     terminal_rect: Option<egui::Rect>,
     sidebar_right: f32,
@@ -179,6 +186,8 @@ impl App {
         idle_benchmark: bool,
     ) -> Self {
         ai_terminal::appearance::setup(&cc.egui_ctx);
+        cc.egui_ctx
+            .send_viewport_cmd(egui::ViewportCommand::SetTheme(egui::SystemTheme::Dark));
         let mut error = None;
         let mut workspace = match model::load(&directory.join("sessions.json")) {
             Ok(w) => w,
@@ -197,7 +206,7 @@ impl App {
             }
         }
         let preferences = workspace.ui.normalize();
-        cc.egui_ctx.set_zoom_factor(preferences.ui_scale);
+        ai_terminal::zoom::initialize(&cc.egui_ctx, preferences.ui_scale);
         i18n::apply(&cc.egui_ctx, preferences.language);
         let icons = ai_terminal::sidebar::Icons::new(&cc.egui_ctx);
         let floating = ai_terminal::floating::FloatingBar::new(icons.clone());
@@ -229,6 +238,7 @@ impl App {
             active: workspace.active,
             last_directory: workspace.last_directory,
             can_draw: true,
+            monitor_transition: Default::default(),
             terminal_focus_pending: true,
             terminal_rect: None,
             sidebar_right: 0.0,
@@ -526,6 +536,16 @@ impl App {
                 continue;
             };
             match event {
+                PtyEvent::Title(title) if title.starts_with(egui_term::CODEX_ATTENTION_EVENT) => {
+                    if session.detected_agent == Some(Agent::Codex)
+                        && let Some(question) = session
+                            .backend
+                            .as_ref()
+                            .and_then(|b| b.take_codex_attention(&title))
+                    {
+                        session.status.codex_attention(question);
+                    }
+                }
                 PtyEvent::Title(title) if session.spec.agent.is_shell() => {
                     if let Some(path) =
                         ai_terminal::shell::directory_from_title(&title, &session.generation)
@@ -986,7 +1006,7 @@ impl App {
                             "UserPromptSubmit",
                             match index {
                                 0 => "Stop",
-                                1 => "PermissionRequest",
+                                1 => "Notification",
                                 _ => "PreToolUse",
                             },
                         ] {
@@ -1001,7 +1021,8 @@ impl App {
                                 turn_id: Some("one".into()),
                                 tool_name: None,
                                 tool_use_id: None,
-                                notification_type: None,
+                                notification_type: (name == "Notification")
+                                    .then(|| "permission_prompt".into()),
                                 source: if name == "ShellAgentStarted" {
                                     Some(if index == 1 { "claude" } else { "codex" }.into())
                                 } else {
@@ -1106,6 +1127,7 @@ impl eframe::App for App {
         if !self.can_draw {
             return;
         }
+        self.monitor_transition.update(&ctx);
         self.frames += 1;
         self.smoke_step(&ctx);
         if ctx.input_mut(|i| {

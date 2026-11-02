@@ -1,3 +1,4 @@
+mod notification;
 pub mod settings;
 
 use crate::types::Size;
@@ -21,12 +22,13 @@ use std::borrow::Cow;
 use std::cmp::min;
 use std::io::Result;
 use std::ops::{Index, RangeInclusive};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicU8, Ordering};
 use std::sync::mpsc::Sender;
 use std::sync::{mpsc, Arc};
 
 pub type TerminalMode = TermMode;
 pub type PtyEvent = Event;
+pub const CODEX_ATTENTION_EVENT: &str = "ai-terminal-codex-attention-v1";
 pub type SelectionType = AlacrittySelectionType;
 
 #[derive(Debug, Clone)]
@@ -145,6 +147,9 @@ pub struct TerminalBackend {
     notifier: Notifier,
     last_content: RenderableContent,
     visible: Arc<AtomicBool>,
+    codex_notifications: Arc<AtomicBool>,
+    codex_notice_epoch: Arc<AtomicU64>,
+    codex_notice_pending: Arc<AtomicU8>,
     shutdown: mpsc::Sender<Event>,
 }
 
@@ -200,6 +205,18 @@ impl TerminalBackend {
             hovered_hyperlink: None,
         };
         let term = Arc::new(FairMutex::new(term));
+        let codex_notifications = Arc::new(AtomicBool::new(false));
+        let codex_notice_epoch = Arc::new(AtomicU64::new(0));
+        let codex_notice_pending = Arc::new(AtomicU8::new(0));
+        let pty = notification::ObservedPty::new(
+            pty,
+            id,
+            codex_notifications.clone(),
+            codex_notice_epoch.clone(),
+            codex_notice_pending.clone(),
+            pty_event_proxy_sender.clone(),
+            app_context.clone(),
+        );
         let pty_event_loop = EventLoop::new(term.clone(), event_proxy, pty, false, false)?;
         let notifier = Notifier(pty_event_loop.channel());
         let pty_notifier = Notifier(pty_event_loop.channel());
@@ -267,8 +284,40 @@ impl TerminalBackend {
             notifier,
             last_content: initial_content,
             visible,
+            codex_notifications,
+            codex_notice_epoch,
+            codex_notice_pending,
             shutdown,
         })
+    }
+
+    /// Observe Codex's scoped OSC 9 attention notifications; never record their contents.
+    pub fn set_codex_notifications(&self, enabled: bool) {
+        self.codex_notifications.store(false, Ordering::Release);
+        self.codex_notice_epoch.fetch_add(1, Ordering::AcqRel);
+        self.codex_notice_pending.store(0, Ordering::Release);
+        self.codex_notifications.store(enabled, Ordering::Release);
+    }
+
+    /// Accept each notice once, only for the currently running Codex invocation.
+    /// Returns whether the notice is a plan/question rather than an approval.
+    pub fn take_codex_attention(&self, notice: &str) -> Option<bool> {
+        let (epoch, kind) = notice
+            .strip_prefix(CODEX_ATTENTION_EVENT)?
+            .strip_prefix(';')?
+            .split_once(';')?;
+        let epoch = epoch.parse::<u64>().ok()?;
+        let (bit, question) = match kind {
+            "approval" => (1, false),
+            "question" => (2, true),
+            _ => return None,
+        };
+        if !self.codex_notifications.load(Ordering::Acquire)
+            || self.codex_notice_epoch.load(Ordering::Acquire) != epoch
+        {
+            return None;
+        }
+        (self.codex_notice_pending.fetch_and(!bit, Ordering::AcqRel) & bit != 0).then_some(question)
     }
 
     pub fn process_command(&mut self, cmd: BackendCommand) {

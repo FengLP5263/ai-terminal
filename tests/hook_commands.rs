@@ -68,7 +68,7 @@ fn stable_codex_command_reports_turns_from_relocated_unicode_helper_paths() {
         }
         assert!(
             !status.unread,
-            "a viewed completion remains visible without becoming unread"
+            "a viewed completion keeps its activity without becoming unread"
         );
     }
 }
