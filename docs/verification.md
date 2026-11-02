@@ -1,5 +1,7 @@
 # 0.1.0 本地预览验证记录
 
+简体中文 | [English](verification.en.md)
+
 2026-10-30。Windows x64，Rust 1.99.1 MSVC，egui/eframe 0.35.0，Alacritty 0.26.0。
 默认 GPU 后端为 glow/OpenGL。记录时尚未首次提交；这是当时的历史状态，当前 Git 状态以仓库为准。
 

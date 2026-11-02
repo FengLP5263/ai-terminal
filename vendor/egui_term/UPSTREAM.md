@@ -1,3 +1,5 @@
+
+[简体中文](UPSTREAM.zh.md) | [English](UPSTREAM.en.md)
 Source: https://github.com/kemokempo/egui_term
 Revision: 31bbc7ab8503c9518fcee5717cfa29011e59f451
 License: MIT (LICENSE preserved).

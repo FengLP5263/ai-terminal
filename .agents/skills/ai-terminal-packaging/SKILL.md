@@ -5,6 +5,8 @@ description: 构建、归档和回读校验 ai-terminal 的本地 Windows ZIP，
 
 # 本地制品
 
+简体中文 | [English](SKILL.en.md)
+
 先读根 AGENTS.md、数据与资产记录。Windows x64，Python 3.11+，Rust 与 C++/SDK 已就绪。
 先运行 ci 与对应版本原生 smoke；视觉／输入修改还要真实截图验收。
 

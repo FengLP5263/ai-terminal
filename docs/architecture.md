@@ -1,61 +1,37 @@
-# Architecture decision: native Windows first
+# 架构决策：Windows 原生优先
 
-Rust owns the application, PTYs and status bridge. egui/eframe draws a small GPU UI
-through glow/OpenGL by default. An optional wgpu/DX12 build is retained for A/B measurement. The terminal component reuses the Apache-2.0
-Alacritty parser and ConPTY backend; a pinned MIT egui_term snapshot provides the
-input and rendering widget. Local performance/input patches are documented beside it.
+简体中文 | [English](architecture.en.md)
 
-This avoids a browser engine and JavaScript runtime in the manager. It does not
-make the agents themselves lightweight: their process/memory costs are independent.
-Measure the release binary before making performance claims.
+Rust 负责应用、PTY 与状态桥。egui/eframe 默认通过 glow/OpenGL 绘制轻量 GPU 界面，保留可选的 wgpu/DX12 构建用于 A/B 测量。终端复用 Apache-2.0 的 Alacritty 解析器和 ConPTY 后端；固定版本的 MIT egui_term 快照提供输入与渲染控件，本地性能和输入补丁在其目录内记录。
 
-## Hot path
+管理器因此不需要浏览器引擎和 JavaScript 运行时。这不意味着 Agent 本身轻量；其进程和内存开销独立计算。性能结论需测量优化版。
 
-ConPTY -> Alacritty parser on its I/O thread -> bounded 5000-line scrollback.
-The visible terminal copies only viewport cells into a reused allocation. Hidden
-terminals continue parsing output but do not request repaint. Output wakeups are
-coalesced to a 16 ms repaint deadline. Sidebar activity animation runs at 10 Hz,
-and idle sessions do not schedule animation. No directory/transcript/process scans.
+## 热路径
 
-## Status path
+ConPTY → I/O 线程上的 Alacritty 解析器 → 最多 5000 行历史。可见终端只把视口单元复制到复用缓冲；隐藏终端继续解析输出，但不请求重绘。输出唤醒合并到 16 ms 重绘期限。侧栏活动动画运行于 10 Hz，空闲会话不安排动画。不扫描目录、对话正文或进程。
 
-Agent lifecycle hook -> `ai-terminal-hook.exe --hook` -> metadata-only authenticated
-loopback TCP message -> bounded queue -> UI state reducer, irrespective of selection.
-Each launch has a new generation ID; stale process events are ignored. Agent session
-and turn IDs reject child-conversation and previous-turn events. A duplicate delivery
-cannot repeat state changes. Acknowledging unread results never changes activity.
+## 状态路径
 
-Hooks return `{}` and never approve, deny or modify tool use. They are injected into
-the launched session via Claude's `--settings` and Codex's per-invocation configuration.
-No user-level agent configuration, API key or trust record is written. Codex requires
-review of non-managed hooks; until it reports events the UI says status not connected.
-Process exit is independently detected from ConPTY. The manager owns one Windows job
-per session, so closing that session also closes its owned descendants.
+Agent 生命周期 hook → `ai-terminal-hook.exe --hook` → 仅元数据的认证 loopback TCP 消息 → 有界队列 → UI 状态 reducer，与当前选择无关。每次启动都有新 generation ID，过滤过期进程事件；Agent session 和 turn ID 拒绝子会话与上一轮事件。重复投递不能重复改变状态。确认未读结果不改变活动状态。
 
-Only session names, directories and actual agent resume IDs are persisted, atomically.
-Restart restores the list; clicking Continue invokes the agent's resume command.
-Terminal scrollback and live process state are not restored after the program exits.
+Hook 返回 `{}`，不批准、拒绝或修改工具调用。通过 Claude 的 `--settings` 和 Codex 单次调用配置注入会话，不写用户级 Agent 配置、API Key 或信任记录。Codex 需要审查非托管 hook；收到事件前提示状态未连接。ConPTY 独立检测进程退出；管理器为每个会话拥有一个 Windows Job，关闭会话会关闭其受管后代。
 
-## Visible indicators
+仅原子保存会话名称、目录和实际 Agent 恢复 ID。重启后恢复列表；本段记录的是早期 Continue 启动恢复命令的设计，当前启动行为以运行规范为准。程序退出后不恢复终端历史和运行进程。
 
-- Spinner: working.
-- Yellow dot: needs input/approval.
-- Green dot: completed this turn, result unread.
-- Idle: no badge. Errors/disconnected status: short contextual message.
+## 可见指示
 
-## Verification and limits
+- 转圈：工作中。
+- 黄点：需要输入或批准。
+- 绿点：本轮完成；本早期记录关联未读，当前已读后的显示行为见运行规范。
+- 空闲：无角标；错误／未连接使用简短上下文提示。
 
-Core tests exercise stale-turn rejection, background completion, unread acknowledgement,
-parallel-tool waiting and bridge authentication. Native smoke uses three real PowerShell
-ConPTYs with synthetic lifecycle events; it produces a GPU screenshot and JSON evidence.
-It is not a live Claude/Codex task test. CLI upgrades can change hook schemas or trust
-handling; actual agent versions and live-event verification must be recorded separately.
+## 验证与限制
 
-No heartbeat can prove an agent's semantic progress while it is silently reasoning.
-We do not use silence timeouts to manufacture a completed state. Background-task and
-scheduled-agent workflows need additional lifecycle coverage beyond this first version.
+核心测试覆盖过期回合拒绝、后台完成、未读确认、并行工具等待和桥认证。原生 smoke 使用三个真实 PowerShell ConPTY 和合成生命周期事件，生成 GPU 截图和 JSON；它不是 Claude/Codex 真实任务测试。CLI 升级可能改变 hook schema 或信任处理；实际 Agent 版本和真实事件验证需单独记录。
 
-## Primary references
+没有心跳可以证明静默推理期间 Agent 的语义进度；不使用静默超时伪造完成。后台任务和定时 Agent 工作流需要额外生命周期覆盖。
+
+## 主要参考
 
 - https://github.com/alacritty/alacritty
 - https://github.com/emilk/egui
@@ -64,24 +40,14 @@ scheduled-agent workflows need additional lifecycle coverage beyond this first v
 - https://code.claude.com/docs/en/hooks
 - https://code.claude.com/docs/en/cli-reference
 
-The completion badge means the current agent turn ended. A persistent dev server or
-other background process does not keep the working spinner alive. A new autonomous
-turn reports UserPromptSubmit and resumes the spinner. It is not project acceptance.
+完成角标表示当前 Agent 回合结束，持续运行的开发服务器等后台进程不会让转圈持续；新的自主回合报告 UserPromptSubmit 并恢复转圈。这不表示项目验收通过。
 
-## Renderer selection
+## 渲染器选择
 
-The same Windows machine was tested with the same GUI, fonts and three-terminal
-fixture. The initial DX12 debug build selected Intel UHD 630 and used about 721 MiB
-resident; OpenGL selected Quadro RTX 4000 and used about 117 MiB. This is a measured
-configuration choice on this machine, not a same-adapter backend-only comparison.
-No universal fastest-renderer claim is made. Release measurements are separate.
+同一 Windows 机器使用相同 GUI、字体和三个终端样例测试。最初 DX12 debug 构建选择 Intel UHD 630，驻留内存约 721 MiB；OpenGL 选择 Quadro RTX 4000，约 117 MiB。这是本机配置选择，不是同显卡纯后端比较，也不宣称普遍最快。release 测量单独记录。
 
-Default: `cargo build --release`.
-Alternative: `cargo build --release --no-default-features --features renderer-wgpu`.
-Switching build features changes `target/release/ai-terminal.exe`; keep measurements
-in separate output directories and never compare a stale binary.
+默认：`cargo build --release`。
+对照：`cargo build --release --no-default-features --features renderer-wgpu`。
+切换构建功能会改变 `target/release/ai-terminal.exe`；在不同输出目录保留测量，不比较旧二进制。
 
-Agent events are consumed in eframe's logic callback, which also runs when painting
-is suspended. Minimized sessions disable terminal redraw wakeups but still reduce
-hook events. A native test delivers completion while minimized and verifies the
-unread result before any UI paint, preventing focus-dependent status refresh.
+Agent 事件在 eframe 的 logic 回调中消费，暂停绘制时仍运行。最小化会话关闭终端重绘唤醒，但继续归约 hook 事件。原生测试在最小化且没有绘制时投递完成事件，验证首次绘制前已更新未读状态，防止依赖焦点的状态刷新。

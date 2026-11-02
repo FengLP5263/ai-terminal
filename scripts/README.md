@@ -1,5 +1,7 @@
 # 开发与交付脚本
 
+简体中文 | [English](README.en.md)
+
 统一入口：Windows `scripts/windows/project.ps1 <action>`；POSIX `sh scripts/posix/project.sh <action>`。
 从脚本位置定位仓库，不要求调用者当前目录。相对制品路径统一相对仓库根目录。
 PowerShell 可用 Get-Help 查看完整命令头；POSIX 使用 --help。Python 要求 3.11+，可用 AI_TERMINAL_PYTHON 指定解释器。

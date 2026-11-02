@@ -1,5 +1,7 @@
 # 运行、配置与操作
 
+简体中文 | [English](runtime.en.md)
+
 ## 支持环境
 
 已验证 Windows x64、Rust 1.99.1 MSVC、Visual Studio C++ Build Tools 与 Windows SDK。

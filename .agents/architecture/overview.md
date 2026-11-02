@@ -1,5 +1,7 @@
 # 架构总览
 
+简体中文 | [English](overview.en.md)
+
 当前版本以 Cargo.toml 为准，初始化基线为 0.1.2。Windows x64、Rust 2024、eframe/egui 0.35、
 Alacritty 0.26；默认 glow/OpenGL，可选 wgpu/DX12 用于本机对照。依赖版本由 Cargo.lock 锁定。
 

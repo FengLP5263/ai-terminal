@@ -13,11 +13,12 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+import check_bilingual
 
 ROOT=Path(__file__).resolve().parent.parent
 REQUIRED=['AGENTS.md','CLAUDE.md','README.md','Cargo.toml','Cargo.lock','build.rs','rust-toolchain.toml','.gitignore','.gitattributes','THIRD_PARTY_NOTICES.md','scripts/README.md','scripts/windows/project.ps1','scripts/posix/project.sh','scripts/package.py']
 REQUIRED += ['.agents/architecture/'+name+'.md' for name in ['overview','runtime','data-and-assets','integrations']]
-REQUIRED += ['.agents/skills/ai-terminal-'+name+'/SKILL.md' for name in ['development','testing','packaging']]
+REQUIRED += ['.agents/skills/ai-terminal-'+name+'/SKILL.md' for name in ['development','testing','packaging','git-workflow']]
 
 def check():
     errors=[]
@@ -25,6 +26,9 @@ def check():
         if not (ROOT/item).is_file():errors.append('missing: '+item)
     result=subprocess.run(['git','ls-files','--cached','--others','--exclude-standard','-z'],cwd=ROOT,capture_output=True,check=True)
     paths=sorted(set(result.stdout.decode('utf-8').split('\0'))-{''})
+    bilingual_errors,bilingual_pairs=check_bilingual.check(paths)
+    errors.extend(bilingual_errors)
+    if not bilingual_errors: errors.extend(check_bilingual.verify_snapshots(bilingual_pairs))
     blocked={'target','output','.tools','.runtime','runtime','.local','reference','.git','__pycache__'}
     secret=re.compile(r'(?:sk-(?:proj-)?[A-Za-z0-9_-]{30,}|-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----)')
     personal=re.compile(r'[A-Za-z]:[\\/]Users[\\/](?!Public(?:[\\/]|$)|<|\$|%)[A-Za-z0-9_.-]+[\\/]')
@@ -66,12 +70,12 @@ def check():
         if rule not in ignore.splitlines():errors.append('missing ignore: '+rule)
     for name in ['dev.ps1','smoke.ps1','measure-idle.ps1','verify-claude.py']:
         if not (ROOT/'scripts'/name).read_text(encoding='utf-8-sig').startswith(('<#','"""','#')):errors.append('missing usage header: '+name)
-    return paths,errors
+    return paths,errors,bilingual_pairs
 
 def main():
     argparse.ArgumentParser(description=__doc__,formatter_class=argparse.RawDescriptionHelpFormatter).parse_args()
-    paths,errors=check()
-    report={'ok':not errors,'candidate_files':len(paths),'font_identities_checked':5,'icon_identities_checked':2,'branding_identities_checked':3,'errors':errors}
+    paths,errors,bilingual_pairs=check()
+    report={'ok':not errors,'candidate_files':len(paths),'font_identities_checked':5,'icon_identities_checked':2,'branding_identities_checked':3,'bilingual_document_pairs_checked':len(bilingual_pairs),'errors':errors}
     print(json.dumps(report,ensure_ascii=False,indent=2))
     return 1 if errors else 0
 

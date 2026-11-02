@@ -1,5 +1,7 @@
 # 0.3.5 会话状态修复
 
+简体中文 | [English](status-reporting-0.3.5.en.md)
+
 ## 问题与行为
 
 - 通过 `/resume` 切换主会话时，旧 reducer 只允许 clear 改变 ID，后续进行中／完成事件被丢弃。现在 resume／clear／fork 明确切换主会话；旧会话和旧回合事件仍被过滤。
