@@ -1,5 +1,7 @@
 # 治理与初始化验收
 
+简体中文 | [English](governance.en.md)
+
 ## 采用前基线
 
 2026-10-30，版本 0.1.2。独立 Git 已初始化但 develop 尚无提交；无远端、额外 worktree、标签或云发布配置。

@@ -5,6 +5,8 @@ description: 在 ai-terminal 仓库进行 Windows 原生终端的本地开发、
 
 # 本地开发
 
+简体中文 | [English](SKILL.en.md)
+
 先读根 AGENTS.md 与架构记录。Windows x64、Rust stable MSVC、C++ Build Tools/SDK；治理和打包需要 Python 3.11+。
 工具链优先使用 PATH，可选加载忽略的 .tools/env.ps1；不能把个人工具路径写进源码或文档。
 

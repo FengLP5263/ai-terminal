@@ -1,5 +1,7 @@
 # ai-terminal 协作规范
 
+简体中文 | [English](AGENTS.en.md)
+
 ## 范围与边界
 
 Windows 原生 Agent 终端管理器。只做项目／会话导航、真实终端、可靠状态提示和对话恢复；
@@ -12,7 +14,8 @@ Windows 原生 Agent 终端管理器。只做项目／会话导航、真实终�
 - 数据／字体／制品：[数据与资产](.agents/architecture/data-and-assets.md)。
 - Agent、协议或关联项目：[集成边界](.agents/architecture/integrations.md)。
 - 执行工作流前读对应项目技能：[开发](.agents/skills/ai-terminal-development/SKILL.md)、
-  [测试](.agents/skills/ai-terminal-testing/SKILL.md)、[制品](.agents/skills/ai-terminal-packaging/SKILL.md)。
+  [测试](.agents/skills/ai-terminal-testing/SKILL.md)、[制品](.agents/skills/ai-terminal-packaging/SKILL.md)、
+  [Git 协作](.agents/skills/ai-terminal-git-workflow/SKILL.md)。
 
 ## 源码与兼容性
 
@@ -33,6 +36,7 @@ Windows 原生 Agent 终端管理器。只做项目／会话导航、真实终�
 - 本地源码不含真实 `.env`、私钥、用户配置、数据库、输出、运行数据或交接压缩包。
 - `.tools/env.ps1`、`.tools/cargo-network.toml` 是可选本机工具链／网络配置，必须保持忽略。
 - 文档使用相对路径或环境变量，禁止写入开发者机器用户名和个人工作目录。
+- 项目自有现行文档按[双语规范](docs/i18n.md)同步中英文、维护互链并通过治理检查；历史文档的翻译进度见台账。
 - 不擅自停止用户已打开的终端；测试只管理自己创建的进程和隔离数据目录。
 - 不创建额外 worktree，也不启动子代理，除非用户明确要求并行工作。
 
