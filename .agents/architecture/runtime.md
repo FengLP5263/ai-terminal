@@ -1,5 +1,7 @@
 # 运行、配置与操作
 
+简体中文 | [English](runtime.en.md)
+
 ## 支持环境
 
 已验证 Windows x64、Rust 1.99.1 MSVC、Visual Studio C++ Build Tools 与 Windows SDK。
@@ -74,7 +76,7 @@ Claude 状态配置在同一终端启动代次内复用，仅内容变化时写�
 
 ## 0.3.5 状态恢复
 
-生命周期 Stop 对应 Completed，与未读分开；已读／当前会话仍显示绿点与「已完成」，下一轮 UserPromptSubmit 恢复 Working。Idle 表示会话就绪，不表示本轮完成。
+生命周期 Stop 对应 Completed，与未读分开；后台完成产生未读绿点，进入并查看会话后清除绿点，但保留「已完成」状态；下一轮 UserPromptSubmit 恢复 Working。Idle 表示会话就绪，不表示本轮完成。
 同一 Agent 调用内的 SessionStart（source 为 resume／clear／fork）可以更新主会话 ID 并清除旧回合；迟到的其他会话事件与子会话 startup 仍被过滤。compact 保持正在工作的状态。
 Codex 状态命令固定为 `& $env:AI_TERMINAL_HELPER --hook`，helper 路径从本次子进程环境读取。安装位置、预览目录和版本号不进入 hook 定义；没有写入 hooks.state，也不绕过 CLI 审查。旧版升级需由用户在 /hooks 审查新的定义；未连接时标题栏明确标识。
 
@@ -101,3 +103,11 @@ Windows 的 egui-winit 补丁保留无文本剪贴板的 Paste 事件。只在�
 浮窗默认关闭，在设置中开启。原生 deferred viewport 使用透明背景、黑色紧凑头像栏、AlwaysOnTop、无标题栏和无任务栏入口。首次置于主窗口所在显示器工作区顶部；拖动浮窗空白边缘移动并保存位置，重新开启时按现有显示器工作区校正。全局缩放或会话数变化时在浮窗所在显示器横向居中，使用屏幕物理坐标和目标显示器 DPI 换算，保留物理垂直位置并同步重设原生视口尺寸。头像和状态角标复用侧栏样式，悬停显示名称与状态；最多同时展示 10 个会话，超出宽度时仅在按住会话区拖动时横向浏览。点击按 UUID 激活既有 PTY 并恢复／聚焦主窗口，不重启 Agent；通过设置关闭浮窗。主窗口正常退出仍由原有确认流程处理。
 
 没有进行中动画或主动拖动时不持续重绘；进行中动画按约 80ms 间隔请求子窗口重绘，后台通知明确唤醒根窗口。根窗口即使最小化仍归约桥事件、更新浮窗快照和保存偏好，避免隐藏主窗口的光标／状态动画继续重绘。没有后台轮询剪贴板、进程树或终端内容。
+
+Windows 主窗口标题栏固定使用深色。普通窗口跨显示器拖动时，松开鼠标后依据鼠标所在显示器的工作区校正越界；先等待 DPI 同步，再按需移动或缩小窗口。最大化窗口由 Windows 管理；同一显示器内的拖动不会被校正。仅检查鼠标左键状态和拖动结束时的指针位置，不记录输入。
+
+## 需要处理状态的信号
+
+Codex 的 PermissionRequest 在自动审批前也会触发，不能单独证明用户看到审批。受管 Codex 进程使用会话级 `tui.notifications`、`tui.notification_method` 和 `tui.notification_condition` 参数接收实际用户提示的 OSC 9；只识别已知提示前缀，不保存通知文本，并按运行代次去重。显式传入的后续 CLI 配置可以覆盖这些参数。部分 Codex 提示类型或未来版本未必发出可识别通知；已有进程需要重新启动才能应用新参数。
+
+Claude 的 PermissionRequest／Elicitation 本身也可能被其他 hook 自动处理；实际权限与交互提示由 Notification 确认，权限提示通常等待约六秒才发出。PermissionDenied 与 PostToolBatch 用于处理拒绝或批次完成后的状态恢复。带显式 `--settings` 的 Claude 仍遵循用户设置，不注入本项目 hook。权限提示解决后，若 CLI 未提供关闭事件，状态可能要等对应工具或批次结束才能恢复；不能把这当成完整的实时状态协议。

@@ -125,6 +125,8 @@ pub fn agent_arguments(
                 "PermissionRequest",
                 "PostToolUse",
                 "PostToolUseFailure",
+                "PostToolBatch",
+                "PermissionDenied",
                 "Notification",
                 "Stop",
                 "StopFailure",
@@ -149,7 +151,10 @@ pub fn agent_arguments(
         Agent::Codex => {
             // Keep this managed terminal's engine, environment and tasks in its own job.
             arguments.push("--no-daemon".into());
-            for setting in codex_hook_overrides() {
+            for setting in codex_hook_overrides()
+                .into_iter()
+                .chain(codex_notification_overrides())
+            {
                 arguments.extend(["-c".into(), setting]);
             }
             if let Some(id) = &spec.agent_session_id {
@@ -159,6 +164,15 @@ pub fn agent_arguments(
         Agent::Shell | Agent::Cmd | Agent::Bash => {}
     }
     Ok(arguments)
+}
+
+/// Enable explicit user-attention notifications only within this managed Codex invocation.
+pub fn codex_notification_overrides() -> Vec<String> {
+    vec![
+        "tui.notifications=['approval-requested','plan-mode-prompt']".into(),
+        "tui.notification_method='osc9'".into(),
+        "tui.notification_condition='always'".into(),
+    ]
 }
 
 pub fn codex_hook_overrides() -> Vec<String> {

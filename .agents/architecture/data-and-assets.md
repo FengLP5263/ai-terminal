@@ -1,5 +1,7 @@
 # 数据、字体与制品
 
+简体中文 | [English](data-and-assets.en.md)
+
 ## 数据与恢复
 
 %LOCALAPPDATA%/ai-terminal/sessions.json 保存会话名称、目录、Agent 类型、实际 resume ID、列表顺序和 UI 偏好。

@@ -1,0 +1,41 @@
+---
+name: ai-terminal-git-workflow
+description: 在 ai-terminal 中检查和执行分支同步、提交、PR 合并、版本标签与已合并特性分支清理，保留共享历史并核验 GitHub 实际合并结果。
+---
+
+# Git 协作与发布
+
+简体中文 | [English](SKILL.en.md)
+
+适用于本仓库的分支、提交、PR、标签和发行协作；开发、测试与构建入口分别见项目 development、testing、packaging 技能。先读根 `AGENTS.md` 和 `CONTRIBUTING.md`，确认本次任务与用户授权；查看状态不授权提交、推送、合并、发布或删除。已有授权在本次任务中持续有效，不重复询问。不得绕过分支保护或审查机制，禁止未经明确授权改写共享历史或强推。
+
+## 分支与日常开发
+
+- `main` 是面向用户的发布主线；`develop` 是日常集成线，允许领先 `main`。独立功能从最新 `develop` 创建 `feature/<name>`，修复用 `fix/<name>`；小改动可在 `develop` 进行。外部贡献者可从 Fork 提交到 `develop`。
+- 开始前核对 `git status --short --branch`、`git worktree list` 和上游；需要远端协作时先 `git fetch`，记录来源与目标的精确 SHA。保留未提交工作，不切换别人的工作区。
+- 功能或修复提交后，检查是否已有对应 PR，再向 `develop` 发起 PR；说明用户可见变更、兼容性、实际验证及未验证项。按变更范围执行项目测试，PR 创建、合并和分支删除各自以用户授权及仓库权限为准。
+- 特性分支是临时工作区。合并后确认 PR、目标代码、是否存在独有提交、其他开放 PR 和工作区占用；获得删除授权后才删除，远端删除使用针对精确旧 SHA 的 lease。本地 `git branch -d` 被拒绝时不得自动升级为 `-D`。rebase/squash 会改变 SHA，补丁等价与文件相同都不能单独证明原始提交已由其他持久引用保留。核对并报告可恢复依据，不承诺未引用对象永久存在。
+
+## 合并策略与历史
+
+目标是保护已有提交、让后续 PR 显示清楚；不能靠强制同步把两条分支伪装成一致。先查看分支保护、可用合并方式、源/目标 SHA 和祖先关系，按 PR 审查要求操作。存在可在 PR 流程中使用的真正快进时优先快进；不要为了快进绕过 PR 直接推送受保护或需要审查的分支。
+
+发布时 `develop` 进入 `main` 应通过 PR。若平台的 rebase 合并会重写提交 ID，或 squash 会压成新提交，不要把它们当成保留提交身份的快进。为避免把同一批工作以不同 SHA 留在两条长期分支，无法在审查流程内快进时，优先使用 PR 的 merge commit 保留提交身份；再按仓库权限与授权，将更新后的 `main` 快进同步到 `develop`，若必须通过 PR 则使用保留父提交的合并方式。此时可能有必要的合并提交，不为了形式上的线性历史改写共享分支。具体方式仍受分支保护和审查规则约束。
+
+合并后刷新远端，核验实际结果，不能只看按钮名称或 PR 的 merged 标记：
+
+```text
+git fetch origin
+git merge-base --is-ancestor origin/main origin/develop
+git rev-list --left-right --count origin/main...origin/develop
+git diff --stat origin/main origin/develop
+git log --graph --oneline --decorate -n 20 --all
+```
+
+`git merge-base --is-ancestor` 返回 0 表示 `main` 是 `develop` 的祖先，返回 1 表示不是祖先，其他错误码需排查命令错误。`rev-list` 与 `diff` 分别比较历史和最终文件：文件为空不代表提交身份一致；领先表示有独有历史，也不自动说明有代码差异。开发中允许 `develop` 有未发布增量；只有声称两者代码同步时，才要求文件差异为空。GitHub PR 的三点差异相对共同祖先，不等同于两个分支当前文件树的直接差异。
+
+如果发现分叉、远端推进或非等价差异，先保留双方引用并比较 SHA、提交图、补丁、实际代码及相关 PR；不自动 rebase 已共享分支、不强推、不覆盖已有提交。需同步且有授权时选择保留历史的方式，合并后复核祖先关系与代码；若目标变化或存在未解决冲突，停止并重新评估。
+
+## 发行交付
+
+用户授权发行后，从经审查的目标提交构建；按 testing 技能执行对应检查和原生验收，按 packaging 技能从干净源码构建 ZIP 并回读校验，不把 `dirty` 预览包当成正式发行包。核对版本、现有标签与提交后创建 `app-v<SemVer>` 注释标签，推送并按授权创建 GitHub Release；核对远端标签指向、附件和下载摘要。标签、发行包、PR 和分支同步分别报告实际结果；不要覆盖正在运行的程序、关闭用户会话或更改其数据。

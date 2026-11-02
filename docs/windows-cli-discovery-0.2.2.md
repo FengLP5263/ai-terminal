@@ -1,5 +1,7 @@
 # 0.2.2 Windows CLI 发现修复
 
+简体中文 | [English](windows-cli-discovery-0.2.2.en.md)
+
 0.2.1 未嵌入开发者个人路径，但只搜索 codex.exe／claude.exe，并依赖一个固定的 npm 内部二进制布局。
 这不能覆盖通常暴露为 codex.cmd 的安装、自定义 npm prefix、其他包管理器启动器，以及桌面进程持有旧 PATH 的情况。
 用户报告的具体设备未直接检查；这里记录已确认的代码缺陷与隔离复现，不将某一种安装方式认定为其唯一原因。

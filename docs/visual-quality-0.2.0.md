@@ -1,5 +1,7 @@
 # 0.2.0 终端显示与会话面板
 
+简体中文 | [English](visual-quality-0.2.0.en.md)
+
 本轮针对用户提供的同一 Claude 会话与 Warp 截图差异，以及 Ctrl＋滚轮缩放需求。
 
 ## 行为

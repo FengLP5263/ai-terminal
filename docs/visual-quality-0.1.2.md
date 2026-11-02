@@ -1,5 +1,7 @@
 # 0.1.2 字体与颜色：REA 对比及修复记录
 
+简体中文 | [English](visual-quality-0.1.2.en.md)
+
 2026-10-30。用户提供 ai-terminal 与 Warp 的对照截图，指出字体、颜色、显示畸变。
 本轮使用 reverse-engineer-anything 技能和实际 REA MCP，只读检查本机 Warp 制品；
 没有对 Warp 进程注入、调试、修改设置或读取会话内容。

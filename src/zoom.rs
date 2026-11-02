@@ -1,5 +1,9 @@
 use crate::model::UiSettings;
 
+/// Apply persisted zoom before the first input pass so its screen rectangle uses the real window size.
+pub fn initialize(ctx: &egui::Context, scale: f32) {
+    ctx.options_mut(|options| options.zoom_factor = scale);
+}
 /// Window-wide UI scale. Consume before layout so the terminal cannot treat it as scroll.
 pub fn input(raw: &mut egui::RawInput, current: f32) -> Option<f32> {
     let mut next = current;
@@ -57,6 +61,36 @@ mod tests {
                 ..Default::default()
             },
             phase: egui::TouchPhase::Move,
+        }
+    }
+    #[test]
+    fn restored_zoom_keeps_the_first_frame_within_the_native_window() {
+        for zoom in [0.5, 0.71, 1.0, 1.5, 2.5] {
+            let ctx = egui::Context::default();
+            initialize(&ctx, zoom);
+            let ppp = 1.5 * zoom;
+            let mut raw = egui::RawInput {
+                screen_rect: Some(egui::Rect::from_min_size(
+                    egui::Pos2::ZERO,
+                    egui::vec2(1200.0 / ppp, 900.0 / ppp),
+                )),
+                ..Default::default()
+            };
+            raw.viewports
+                .get_mut(&egui::ViewportId::ROOT)
+                .unwrap()
+                .native_pixels_per_point = Some(1.5);
+            let _ = ctx.run_ui(raw, |ui| {
+                let rect = ui.ctx().input(|input| input.content_rect());
+                assert!(
+                    (rect.width() * ppp - 1200.0).abs() < 0.1,
+                    "zoom {zoom}: {rect:?}"
+                );
+                assert!(
+                    (rect.height() * ppp - 900.0).abs() < 0.1,
+                    "zoom {zoom}: {rect:?}"
+                );
+            });
         }
     }
     #[test]

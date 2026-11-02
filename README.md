@@ -1,38 +1,105 @@
-# ai-terminal
+<div align="center">
 
-一个方便管理多个 AI 编程会话的 Windows 原生终端。把不同项目的 Codex、Claude Code 和 PowerShell 会话放在一个窗口里，快速切换，并查看哪些 Agent 正在工作、等待处理或已完成。
+<img src="assets/branding/ai-terminal.png" width="96" alt="AI Terminal 图标">
 
-A lightweight Windows-native terminal workspace for managing multiple AI coding agents.
+# AI Terminal
 
-**当前开发版本：0.4.0 · Windows x64 · MIT**
+**给多个 AI 会话，一个清爽的工作空间。**
 
-已发布的预览版及 Windows ZIP 见 [GitHub Releases](https://github.com/FengLP5263/ai-terminal/releases)。
+在熟悉的终端里使用 Codex 和 Claude Code，随时查看会话状态，需要时一键返回。
 
-[报告问题](https://github.com/FengLP5263/ai-terminal/issues) · [参与贡献](CONTRIBUTING.md) · [许可证](LICENSE)
+[![GitHub Release](https://img.shields.io/github/v/release/FengLP5263/ai-terminal?label=release)](https://github.com/FengLP5263/ai-terminal/releases/latest)
+[![Platform](https://img.shields.io/badge/platform-Windows%20x64-0078D4)](#平台支持)
+[![License](https://img.shields.io/badge/license-MIT-5c8a66)](LICENSE)
 
-## 核心功能
+[下载使用](#快速开始) · [功能介绍](#为多会话而设计) · [常见问题](#常见问题) · [参与贡献](CONTRIBUTING.md)
 
-- **集中管理会话**：新建 PowerShell、CMD 或 Git Bash，在终端中运行你已安装的 CLI，保留各自的认证与权限操作。
-- **会话状态提示**：转圈表示工作中，黄点表示需要处理，绿点表示本轮完成，查看后仍保留到下一轮；后台会话也会更新。
-- **整理工作区**：拖动排序、重命名、调整侧栏宽度，或收起为 Agent 头像栏。
-- **整体缩放**：Ctrl＋滚轮或 Ctrl＋加减缩放整个界面，Ctrl＋0 恢复 100%；终端随可用区域重排。普通滚轮滚动终端内容，Codex 以保留滚动历史的内联模式启动。
-- **原生文字显示**：内置 Hack 字体，Windows 原生文字绘制，支持中文、ANSI 颜色与系统彩色表情。
-- **即开即用**：保存列表、顺序、名称与界面偏好；重开后直接进入上次选中的 Shell，其他会话单击即可打开。
+简体中文 | [English](README.en.md)
 
-项目追求简洁、实用与性能。使用 Rust、egui、Alacritty 和 Windows ConPTY，不内嵌浏览器运行时。
+</div>
 
-## 从源码运行
+## 为什么做 AI Terminal？
 
-如需直接使用，可下载 [Releases](https://github.com/FengLP5263/ai-terminal/releases) 中的 Windows ZIP，完整解压后运行 `ai-terminal.exe`，无需安装 Rust 或 Python。以下步骤适用于从源码构建。
+AI 任务可能运行很久。打开多个窗口后，来回确认哪个会话还在工作、哪个需要处理，很容易打断手头的事。AI Terminal 把终端会话和状态集中起来，让你继续使用自己熟悉的 Shell 和 Agent，需要时再回到对应会话。
 
-准备环境：
+它是一个 Windows 原生终端工作区，不内置模型服务，也不要求你改变现有 CLI 的登录、权限或工作习惯。
 
-- Windows x64。
-- Rust stable 的 MSVC 工具链，以及 Visual Studio C++ Build Tools 与 Windows SDK（含 rc.exe 资源编译器，构建时自动查找）。已验证 Rust 1.99.1，最低声明版本见 Cargo.toml。
-- Python 3.11+，用于项目检查和打包。
-- 预先安装并配置好要使用的 Codex CLI、Claude Code 或 PowerShell。ai-terminal 沿用 CLI 的登录与模型设置，无需再填写 API Key。
+## 看看界面
 
-在 PowerShell 中执行：
+![AI Terminal 多会话工作区：侧栏显示多个会话，右侧是终端](assets/readme/workspace.png)
+
+开启浮窗后，可以在其他工作窗口上方查看会话头像和状态，点击头像回到对应会话：
+
+![AI Terminal 浮窗示意](assets/readme/floating.png)
+
+> 截图取自开发中的程序，使用合成会话内容和模拟状态，不包含真实对话。发行版的功能与界面请以对应版本说明为准。
+
+## 为多会话而设计
+
+| 功能 | 你可以做什么 |
+| --- | --- |
+| **真正的终端** | 新建 PowerShell、CMD 或 Git Bash，在里面直接运行已安装的命令行工具。 |
+| **Agent 会话识别** | 启动 Codex 或 Claude Code 后显示对应头像；其他命令仍可作为普通终端使用。 |
+| **任务状态** | 在侧栏和浮窗中查看支持的 Agent 的进行中、需要处理、完成或失败状态。状态来自支持的生命周期通知和进程退出，并非对所有 CLI 的通用推断。 |
+| **置顶浮窗** | 只显示会话头像和状态，一次最多显示 10 个；拖动头像区域可查看其余会话，点击头像回到会话。 |
+| **整理自己的工作区** | 拖动会话排序、重命名、设置颜色、收起侧栏；使用 Ctrl + 滚轮调整整个界面大小。 |
+| **熟悉的终端体验** | 支持中文、ANSI 颜色和系统彩色 emoji；Codex／Claude Code 可使用剪贴板图片，具体交互由对应 CLI 处理。 |
+| **中英双语** | 自动跟随系统语言，也可在设置中手动选择简体中文或 English。 |
+
+## 平台支持
+
+| 平台 | 状态 |
+| --- | --- |
+| Windows x64 | 支持 |
+| macOS / Linux | 暂不支持原生 GUI |
+
+## 快速开始
+
+### 1. 下载并启动
+
+从 [GitHub Releases](https://github.com/FengLP5263/ai-terminal/releases/latest) 下载 Windows x64 ZIP，**完整解压**后运行 `ai-terminal.exe`。请保持 `ai-terminal-hook.exe` 与它位于同一目录。运行发行包不需要安装 Rust、Python 或 Electron。
+
+### 2. 创建终端，启动 Agent
+
+点击左上角 **＋** 选择 Shell，或按 <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>N</kbd> 新建 PowerShell。在终端中进入项目目录，输入已安装的 CLI 命令（将示例路径替换为自己的路径）：
+
+```powershell
+cd 'C:\path\to\your-project'
+codex
+# 或运行 claude
+```
+
+请事先自行安装并配置 [Codex CLI](https://github.com/openai/codex) 或 [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview)。AI Terminal 沿用 CLI 自己的登录、模型、信任和权限设置。
+
+### 3. 按自己的方式管理
+
+在左上角齿轮中设置语言和浮窗；悬停会话头像可查看信息，点击即可切换。浮窗可拖动位置，并可在设置中关闭。按住 <kbd>Ctrl</kbd> 滚动鼠标滚轮可缩放整个界面。
+
+## 常见问题
+
+### 已经安装 CLI，为什么提示找不到命令？
+
+请确认 Windows 可从当前或用户／系统 `PATH` 找到对应的 `.exe`、`.cmd` 或 `.bat` 启动器。仅安装在 WSL 中的程序或 PowerShell 别名不属于受支持的 Windows 入口。
+
+### 为什么 Agent 没有显示状态？
+
+状态依赖 CLI 支持的生命周期通知。Codex 通常在首次提交任务后才发送通知；如仍无状态，可在 CLI 中使用 `/hooks` 自行审查。没有状态不代表任务已经结束。AI Terminal 不会替你信任 hook 或修改用户级 CLI 配置。
+
+### 重启后可以继续之前的对话吗？
+
+程序恢复的是会话列表和界面设置，不会恢复原先运行的进程或终端屏幕内容。要继续 AI 对话，请使用对应 CLI 自带的会话恢复功能。退出程序会结束由它管理的会话进程，关闭活动任务前请保存工作。
+
+### 怎么查看终端历史和粘贴图片？
+
+普通滚轮用于查看历史；全屏应用接管鼠标滚轮时可用 <kbd>Shift</kbd> + 滚轮查看本地历史。识别到 Codex／Claude Code 时，可通过 <kbd>Ctrl</kbd> + <kbd>V</kbd> 或 <kbd>Shift</kbd> + <kbd>Insert</kbd> 将剪贴板图片交给 CLI 处理。
+
+### 会保存我的对话或 API Key 吗？
+
+默认数据位于 `%LOCALAPPDATA%/ai-terminal`，保存会话元数据、界面偏好及临时 hook 配置；不保存提示词、对话正文或 API Key。各 CLI 自己的数据和配置由其各自管理。
+
+## 从源码开发
+
+需要 Windows x64、Rust stable MSVC、Visual Studio C++ Build Tools、包含 `rc.exe` 的 Windows SDK 和 Python 3.11+。
 
 ```powershell
 git clone https://github.com/FengLP5263/ai-terminal.git
@@ -42,65 +109,14 @@ rustup component add rustfmt clippy
 .\scripts\windows\project.ps1 run
 ```
 
-`ci` 包括治理检查、格式、Clippy、Rust 与 Python 回归，不调用模型 API。
-完整命令、参数和平台边界见[脚本目录](scripts/README.md)。macOS/Linux 原生 GUI 尚未支持。
+`ci` 包含治理、格式、Clippy、Rust 和 Python 检查，不调用模型 API。开发、测试和打包的详细说明见[文档目录](docs/README.md)及[开发脚本](scripts/README.md)。
 
-## 使用
+## 一起完善
 
-1. 点击左上角＋，在菜单中选择 PowerShell、CMD 或 Bash；Ctrl＋Shift＋N 直接新建 PowerShell。
-2. 首次默认使用用户主目录；此后沿用当前会话最近所在目录。终端中正常 `cd` 即可切换，新会话会继承更新后的目录。
-3. 输入 `codex` 或 `claude` 启动已安装的 Agent，列表自动切换对应图标，退出后恢复终端图标；`echo codex` 等普通文本不会触发识别。
-4. 左侧可拖动排序、编辑名称、收起面板或调整宽度；右键会话 →「会话颜色」可选择或恢复颜色，当前会话会更亮。Ctrl＋滚轮缩放整个界面，Ctrl＋0 恢复默认。
-5. 信任、登录和权限仍由 CLI 处理。任务状态沿用生命周期通知；点击顶部状态可查看连接说明并复制 `/hooks`；Codex 钩子未启用时，可在 `/hooks` 中审查状态 hook，首次通知前显示「等待任务通知」；Codex 欢迎页通常尚未创建任务，提交首轮任务后才开始回传。0.3.5 起状态命令不再包含安装路径，迁移目录不改变 hook 定义；从旧版升级后仍需审查一次新的定义。
-6. 普通滚轮查看终端历史；Claude 等全屏程序开启鼠标协议时，由程序处理滚轮翻看消息。Shift＋滚轮查看本地历史，Ctrl＋滚轮保持全窗口缩放。
-7. 打开窗口默认进入 PowerShell；恢复列表时直接打开上次选中的终端，其他标签单击即可进入。旧版 Codex／Claude 标签保留名称、目录与历史 ID，并通过 PowerShell 打开；需要恢复 AI 对话时，在命令行中使用 CLI 的恢复命令。Bash 当前使用 Windows 本机 Git Bash，WSL 后续再支持。
+欢迎反馈问题、分享想法、改进终端体验和文档！提交之前，请先阅读[贡献指南](CONTRIBUTING.md)和[协作规范](AGENTS.md)。反馈问题时请勿包含凭据或私人对话。
 
-### 已安装 CLI 却提示找不到？
-
-0.2.1 对 npm 安装布局有过强假设，会漏掉自定义安装目录。0.2.2 改为查找公开的 `.exe`、`.cmd` 和 `.bat` 启动器，并在每次启动会话时读取进程 PATH 及 Windows 保存的用户／系统 PATH；不再依赖包内部目录。
-
-自定义安装目录若不在任何 PATH 中，可将启动器所在目录加入 Windows 用户 PATH，或从能够运行该 CLI 的终端启动 ai-terminal。仅在 WSL 或 PowerShell 别名／函数中可用的命令不等于已安装可直接启动的 Windows CLI。
-
-默认数据位于 `%LOCALAPPDATA%/ai-terminal`，只保存会话元数据、界面偏好及临时 hook 配置。
-ai-terminal 不保存提示词、对话正文或 API Key；各 CLI 自己的数据管理规则仍适用。
-退出会回收本程序拥有的会话进程，不会按进程名清理其他终端。关闭活跃任务前请先保存工作。
-
-## 本地打包
-
-```powershell
-.\scripts\windows\project.ps1 release
-.\scripts\windows\project.ps1 smoke -Release
-.\scripts\windows\project.ps1 package
-```
-
-`package` 要求干净的 Git 工作区，在 `output/packages/` 生成带 manifest、文件哈希和许可证的 ZIP，并回读校验；不会自动上传或发布。
-两个 EXE 必须放在同一目录。原生 smoke 使用隔离数据和三个真实 PowerShell 终端，不操作你的现有会话。
-
-## 欢迎一起完善
-
-欢迎使用、报告问题、分享建议，也欢迎通过 Pull Request 一起完善。输入与渲染兼容性、状态可靠性、性能、无障碍和文档都是有价值的贡献方向。
-
-提交前请阅读[贡献指南](CONTRIBUTING.md)。遇到问题请附上系统、CLI 版本、复现步骤和截图，隐藏密钥与私人对话。
-
-## 架构与验证
-
-- [协作规范](AGENTS.md) · [架构总览](.agents/architecture/overview.md)
-- [运行与配置](.agents/architecture/runtime.md) · [数据与资产](.agents/architecture/data-and-assets.md)
-- [集成边界](.agents/architecture/integrations.md) · [第三方来源](THIRD_PARTY_NOTICES.md)
-- [0.3.3 会话配色与滚动修复](docs/sidebar-scroll-0.3.3.md) · [程序图标 B · 会话叠窗](assets/branding/README.md) · [图标方案对照页](design/icon-concepts/index.html)
-- [0.3.2 直接进入终端与表情名称](docs/shell-entry-emoji-0.3.2.md)
-- [0.3.1 界面细节优化](docs/ui-polish-0.3.1.md)
-- [0.2.1 原生文字与整体缩放验证](docs/visual-quality-0.2.1.md) · [治理记录](docs/governance.md)
-
-状态来自 Agent 生命周期 hook 和进程退出；CLI 升级后可能需要重新验证 hook 兼容性。绿点表示本轮结束，不表示项目验收通过。
-实际 Agent TUI、合成事件与真实模型回合分别记录；真实模型验证需要显式授权，不属于默认 CI。
-物理输入法全部组合、图片粘贴、长期多会话和 Claude fullscreen renderer 仍有待验证范围。彩色表情受系统字体版本限制。
+[提交 Issue](https://github.com/FengLP5263/ai-terminal/issues) · [查看贡献指南](CONTRIBUTING.md) · [浏览文档](docs/README.md)
 
 ## 许可证
 
-项目代码使用 [MIT License](LICENSE)。字体、图标和其他第三方组件保留各自许可证，详见[第三方来源](THIRD_PARTY_NOTICES.md)。
-
-0.3.7 恢复 Codex 原生全屏 TUI（启动 Logo、底部输入框及应用内滚动），并为受管终端使用独立引擎以保留会话级状态环境。识别到 Codex／Claude 后，Ctrl+V 或 Shift+Insert 可将剪贴板图片交给 CLI 原生附件处理；普通文字粘贴、Shell 和会话命名仍按原方式处理。图片不会被管理器保存或发送。
-
-
-0.4.0 新增设置与灵动岛状态浮窗：左上角齿轮替代“AI终端”文字，可选择跟随系统、简体中文或 English，立即生效并保存。设置中开启置顶浮窗后，精简的横向头像栏在主窗口最小化时继续显示侧栏同款状态角标；最多显示 10 个头像，更多会话按住头像区拖动浏览；鼠标悬停显示名称和状态。点击头像恢复原终端，拖动浮窗边缘可移动，在设置中关闭。浮窗随全局缩放同步改变大小，并在缩放或会话数量变化时保持所在屏幕的横向居中；拖动设置的高度和开关随偏好保存，默认关闭。终端正文、Agent 输出和用户命名不作翻译。
+项目代码使用 [MIT License](LICENSE)。第三方组件保留各自的许可证，详见[第三方声明](THIRD_PARTY_NOTICES.md)。

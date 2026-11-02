@@ -1,5 +1,7 @@
 # 第三方来源
 
+简体中文 | [English](THIRD_PARTY_NOTICES.en.md)
+
 | 组件／资产 | 声明 | 来源与原许可证 |
 | --- | --- | --- |
 | egui_term 本地快照 | MIT | vendor/egui_term/LICENSE、UPSTREAM.md，固定上游 revision |

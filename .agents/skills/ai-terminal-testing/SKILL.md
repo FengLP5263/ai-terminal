@@ -5,6 +5,8 @@ description: 验证 ai-terminal 的离线 Rust 回归、治理脚本、Windows �
 
 # 测试与验收
 
+简体中文 | [English](SKILL.en.md)
+
 ```powershell
 .\scripts\windows\project.ps1 ci
 .\scripts\windows\project.ps1 release

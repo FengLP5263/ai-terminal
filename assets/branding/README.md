@@ -1,5 +1,7 @@
 # AI终端程序图标
 
+简体中文 | [English](README.en.md)
+
 用户选择的 B「会话叠窗」方案，原始矢量与设计候选 b.svg 字节一致；原创图形使用项目 MIT 许可。
 
 - ai-terminal.svg：矢量源。

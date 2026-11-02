@@ -1,5 +1,7 @@
 # ai-terminal 协作规范
 
+简体中文 | [English](AGENTS.en.md)
+
 ## 范围与边界
 
 Windows 原生 Agent 终端管理器。只做项目／会话导航、真实终端、可靠状态提示和对话恢复；
@@ -12,14 +14,15 @@ Windows 原生 Agent 终端管理器。只做项目／会话导航、真实终�
 - 数据／字体／制品：[数据与资产](.agents/architecture/data-and-assets.md)。
 - Agent、协议或关联项目：[集成边界](.agents/architecture/integrations.md)。
 - 执行工作流前读对应项目技能：[开发](.agents/skills/ai-terminal-development/SKILL.md)、
-  [测试](.agents/skills/ai-terminal-testing/SKILL.md)、[制品](.agents/skills/ai-terminal-packaging/SKILL.md)。
+  [测试](.agents/skills/ai-terminal-testing/SKILL.md)、[制品](.agents/skills/ai-terminal-packaging/SKILL.md)、
+  [Git 协作](.agents/skills/ai-terminal-git-workflow/SKILL.md)。
 
 ## 源码与兼容性
 
 - 生产源码为 `src/`、`vendor/egui_term/src/`、`vendor/egui-winit/src/`；字体为 `assets/fonts/`。不为治理重排源码。
 - `src/bin/ai-terminal-hook.rs` 必须保持独立、轻量，不初始化字体或 GPU。
-- 状态只来自 Agent 生命周期与进程退出。不得用输出静默、铃声或进程存在判断完成。
-- 点开会话保留现有运行进程，未启动时直接打开其 Shell，并清除未读；绿点表示本轮结束，不等于项目验收通过。
+- 状态只来自 Agent 明确的生命周期／交互通知与进程退出。不得用输出静默、铃声或进程存在判断完成。
+- 点开会话保留现有运行进程，未启动时直接打开其 Shell，并清除未读；绿点表示本轮完成且尚未查看，查看后消失，不等于项目验收通过。
 - 状态消费必须在后台 logic 中进行；隐藏终端继续排空输出且不重绘。
 - 保留有界队列、5000 行历史、合并唤醒和 viewport 快照；避免全历史复制、轮询扫描和空闲重绘。
 - hook 仅会话级注入，不改用户级配置；不保存提示词、结果、账号凭据，不自动信任项目／hook。
@@ -33,6 +36,7 @@ Windows 原生 Agent 终端管理器。只做项目／会话导航、真实终�
 - 本地源码不含真实 `.env`、私钥、用户配置、数据库、输出、运行数据或交接压缩包。
 - `.tools/env.ps1`、`.tools/cargo-network.toml` 是可选本机工具链／网络配置，必须保持忽略。
 - 文档使用相对路径或环境变量，禁止写入开发者机器用户名和个人工作目录。
+- 项目自有现行文档按[双语规范](docs/i18n.md)同步中英文、维护互链并通过治理检查；历史文档的翻译进度见台账。
 - 不擅自停止用户已打开的终端；测试只管理自己创建的进程和隔离数据目录。
 - 不创建额外 worktree，也不启动子代理，除非用户明确要求并行工作。
 

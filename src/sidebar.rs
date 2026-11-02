@@ -114,11 +114,7 @@ pub fn paint_status(ui: &egui::Ui, avatar: Rect, activity: Activity, unread: boo
             Stroke::new(1.5, Color32::from_rgb(136, 180, 246)),
         ));
         ui.ctx().request_repaint_after(Duration::from_millis(80));
-    } else if matches!(
-        activity,
-        Activity::Waiting | Activity::Completed | Activity::Failed
-    ) || unread
-    {
+    } else if matches!(activity, Activity::Waiting | Activity::Failed) || unread {
         ui.painter().circle_filled(indicator, 5.5, surface);
         ui.painter().circle_filled(
             indicator,

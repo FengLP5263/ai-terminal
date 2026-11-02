@@ -1,5 +1,7 @@
 # 0.3.7 原生 TUI、状态与图片
 
+简体中文 | [English](native-tui-images-0.3.7.en.md)
+
 ## 修改
 
 - 取消 Codex 的强制 --no-alt-screen，保留其全屏欢迎 Logo、固定底部输入区和原生消息滚动。受管入口用 --no-daemon 保留自身会话环境及 Job 所有权，不停止已有 daemon。

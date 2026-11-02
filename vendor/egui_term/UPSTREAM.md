@@ -1,3 +1,5 @@
+
+[简体中文](UPSTREAM.zh.md) | [English](UPSTREAM.en.md)
 Source: https://github.com/kemokempo/egui_term
 Revision: 31bbc7ab8503c9518fcee5717cfa29011e59f451
 License: MIT (LICENSE preserved).
@@ -59,3 +61,5 @@ galleys reused across ANSI colors. Application embeds licensed Hack faces.
 
 
 0.4.0：PTY 元数据／退出与重绘事件明确请求 ROOT viewport 重绘；管理器新增独立 deferred 状态浮窗后，不能依赖当前正在绘制的 viewport 来唤醒根 logic。终端 I/O、隐藏输出排空、鼠标协议与有界历史保持原有实现。
+
+Managed Codex invocations: a bounded, session-scoped OSC 9 observer forwards only recognized attention-notification metadata; content is discarded. The read/write wrapper preserves the PTY stream and coalesces repeated notices. No ordinary output or bell is used to infer completion.
