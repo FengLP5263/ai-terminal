@@ -20,6 +20,8 @@ Alacritty 0.26；默认 glow/OpenGL，可选 wgpu/DX12 用于本机对照。依�
 | vendor/egui-winit | 与 eframe 相同的 0.35.0；仅保留无文本剪贴板的粘贴请求 |
 | assets/fonts、assets/icons、assets/branding | 固定来源的 Hack 字体、Agent 图标，以及原创 B 方案程序图标和来源校验 |
 | examples/terminal_probe.rs、workspace_probe.rs | 开发核查：真实 TUI 或本地 ANSI 样例、受控输入、GPU 截图后退出 |
+| examples/bash_probe.rs | 真实 Git Bash 与隔离 HOME，启动配置、目录通知、Agent 入口和原生截图核查；不请求模型 |
+| examples/shell_switch_probe.rs | 正式 App 控件的嵌套 Shell 头像与逐层返回截图；隔离会话，仅向自身窗口输入，不启动 Agent／模型 |
 
 数据流：ConPTY I/O 线程 → Alacritty 网格 → 活动 viewport → GPU。
 另一条独立路径为会话级 CLI 启停／Agent hook → 独立 helper → 认证 TCP → 有界队列 → App::logic → 侧栏提示。
@@ -37,3 +39,9 @@ Windows 预览包通过 GitHub Releases 分发；尚无自动发布服务、云 
 
 
 0.4.0：src/i18n.rs 管理系统／中文／英文偏好；settings.rs 提供设置窗口；floating.rs 使用同进程的 deferred viewport 构建透明、置顶、圆角胶囊。跨窗口仅共享会话元数据快照，通过有界 32 项消息通知根窗口，不共享或复制终端内容。根窗口在最小化时只执行 logic；所有 PTY 和桥通知明确唤醒 ROOT，避免子窗口活跃时任务事件无人归约。
+
+## Windows 兼容性修复（未发布）
+
+`src/window_frame.rs` 为应用自己的窗口请求深色 DWM 标题栏，并在原生主题／设置通知处理后恢复该策略；`src/native_console.rs` 在创建会话前检查随包组件。`assets/windows/conpty/` 保存固定版本的微软原生控制台、许可证与来源。Alacritty 使用程序目录的组件，build.rs 为正式程序、测试和示例准备相同版本。
+
+`examples/composer_probe.rs` 覆盖恢复至 151.13608% 与随后 125%、150%、151.13608% 缩放的全屏输入区；`titlebar_probe.rs` 截取自身原生窗口及标题栏；`discovery_probe.rs` 仅调用已安装 CLI 的公开 --version。合成样例、公开版本查询和真实模型回合分别记录。

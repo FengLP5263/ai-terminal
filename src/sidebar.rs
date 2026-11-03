@@ -144,17 +144,25 @@ pub fn show(
     } else {
         "sessions"
     })
-    .default_size(width)
-    .size_range(if collapsed {
-        52.0..=52.0
+    .exact_size(if collapsed {
+        52.0
     } else {
-        190.0..=420.0
+        width.clamp(
+            crate::model::UiSettings::MIN_SIDEBAR_WIDTH,
+            crate::model::UiSettings::MAX_SIDEBAR_WIDTH,
+        )
     })
-    .resizable(!collapsed)
+    .resizable(false)
+    .show_separator_line(true)
     .frame(
         egui::Frame::new()
             .fill(appearance::SIDEBAR_BG)
-            .inner_margin(8),
+            .inner_margin(egui::Margin {
+                left: 8,
+                right: 1,
+                top: 8,
+                bottom: 8,
+            }),
     );
     let response = panel.show(ui, |ui| {
         ui.horizontal(|ui| {
@@ -199,7 +207,22 @@ pub fn show(
             });
             ui.add_space(8.0);
         }
+        // Keep an unobtrusive gutter beside the avatars; hover changes opacity only.
+        let scroll_style = &mut ui.style_mut().spacing.scroll;
+        scroll_style.floating = true;
+        scroll_style.bar_width = 3.0;
+        scroll_style.floating_width = 3.0;
+        scroll_style.floating_allocated_width = 7.0;
+        scroll_style.bar_inner_margin = 0.0;
+        scroll_style.bar_outer_margin = 0.0;
+        scroll_style.dormant_background_opacity = 0.0;
+        scroll_style.active_background_opacity = 0.0;
+        scroll_style.interact_background_opacity = 0.0;
+        scroll_style.dormant_handle_opacity = 0.25;
+        scroll_style.active_handle_opacity = 0.45;
+        scroll_style.interact_handle_opacity = 0.7;
         egui::ScrollArea::vertical()
+            .id_salt("session-list-scroll")
             .auto_shrink([false, false])
             .show(ui, |ui| {
                 for (index, entry) in entries.iter().enumerate() {
@@ -378,6 +401,23 @@ pub fn show(
             });
     });
     actions.width = response.response.rect.width();
+    if !collapsed {
+        // The resize target lives outside the list, so it cannot steal scrollbar drags.
+        let panel = response.response.rect;
+        let grip = Rect::from_min_max(
+            Pos2::new(panel.right(), panel.top()),
+            Pos2::new(panel.right() + 6.0, panel.bottom()),
+        );
+        let resize = ui
+            .interact(grip, egui::Id::new("sidebar-resize"), Sense::drag())
+            .on_hover_cursor(egui::CursorIcon::ResizeHorizontal);
+        if resize.dragged() {
+            actions.width = (actions.width + resize.drag_delta().x).clamp(
+                crate::model::UiSettings::MIN_SIDEBAR_WIDTH,
+                crate::model::UiSettings::MAX_SIDEBAR_WIDTH,
+            );
+        }
+    }
     actions
 }
 

@@ -12,7 +12,7 @@ Use Codex and Claude Code in a familiar terminal, keep an eye on their status, a
 [![Platform](https://img.shields.io/badge/platform-Windows%20x64-0078D4)](#platform-support)
 [![License](https://img.shields.io/badge/license-MIT-5c8a66)](LICENSE)
 
-[Get started](#quick-start) · [Features](#built-for-multiple-sessions) · [FAQ](#frequently-asked-questions) · [Contribute](CONTRIBUTING.en.md)
+[Get started](#quick-start) · [Features](#built-for-multiple-sessions) · [Changelog](CHANGELOG.en.md) · [FAQ](#frequently-asked-questions) · [Contribute](CONTRIBUTING.en.md)
 
 [简体中文](README.md) | English
 
@@ -57,7 +57,7 @@ Enable the floating bar to see session avatars and status above other windows. C
 
 ### 1. Download and run
 
-Download the Windows x64 ZIP from [GitHub Releases](https://github.com/FengLP5263/ai-terminal/releases/latest), **extract the entire archive**, and run `ai-terminal.exe`. Keep `ai-terminal-hook.exe` in the same directory. Rust, Python, and Electron are not required to run the release package.
+Download the Windows x64 ZIP from [GitHub Releases](https://github.com/FengLP5263/ai-terminal/releases/latest), **extract the entire archive**, and run `ai-terminal.exe`. Starting with 0.4.3, keep `ai-terminal.exe`, `ai-terminal-hook.exe`, `conpty.dll`, and `OpenConsole.exe` together. Rust, Python, and Electron are not required to run the release package.
 
 ### 2. Open a terminal and start an Agent
 
@@ -75,11 +75,17 @@ Install and configure [Codex CLI](https://github.com/openai/codex) or [Claude Co
 
 Use the gear at the top left to set the language and floating bar. Hover over a session avatar for details and click it to switch sessions. Drag the floating bar to reposition it, and turn it off in settings. Hold <kbd>Ctrl</kbd> and scroll to scale the entire interface.
 
+Interactively launching `powershell`, `cmd` or `bash` through a managed entry updates the avatar to the current shell; `exit` restores each level. Codex/Claude take avatar priority while active, then return to the current shell. One-off scripts and tool commands inside Agents do not change shell identity.
+
 ## Frequently asked questions
 
 ### Why is an installed CLI not found?
 
 Make sure its Windows `.exe`, `.cmd`, or `.bat` launcher is available on the current, user, or system `PATH`. A program installed only in WSL or exposed only as a PowerShell alias is not a supported Windows entry point.
+
+### Can I use it without Git Bash?
+
+Yes, use PowerShell or CMD directly. Git Bash is optional; selecting it when unavailable offers a button to switch to an available shell. Portable Git needs its `cmd` or `bin` directory on `PATH`. Git Bash loads its system/user startup configuration, preserving prompts, aliases and completion.
 
 ### Why is there no Agent status?
 
@@ -120,3 +126,7 @@ Issues, ideas, terminal improvements, and documentation contributions are welcom
 ## License
 
 Project code is available under the [MIT License](LICENSE). Third-party components retain their own licenses; see [third-party notices](THIRD_PARTY_NOTICES.en.md).
+
+## 0.4.3 update
+
+Improve Git Bash startup configuration, nested-shell avatars, drag selection, and sidebar scrolling. Fix stale npm entries and Windows 10 dark captions, and bundle a pinned Microsoft native console runtime. See the [bilingual changelog](CHANGELOG.en.md) for additions, improvements, fixes, and upgrade guidance, and the [Windows 10 record](docs/windows10-compatibility.en.md) for verification scope. Each release ZIP includes both changelog files.

@@ -27,3 +27,7 @@ package 会调用 Cargo release 构建，生成独立版本目录和 ZIP，记�
 打包从 Cargo metadata 的 target_directory 读取本次 release 二进制，遵循标准 CARGO_TARGET_DIR／build.target-dir。默认构建目录的 EXE 被正在运行的预览占用时，可在当前命令环境设置 CARGO_TARGET_DIR 为另一个忽略的构建目录再执行相同 package 入口；不会覆盖已打开的程序，也不会从旧默认目录误取 EXE。
 
 制品源码身份还须覆盖本地 egui_glow 的 Cargo 清单、Rust 源码与 GLSL 着色器；相关许可证通过 Cargo metadata 收集。
+
+原生控制台升级后，新包使用 format_version 2；必须包含 conpty.dll、OpenConsole.exe、微软原始许可证及来源记录，并覆盖到源码身份。打包前核对 assets/windows/conpty 的固定哈希；缺失组件不能交付，也不从其他预览目录补拷。保留对旧格式 ZIP 的只读校验。
+
+打包前校验 CHANGELOG.md／CHANGELOG.en.md 含 Cargo 当前版本唯一、同日期、分类且非空的条目；缺失时拒绝构建。ZIP 附带完整双语更新日志，其字节也计入源码身份。更新日志校验可通过既有 governance、ci、package 入口执行，Windows／POSIX 的入口参数不变。

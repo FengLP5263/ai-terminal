@@ -12,7 +12,7 @@
 [![Platform](https://img.shields.io/badge/platform-Windows%20x64-0078D4)](#平台支持)
 [![License](https://img.shields.io/badge/license-MIT-5c8a66)](LICENSE)
 
-[下载使用](#快速开始) · [功能介绍](#为多会话而设计) · [常见问题](#常见问题) · [参与贡献](CONTRIBUTING.md)
+[下载使用](#快速开始) · [功能介绍](#为多会话而设计) · [更新日志](CHANGELOG.md) · [常见问题](#常见问题) · [参与贡献](CONTRIBUTING.md)
 
 简体中文 | [English](README.en.md)
 
@@ -57,7 +57,7 @@ AI 任务可能运行很久。打开多个窗口后，来回确认哪个会话�
 
 ### 1. 下载并启动
 
-从 [GitHub Releases](https://github.com/FengLP5263/ai-terminal/releases/latest) 下载 Windows x64 ZIP，**完整解压**后运行 `ai-terminal.exe`。请保持 `ai-terminal-hook.exe` 与它位于同一目录。运行发行包不需要安装 Rust、Python 或 Electron。
+从 [GitHub Releases](https://github.com/FengLP5263/ai-terminal/releases/latest) 下载 Windows x64 ZIP，**完整解压**后运行 `ai-terminal.exe`。0.4.3 起请将 `ai-terminal.exe`、`ai-terminal-hook.exe`、`conpty.dll` 和 `OpenConsole.exe` 保留在同一目录。运行发行包不需要安装 Rust、Python 或 Electron。
 
 ### 2. 创建终端，启动 Agent
 
@@ -75,11 +75,17 @@ codex
 
 在左上角齿轮中设置语言和浮窗；悬停会话头像可查看信息，点击即可切换。浮窗可拖动位置，并可在设置中关闭。按住 <kbd>Ctrl</kbd> 滚动鼠标滚轮可缩放整个界面。
 
+在受管终端里交互式启动 `powershell`、`cmd` 或 `bash` 时，头像会跟随当前 Shell；`exit` 逐层恢复。启动 Codex／Claude 时优先显示 Agent 头像，退出后恢复当前 Shell。单次脚本命令和 Agent 内部的工具命令不会因此改变 Shell 头像。
+
 ## 常见问题
 
 ### 已经安装 CLI，为什么提示找不到命令？
 
 请确认 Windows 可从当前或用户／系统 `PATH` 找到对应的 `.exe`、`.cmd` 或 `.bat` 启动器。仅安装在 WSL 中的程序或 PowerShell 别名不属于受支持的 Windows 入口。
+
+### 没有安装 Git Bash 也能使用吗？
+
+可以直接使用 PowerShell 或 CMD。Git Bash 是可选依赖；选择后若未找到安装，界面会提供切换到可用 Shell 的按钮。便携版 Git 需将 `cmd` 或 `bin` 目录加入 `PATH`。Git Bash 会加载其系统／用户启动配置，保留提示符、别名和补全。
 
 ### 为什么 Agent 没有显示状态？
 
@@ -120,3 +126,7 @@ rustup component add rustfmt clippy
 ## 许可证
 
 项目代码使用 [MIT License](LICENSE)。第三方组件保留各自的许可证，详见[第三方声明](THIRD_PARTY_NOTICES.md)。
+
+## 0.4.3 更新
+
+改善 Git Bash 启动配置、嵌套 Shell 头像、鼠标拖选和侧栏滚动；修复失效 npm 启动入口与 Windows 10 深色标题栏，并随包提供固定版本的微软原生控制台组件。完整的新增、改进、修复及升级说明见[中英文更新日志](CHANGELOG.md)，验证范围见 [Windows 10 记录](docs/windows10-compatibility.md)。每次发行的 ZIP 均附带两份更新日志。

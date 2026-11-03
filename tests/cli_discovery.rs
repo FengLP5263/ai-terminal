@@ -71,6 +71,50 @@ fn custom_cmd_entry_preserves_complex_hook_args_and_the_child_exit_code() {
 }
 
 #[test]
+fn a_standard_stale_native_npm_entry_is_skipped_before_the_real_launch() {
+    let root = tempfile::tempdir().unwrap();
+    let old = root.path().join("stale prefix");
+    let healthy = root.path().join("healthy prefix");
+    std::fs::create_dir(&old).unwrap();
+    std::fs::create_dir(&healthy).unwrap();
+    let header = "@ECHO off\r\nGOTO start\r\n:find_dp0\r\nSET dp0=%~dp0\r\nEXIT /b\r\n:start\r\nSETLOCAL\r\nCALL :find_dp0\r\n";
+    std::fs::write(
+        old.join("claude.cmd"),
+        format!("{header}\"%dp0%\\removed.exe\"  %*\r\n"),
+    )
+    .unwrap();
+    std::fs::copy(fixture(), healthy.join("installed.exe")).unwrap();
+    let script = healthy.join("claude.cmd");
+    std::fs::write(&script, format!("{header}\"%dp0%\\installed.exe\"  %*\r\n")).unwrap();
+    let selected = CliSearch::from_directories([old, healthy])
+        .resolve(Agent::Claude)
+        .unwrap();
+    assert_eq!(selected, script);
+    let output_file = root.path().join("arguments.txt");
+    let output = Command::new(env!("CARGO_BIN_EXE_ai-terminal-hook"))
+        .arg("--launch-cli")
+        .arg(selected)
+        .arg(&output_file)
+        .arg("literal 中文")
+        .stdin(Stdio::null())
+        .creation_flags(0x0800_0000)
+        .output()
+        .unwrap();
+    assert_eq!(
+        output.status.code(),
+        Some(37),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(String::from_utf8_lossy(&output.stdout).contains("CLI_ENTRY_READY"));
+    assert!(
+        std::fs::read_to_string(output_file)
+            .unwrap()
+            .contains("literal 中文")
+    );
+}
+
+#[test]
 fn cmd_entry_has_interactive_conpty_handles_and_stays_in_the_owned_process_tree() {
     let root = tempfile::tempdir().unwrap();
     let script = shim(root.path());

@@ -72,8 +72,7 @@ pub fn build(
         return crate::shell::build(spec, bridge, runtime, helper);
     }
     let search = crate::discovery::CliSearch::current();
-    let binary = search.find(spec.agent).ok_or_else(|| format!(
-        "未找到 {}。已检查 PATH、Windows 用户／系统 PATH 和常见安装目录。请确认本机可运行对应 CLI；自定义安装请将启动器目录加入用户 PATH，或从可运行该 CLI 的终端启动 ai-terminal。仅在 WSL 中安装的 CLI 暂不支持。", spec.agent.label()))?;
+    let binary = search.resolve(spec.agent)?;
     let generation = uuid::Uuid::new_v4().to_string();
     let mut arguments = vec![];
     let mut environment = HashMap::from([

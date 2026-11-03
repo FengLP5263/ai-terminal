@@ -23,7 +23,7 @@ impl Agent {
             Self::Claude => "Claude Code",
             Self::Shell => "PowerShell",
             Self::Cmd => "CMD",
-            Self::Bash => "Bash",
+            Self::Bash => "Git Bash",
         }
     }
 }
@@ -111,6 +111,8 @@ impl Default for UiSettings {
     }
 }
 impl UiSettings {
+    pub const MIN_SIDEBAR_WIDTH: f32 = 190.0;
+    pub const MAX_SIDEBAR_WIDTH: f32 = 420.0;
     pub const MIN_ZOOM: f32 = 0.5;
     pub const MAX_ZOOM: f32 = 2.5;
     pub const MIN_FONT: f32 = 8.0;
@@ -122,7 +124,8 @@ impl UiSettings {
             1.0
         };
         self.sidebar_width = if self.sidebar_width.is_finite() {
-            self.sidebar_width.clamp(190.0, 420.0)
+            self.sidebar_width
+                .clamp(Self::MIN_SIDEBAR_WIDTH, Self::MAX_SIDEBAR_WIDTH)
         } else {
             238.0
         };

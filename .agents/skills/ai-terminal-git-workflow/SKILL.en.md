@@ -33,4 +33,6 @@ For divergence, remote movement, or non-equivalent changes, preserve both refs a
 
 ## Release delivery
 
+Before releasing, review the scope against the previous release tag and update the current-version entries in root CHANGELOG.md/CHANGELOG.en.md with actual additions, improvements, fixes, upgrade guidance, and unverified cases. Dates must match. Base historical summaries on existing releases without inventing unreleased versions. Generate GitHub Release notes from the same entries, then add validation and asset hashes. Packaging/governance reject missing, duplicate, empty, or date-mismatched entries. Verify both the online notes and both changelog files in the downloaded package.
+
 When authorized, build from the reviewed target commit. Run the relevant testing skill checks and native acceptance; use the packaging skill to build and verify a clean-source ZIP, never a dirty preview as a clean release. Check version, existing tag, and target commit before creating and pushing an annotated `app-v<SemVer>` tag and, when authorized, a GitHub Release. Verify the remote tag, assets, and downloaded hashes. Report tag, package, PR, and synchronization results separately; do not overwrite running binaries, close user sessions, or alter their data.

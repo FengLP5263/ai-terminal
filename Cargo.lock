@@ -40,12 +40,13 @@ dependencies = [
 
 [[package]]
 name = "ai-terminal"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "eframe",
  "egui",
  "egui_term",
  "png",
+ "raw-window-handle",
  "serde",
  "serde_json",
  "tempfile",

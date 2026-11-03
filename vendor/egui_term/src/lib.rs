@@ -8,6 +8,7 @@ mod theme;
 mod types;
 mod view;
 
+pub use alacritty_terminal::event::WindowSize;
 pub use backend::settings::BackendSettings;
 pub use backend::{BackendCommand, PtyEvent, TerminalBackend, TerminalMode, CODEX_ATTENTION_EVENT};
 pub use bindings::{Binding, BindingAction, InputKind, KeyboardBinding};

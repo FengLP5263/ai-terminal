@@ -7,6 +7,7 @@ Start here for current guidance. Versioned documents are historical records of t
 ## Getting started and contributing
 
 - [Project overview and usage](../README.en.md) · [Contribution guide](../CONTRIBUTING.en.md) · [Collaboration rules](../AGENTS.en.md)
+- [Changelog and released versions](../CHANGELOG.en.md)
 - [Git branches, PRs, and releases](../.agents/skills/ai-terminal-git-workflow/SKILL.en.md)
 - [Development and delivery scripts](../scripts/README.en.md) · [Local development](../.agents/skills/ai-terminal-development/SKILL.en.md) · [Testing](../.agents/skills/ai-terminal-testing/SKILL.en.md) · [Packaging](../.agents/skills/ai-terminal-packaging/SKILL.en.md)
 
@@ -17,6 +18,8 @@ Start here for current guidance. Versioned documents are historical records of t
 - [Application icon](../assets/branding/README.en.md) · [Icon concepts](../design/icon-concepts/README.en.md) · [Third-party notices](../THIRD_PARTY_NOTICES.en.md)
 
 ## Historical records
+
+- [Windows 10 compatibility fixes and outstanding verification](windows10-compatibility.en.md)
 
 The original versioned `docs/` records and earlier architecture, governance, and verification documents remain at their existing paths for traceability. Use current architecture records and source code for current behavior; historical tests are not current validation.
 

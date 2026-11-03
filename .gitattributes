@@ -10,3 +10,6 @@ Cargo.lock text eol=lf
 *.ttf binary
 *.png binary
 *.ico binary
+assets/windows/conpty/x64/*.dll binary
+assets/windows/conpty/x64/*.exe binary
+assets/windows/conpty/LICENSE.txt -text whitespace=cr-at-eol

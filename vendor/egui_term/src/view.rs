@@ -36,6 +36,8 @@ pub struct TerminalViewState {
     preedit: String,
     input_enabled: bool,
     is_dragged: bool,
+    local_selection_drag: bool,
+    pending_primary: Option<Pos2>,
     scroll_pixels: f32,
     current_mouse_position_on_grid: TerminalGridPoint,
 }
@@ -45,6 +47,7 @@ pub struct TerminalView<'a> {
     has_focus: bool,
     focus_requested: bool,
     native_image_paste: bool,
+    drag_selection: bool,
     snapshot_only: bool,
     size: Vec2,
     backend: &'a mut TerminalBackend,
@@ -90,6 +93,7 @@ impl<'a> TerminalView<'a> {
             has_focus: false,
             focus_requested: false,
             native_image_paste: false,
+            drag_selection: false,
             snapshot_only: false,
             size: ui.available_size(),
             backend,
@@ -127,6 +131,13 @@ impl<'a> TerminalView<'a> {
     #[inline]
     pub fn set_native_image_paste(mut self, enabled: bool) -> Self {
         self.native_image_paste = enabled;
+        self
+    }
+
+    /// Prefer local text selection for plain left drags in coding CLIs.
+    /// A click without a drag still reaches the application on release.
+    pub fn set_drag_selection(mut self, enabled: bool) -> Self {
+        self.drag_selection = enabled;
         self
     }
 
@@ -193,6 +204,9 @@ impl<'a> TerminalView<'a> {
             || layout.gained_focus()
         {
             state.preedit.clear();
+            state.is_dragged = false;
+            state.local_selection_drag = false;
+            state.pending_primary = None;
         }
         state.input_enabled = self.has_focus;
         self
@@ -288,7 +302,7 @@ impl<'a> TerminalView<'a> {
                     pos,
                     ..
                 } if layout.rect.contains(pos) || state.is_dragged => {
-                    input_actions.push(process_button_click(
+                    input_actions = process_button_click(
                         state,
                         layout,
                         self.backend,
@@ -297,7 +311,8 @@ impl<'a> TerminalView<'a> {
                         pos,
                         &modifiers,
                         pressed,
-                    ))
+                        self.drag_selection,
+                    )
                 }
                 egui::Event::PointerMoved(pos) if layout.rect.contains(pos) || state.is_dragged => {
                     input_actions = process_mouse_move(state, layout, self.backend, pos, &modifiers)
@@ -776,7 +791,7 @@ fn process_mouse_wheel(
     InputAction::BackendCall(BackendCommand::MouseWheel(lines, modifiers, point))
 }
 
-// Keep the upstream input-handler interface intact.
+// Route the complete mouse event together with terminal selection policy.
 #[allow(clippy::too_many_arguments)]
 fn process_button_click(
     state: &mut TerminalViewState,
@@ -787,43 +802,79 @@ fn process_button_click(
     position: Pos2,
     modifiers: &Modifiers,
     pressed: bool,
-) -> InputAction {
-    match button {
-        PointerButton::Primary => process_left_button(
+    drag_selection: bool,
+) -> Vec<InputAction> {
+    if button != PointerButton::Primary {
+        return vec![InputAction::Ignore];
+    }
+    let terminal_mode = backend.last_content().terminal_mode;
+    let application_mouse = terminal_mode.intersects(TermMode::MOUSE_MODE) && !modifiers.shift;
+    if pressed {
+        state.is_dragged = true;
+        state.local_selection_drag = !application_mouse;
+        state.pending_primary = if application_mouse && drag_selection && modifiers.is_none() {
+            Some(position)
+        } else {
+            None
+        };
+        if !application_mouse || state.pending_primary.is_some() {
+            return vec![process_left_button_pressed(state, layout, position)];
+        }
+    } else {
+        state.is_dragged = false;
+        if let Some(start) = state.pending_primary.take() {
+            return vec![
+                application_left_click(backend, layout, start, *modifiers, true),
+                application_left_click(backend, layout, position, *modifiers, false),
+            ];
+        }
+        if state.local_selection_drag {
+            state.local_selection_drag = false;
+            return vec![process_left_button_released(
+                state,
+                layout,
+                backend,
+                bindings_layout,
+                position,
+                modifiers,
+            )];
+        }
+    }
+    if application_mouse {
+        vec![application_left_click(
+            backend, layout, position, *modifiers, pressed,
+        )]
+    } else {
+        vec![process_left_button_released(
             state,
             layout,
             backend,
             bindings_layout,
             position,
             modifiers,
-            pressed,
-        ),
-        _ => InputAction::Ignore,
+        )]
     }
 }
 
-fn process_left_button(
-    state: &mut TerminalViewState,
-    layout: &Response,
+fn application_left_click(
     backend: &TerminalBackend,
-    bindings_layout: &BindingsLayout,
+    layout: &Response,
     position: Pos2,
-    modifiers: &Modifiers,
+    modifiers: Modifiers,
     pressed: bool,
 ) -> InputAction {
-    let terminal_mode = backend.last_content().terminal_mode;
-    if terminal_mode.intersects(TermMode::MOUSE_MODE) {
-        InputAction::BackendCall(BackendCommand::MouseReport(
-            MouseButton::LeftButton,
-            *modifiers,
-            state.current_mouse_position_on_grid,
-            pressed,
-        ))
-    } else if pressed {
-        process_left_button_pressed(state, layout, position)
-    } else {
-        process_left_button_released(state, layout, backend, bindings_layout, position, modifiers)
-    }
+    let point = TerminalBackend::selection_point(
+        position.x - layout.rect.min.x,
+        position.y - layout.rect.min.y,
+        &backend.last_content().terminal_size,
+        0,
+    );
+    InputAction::BackendCall(BackendCommand::MouseReport(
+        MouseButton::LeftButton,
+        modifiers,
+        point,
+        pressed,
+    ))
 }
 
 fn process_left_button_pressed(
@@ -899,18 +950,37 @@ fn process_mouse_move(
     );
 
     let mut actions = vec![];
+    if let Some(start) = state.pending_primary {
+        if position.distance(start) < 3.0 {
+            return actions;
+        }
+        state.pending_primary = None;
+        state.local_selection_drag = true;
+        actions.push(InputAction::BackendCall(build_start_select_command(
+            layout, start,
+        )));
+    }
     // Handle command or selection update based on terminal mode and modifiers
     if state.is_dragged {
         let terminal_mode = terminal_content.terminal_mode;
-        let cmd = if terminal_mode.contains(TermMode::MOUSE_MOTION) && modifiers.is_none() {
+        let cmd = if state.local_selection_drag {
+            InputAction::BackendCall(BackendCommand::SelectUpdate(cursor_x, cursor_y))
+        } else if terminal_mode.intersects(TermMode::MOUSE_DRAG | TermMode::MOUSE_MOTION)
+            && modifiers.is_none()
+        {
             InputAction::BackendCall(BackendCommand::MouseReport(
                 MouseButton::LeftMove,
                 *modifiers,
-                state.current_mouse_position_on_grid,
+                TerminalBackend::selection_point(
+                    cursor_x,
+                    cursor_y,
+                    &terminal_content.terminal_size,
+                    0,
+                ),
                 true,
             ))
         } else {
-            InputAction::BackendCall(BackendCommand::SelectUpdate(cursor_x, cursor_y))
+            InputAction::Ignore
         };
 
         actions.push(cmd);
