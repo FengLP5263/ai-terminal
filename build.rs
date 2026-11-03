@@ -16,6 +16,7 @@ fn main() {
     }
     let root = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").unwrap());
     let out = PathBuf::from(env::var_os("OUT_DIR").unwrap());
+    stage_native_console(&root, &out);
     let icon = root
         .join("assets/branding/ai-terminal.ico")
         .to_string_lossy()
@@ -52,6 +53,32 @@ fn main() {
         compiled.display()
     );
     println!("cargo:rustc-link-arg-examples={}", compiled.display());
+}
+
+fn stage_native_console(root: &std::path::Path, out: &std::path::Path) {
+    assert_eq!(
+        env::var("CARGO_CFG_TARGET_ARCH").as_deref(),
+        Ok("x86_64"),
+        "The bundled native console currently supports Windows x64 only"
+    );
+    let profile = out.ancestors().nth(3).expect("Cargo profile directory");
+    for name in ["conpty.dll", "OpenConsole.exe"] {
+        let source = root.join("assets/windows/conpty/x64").join(name);
+        println!("cargo:rerun-if-changed={}", source.display());
+        let bytes = fs::read(&source).expect("pinned native console asset");
+        for folder in [
+            profile.to_path_buf(),
+            profile.join("examples"),
+            profile.join("deps"),
+        ] {
+            fs::create_dir_all(&folder).expect("native output directory");
+            let target = folder.join(name);
+            println!("cargo:rerun-if-changed={}", target.display());
+            if fs::read(&target).ok().as_deref() != Some(bytes.as_slice()) {
+                fs::copy(&source, &target).unwrap_or_else(|error| panic!("Cannot stage {}: {error}. Use a separate CARGO_TARGET_DIR if an existing preview owns this file.", target.display()));
+            }
+        }
+    }
 }
 
 fn resource_compiler() -> PathBuf {

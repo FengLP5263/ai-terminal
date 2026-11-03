@@ -43,6 +43,17 @@ fn frame_with_window_focus(
     discard: bool,
     focused: bool,
 ) -> egui::FullOutput {
+    frame_with_selection(ctx, backend, events, discard, focused, false)
+}
+
+fn frame_with_selection(
+    ctx: &egui::Context,
+    backend: &mut TerminalBackend,
+    events: Vec<Event>,
+    discard: bool,
+    focused: bool,
+    drag_selection: bool,
+) -> egui::FullOutput {
     let input = egui::RawInput {
         focused,
         screen_rect: Some(egui::Rect::from_min_size(
@@ -55,8 +66,11 @@ fn frame_with_window_focus(
     ctx.run_ui(input, |ui| {
         let view = TerminalView::new(ui, backend)
             .set_focus(true)
+            .set_drag_selection(drag_selection)
             .set_size(egui::vec2(780.0, 460.0));
-        ui.add(view);
+        let rect = ui.add(view).rect;
+        ui.ctx()
+            .data_mut(|data| data.insert_temp(egui::Id::new("terminal-test-rect"), rect));
         if discard && ui.ctx().current_pass_index() == 0 {
             ui.ctx().request_discard("exercise repeat layout pass");
         }
@@ -403,6 +417,132 @@ fn mouse_terminal(ctx: &egui::Context, mode: &str) -> TerminalBackend {
         },
     )
     .unwrap()
+}
+
+fn pointer_button(pos: egui::Pos2, pressed: bool, modifiers: Modifiers) -> Event {
+    Event::PointerButton {
+        pos,
+        button: egui::PointerButton::Primary,
+        pressed,
+        modifiers,
+    }
+}
+
+fn selection_points(ctx: &egui::Context, backend: &TerminalBackend) -> [egui::Pos2; 2] {
+    let rect: egui::Rect =
+        ctx.data(|data| data.get_temp(egui::Id::new("terminal-test-rect")).unwrap());
+    let size = backend.last_content().terminal_size;
+    [0.1, 8.9].map(|column| rect.min + egui::vec2(column * size.cell_width, 1.5 * size.cell_height))
+}
+
+fn select_fixture(
+    ctx: &egui::Context,
+    backend: &mut TerminalBackend,
+    prefer_local: bool,
+    modifiers: Modifiers,
+) {
+    let [start, end] = selection_points(ctx, backend);
+    for events in [
+        vec![
+            Event::PointerMoved(start),
+            pointer_button(start, true, modifiers),
+        ],
+        vec![Event::PointerMoved(end)],
+        vec![pointer_button(end, false, modifiers)],
+    ] {
+        frame_with_selection(ctx, backend, events, false, true, prefer_local);
+    }
+}
+
+#[test]
+fn coding_cli_left_drag_selects_and_copies_without_sending_mouse_or_interrupt() {
+    for mode in ["sgr", "legacy", "select-motion", "select-all", "local"] {
+        let ctx = egui::Context::default();
+        let mut backend = mouse_terminal(&ctx, mode);
+        frame_with_selection(&ctx, &mut backend, vec![], false, true, true);
+        wait_text(&mut backend, "SELECT_ME");
+        frame_with_selection(&ctx, &mut backend, vec![], false, true, true);
+        select_fixture(&ctx, &mut backend, true, Modifiers::NONE);
+        assert_eq!(backend.selectable_content(), "SELECT_ME", "{mode}");
+        let output = frame_with_selection(&ctx, &mut backend, vec![Event::Copy], false, true, true);
+        assert!(
+            output
+                .platform_output
+                .commands
+                .iter()
+                .any(|command| matches!(
+                    command, egui::OutputCommand::CopyText(text) if text == "SELECT_ME"
+                )),
+            "{mode}: selected text was not copied"
+        );
+        // A sentinel reaches the raw console first only if dragging/copying did
+        // not leak a mouse report or Ctrl+C into the running application.
+        backend.process_command(egui_term::BackendCommand::Write(b"z".to_vec()));
+        wait_text(&mut backend, "REPORT_0_7A");
+    }
+}
+
+#[test]
+fn coding_cli_click_without_drag_still_reaches_the_application() {
+    let ctx = egui::Context::default();
+    let mut backend = mouse_terminal(&ctx, "select-all");
+    frame_with_selection(&ctx, &mut backend, vec![], false, true, true);
+    wait_text(&mut backend, "SELECT_ME");
+    let [pos, _] = selection_points(&ctx, &backend);
+    frame_with_selection(
+        &ctx,
+        &mut backend,
+        vec![pointer_button(pos, true, Modifiers::NONE)],
+        false,
+        true,
+        true,
+    );
+    frame_with_selection(
+        &ctx,
+        &mut backend,
+        vec![pointer_button(pos, false, Modifiers::NONE)],
+        false,
+        true,
+        true,
+    );
+    wait_text(&mut backend, "REPORT_0_1B-5B-3C-30-3B-31-3B-32-4D");
+    wait_text(&mut backend, "REPORT_1_1B-5B-3C-30-3B-31-3B-32-6D");
+    assert!(backend.selectable_content().is_empty());
+}
+
+#[test]
+fn copy_without_selection_keeps_ctrl_c_interrupt() {
+    let ctx = egui::Context::default();
+    let mut backend = mouse_terminal(&ctx, "select-all");
+    frame_with_selection(&ctx, &mut backend, vec![], false, true, true);
+    wait_text(&mut backend, "SELECT_ME");
+    let output = frame_with_selection(&ctx, &mut backend, vec![Event::Copy], false, true, true);
+    assert!(
+        !output
+            .platform_output
+            .commands
+            .iter()
+            .any(|command| matches!(command, egui::OutputCommand::CopyText(_)))
+    );
+    wait_text(&mut backend, "REPORT_0_03");
+}
+
+#[test]
+fn generic_mouse_application_keeps_drag_reports_and_shift_selection() {
+    for mode in ["select-motion", "select-all"] {
+        let ctx = egui::Context::default();
+        let mut backend = mouse_terminal(&ctx, mode);
+        frame(&ctx, &mut backend, vec![], false);
+        wait_text(&mut backend, "SELECT_ME");
+        frame(&ctx, &mut backend, vec![], false);
+        select_fixture(&ctx, &mut backend, false, Modifiers::NONE);
+        wait_text(&mut backend, "REPORT_0_1B-5B-3C-30-");
+        wait_text(&mut backend, "REPORT_1_1B-5B-3C-33-32-");
+        wait_text(&mut backend, "REPORT_2_1B-5B-3C-30-");
+        assert!(backend.selectable_content().is_empty());
+        select_fixture(&ctx, &mut backend, false, Modifiers::SHIFT);
+        assert_eq!(backend.selectable_content(), "SELECT_ME");
+    }
 }
 #[test]
 fn application_mouse_tracking_receives_real_wheel_reports_in_both_directions() {

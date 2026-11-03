@@ -133,6 +133,7 @@ impl eframe::App for Probe {
         });
         let view = TerminalView::new(ui, &mut self.terminal)
             .set_native_image_paste(true)
+            .set_drag_selection(true)
             .set_focus(true)
             .set_font(ai_terminal::appearance::terminal_font(14.0));
         ui.add(view);

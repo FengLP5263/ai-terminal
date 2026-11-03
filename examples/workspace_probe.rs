@@ -17,7 +17,7 @@ struct Probe {
     terminal: TerminalBackend,
     icons: Icons,
     preferences: UiSettings,
-    ids: Vec<&'static str>,
+    ids: Vec<String>,
     active: String,
     output: PathBuf,
     began: Instant,
@@ -30,6 +30,8 @@ struct Probe {
     name: String,
     selected_name: bool,
     zoom_verified: bool,
+    many_sessions: bool,
+    rail_scrolled: bool,
 }
 impl Probe {
     fn tick(&mut self, ctx: &egui::Context) {
@@ -58,6 +60,20 @@ impl eframe::App for Probe {
             .entry(egui::ViewportId::ROOT)
             .or_default()
             .focused = Some(true);
+        if self.many_sessions && self.stage == 2 {
+            input
+                .events
+                .push(egui::Event::PointerMoved(egui::pos2(49.0, 300.0)));
+            if !self.rail_scrolled {
+                self.rail_scrolled = true;
+                input.events.push(egui::Event::MouseWheel {
+                    unit: egui::MouseWheelUnit::Line,
+                    delta: egui::vec2(0.0, -3.0),
+                    modifiers: egui::Modifiers::NONE,
+                    phase: egui::TouchPhase::Move,
+                });
+            }
+        }
         if self.stage == 1 && !self.wheel_sent {
             self.wheel_sent = true;
             input
@@ -84,11 +100,11 @@ impl eframe::App for Probe {
             .ids
             .iter()
             .map(|id| {
-                let (name, agent, activity, unread) = match *id {
+                let (name, agent, activity, unread) = match id.as_str() {
                     "codex" => ("接口联调 👩🏽‍💻", Agent::Codex, Activity::Completed, true),
                     "claude" => ("AI 终端 ❤️🚀", Agent::Claude, Activity::Working, false),
                     "cmd" => ("CMD", Agent::Cmd, Activity::Idle, false),
-                    "bash" => ("Bash", Agent::Bash, Activity::Idle, false),
+                    "bash" => ("Git Bash", Agent::Bash, Activity::Idle, false),
                     _ => ("PowerShell", Agent::Shell, Activity::Waiting, false),
                 };
                 Entry {
@@ -96,7 +112,7 @@ impl eframe::App for Probe {
                     name,
                     directory: std::path::Path::new("C:/Projects/ai-terminal"),
                     agent,
-                    color: match *id {
+                    color: match id.as_str() {
                         "codex" => Some(model::SessionColor::Blue),
                         "claude" => Some(model::SessionColor::Purple),
                         "cmd" => Some(model::SessionColor::Green),
@@ -117,6 +133,9 @@ impl eframe::App for Probe {
             self.preferences.sidebar_width,
             &self.icons,
         );
+        if !self.preferences.sidebar_collapsed {
+            self.preferences.sidebar_width = actions.width;
+        }
         if actions.toggle {
             self.preferences.sidebar_collapsed = !self.preferences.sidebar_collapsed;
         }
@@ -124,8 +143,8 @@ impl eframe::App for Probe {
             self.active = id;
         }
         if let Some((from, to, after)) = actions.reorder {
-            let a = self.ids.iter().position(|s| *s == from).unwrap();
-            let b = self.ids.iter().position(|s| *s == to).unwrap();
+            let a = self.ids.iter().position(|s| s == &from).unwrap();
+            let b = self.ids.iter().position(|s| s == &to).unwrap();
             model::reorder(&mut self.ids, a, b, after);
         }
         egui::CentralPanel::default()
@@ -229,6 +248,7 @@ fn main() -> eframe::Result {
         .and_then(|v| v.parse::<f32>().ok())
         .unwrap_or(1160.0)
         .clamp(720.0, 1600.0);
+    let many_sessions = std::env::args().nth(3).as_deref() == Some("many");
     eframe::run_native(
         "ai-terminal workspace visual probe",
         eframe::NativeOptions {
@@ -258,7 +278,11 @@ fn main() -> eframe::Result {
                 terminal,
                 icons: Icons::new(&cc.egui_ctx),
                 preferences: UiSettings::default(),
-                ids: vec!["codex", "claude", "shell", "cmd", "bash"],
+                ids: ["codex", "claude", "shell", "cmd", "bash"]
+                    .into_iter()
+                    .map(String::from)
+                    .chain((0..if many_sessions { 25 } else { 0 }).map(|i| format!("shell-{i}")))
+                    .collect(),
                 active: "claude".into(),
                 output,
                 began: Instant::now(),
@@ -271,6 +295,8 @@ fn main() -> eframe::Result {
                 name: "命名 😀 👋🏽 👩‍💻 ❤️ 🚀".into(),
                 selected_name: false,
                 zoom_verified: false,
+                many_sessions,
+                rail_scrolled: false,
             }))
         }),
     )

@@ -40,6 +40,8 @@ Windows 构建由 `build.rs` 编译程序图标资源；需 Windows SDK 的 rc.e
 
 ## 当前 CI 边界
 
+governance、ci 和 package 会检查根中英文更新日志是否含 Cargo 当前版本的唯一日期条目、分类与实际变更，且双语日期相同；package 将两份完整日志装入 ZIP 并计入源码摘要。Windows／POSIX 统一入口及参数不变；新增回归包含缺失翻译、错误／重复版本、日期分歧及空当前条目。
+
 project.ps1 ci 是厂商无关入口；源码托管于 GitHub，尚未配置云 runner，不把本机结果当作 GitHub Actions 检查。
 常规 CI 不需要 GPU、模型账号或代理权限；真实 GPU smoke 和视觉验收在 Windows 交互环境单独执行。
 
@@ -58,3 +60,13 @@ Git Bash governance/format-check。verify-package 与失败路径以最终验收
 缩放回归另运行 `cargo build --offline --locked --example island_zoom_probe` 和 `target/debug/examples/island_zoom_probe.exe output/<unique-zoom-probe>`，核验真实原生视口在 50%、71%、100% 和 150% 下的物理尺寸、屏幕居中、垂直位置与截图；探针只读取自身窗口并使用合成会话；可附加目标显示器的物理 X 坐标来验证不同 DPI 的屏幕。
 
 制品源码身份还包含本地 egui_glow 的 Cargo 清单、Rust 源码和 GLSL 着色器，避免遗漏图形补丁。
+
+Git Bash 原生启动与截图核查（仅 Windows，PowerShell 或 Git Bash 均可执行）：`cargo build --offline --locked --bins --example bash_probe`，再运行 `target/debug/examples/bash_probe.exe output/<unique-bash-probe>`。探针使用真实 Git Bash、临时 HOME 与合成用户启动文件，核验目录元数据、配置／Agent 入口及 PNG 后退出；不读取真实用户配置、不启动模型。Git 缺失或验证失败会明确返回非零。缺失回退的合成测试与已安装 Git 的原生验收分开记录。
+
+Shell 头像的原生截图核查（仅 Windows，PowerShell／Git Bash）：`cargo build --offline --locked --release --bins --example shell_switch_probe`，再运行 `target/release/examples/shell_switch_probe.exe output/<unique-shell-switch-probe>`。使用正式 App 控件和 B 图标、隔离会话与系统目录，不读取用户 profile、不启动 Agent／模型；只向自身窗口注入 CMD→PowerShell→CMD→逐层 exit 的输入，生成五张截图并正常退出。capture.json 仅说明截图已生成，必须人工确认内容、头像和正常退出，不能当作自动视觉验收。
+
+侧栏溢出与滚动条截图（仅 Windows，PowerShell／Git Bash）：`cargo build --offline --locked --release --bins --example workspace_probe`，再运行 `target/release/examples/workspace_probe.exe output/<unique-sidebar-probe> 1160 many`。many 模式生成 30 个合成会话，在展开、缩放和收起后滚动并悬停滚动条，写出 PNG／JSON；仅使用自身的 ANSI 样例 PTY，不启动 Agent 或模型。检查滚动条保持细窄、不遮挡头像，并核对正常退出。
+
+全屏滚轮／拖选截图（仅 Windows）：`cargo build --offline --locked --release --example scroll_probe`，再用 `rustc --edition=2024 --crate-name mouse_console tests/fixtures/mouse_console.rs -o output/mouse-console.exe` 构建本地样例，运行 `target/release/examples/scroll_probe.exe output/mouse-console.exe output/<unique-selection-probe>`。检查上下翻页、普通左键拖选的高亮及连接说明截图和正常退出；复制行为由 `tests/terminal_interaction.rs` 的真实 ConPTY 回归覆盖。原生探针只向自身窗口输入，不写系统剪贴板、不启动 Agent 或模型。
+
+Windows 兼容性探针：先运行 `cargo build --offline --locked --release --bins --example composer_probe --example titlebar_probe --example discovery_probe`，并用前述 rustc 命令准备 output/mouse-console.exe。分别执行 `target/release/examples/composer_probe.exe output/mouse-console.exe output/<unique-composer-probe>`、`target/release/examples/titlebar_probe.exe output/<unique-titlebar-probe>` 和 `target/release/examples/discovery_probe.exe output/<unique-discovery-probe>`。前两项只使用自身窗口／本地样例，后一项只执行已安装 CLI 的 --version；核对 JSON、PNG 和退出码，Windows 10／11 的结果分开记录。构建会准备固定的原生控制台组件；不能只复制探针 EXE 到另一设备。

@@ -23,6 +23,7 @@ Cargo.toml 声明最低 Rust 1.92；使用 stable 工具链，制品记录实际
 | NPM_CONFIG_PREFIX、PNPM_HOME、NVM_SYMLINK、VOLTA_HOME、BUN_INSTALL | 可选现有安装工具的目录线索；不设默认值、不写用户环境 |
 | AI_TERMINAL_ENDPOINT、AI_TERMINAL_TOKEN | 本轮管理器的 loopback 桥和认证，不能提交值 |
 | AI_TERMINAL_SESSION、AI_TERMINAL_GENERATION | 本地会话标识与启动代次 |
+| AI_TERMINAL_SHELL_INVOCATION、AI_TERMINAL_REAL_* | 当前嵌套 Shell 调用标识与已发现的真实程序路径，仅传入本次子进程 |
 | TERM、COLORTERM、NO_COLOR、FORCE_COLOR、CLICOLOR_FORCE | GUI 启动前在本进程内规范交互终端颜色能力 |
 | CLAUDECODE | 子会话避免继承父 Claude 的嵌套标记 |
 | RC | 可选 Windows SDK 资源编译器路径，仅构建时读取；默认从 PATH／SDK 查找 |
@@ -39,6 +40,7 @@ GUI 只改自己的进程环境，不改 Windows 用户／系统环境或 Warp�
 左侧会话可拖动排序；悬停铅笔或右键编辑名称，标题栏的面板按钮收起为头像栏，再次点击展开。
 右键会话 → 会话颜色可选 7 种颜色或恢复默认；颜色随会话保存，当前行采用更亮的底色和文字，行间分隔线保持一物理像素。标题 AI终端 与两个按钮共用 32 逻辑像素的高度和中心。
 面板右边缘可调宽度。窗口内 Ctrl＋滚轮缩放整个界面（50%–250%），Ctrl＋加减同样可用；Ctrl＋0 或标题栏比例按钮恢复 100%。终端跟随剩余内容区重新计算行列，普通滚轮保留历史滚动。
+展开和收起侧栏共用固定 3 逻辑像素的滚动条，位于分割线内侧约 1 逻辑像素；悬停／滚动只改变明暗，不扩宽。列表右侧预留间隙，不覆盖头像或状态点，保留滚轮和拖动滚动；样式只作用于侧栏。展开时，分割线外侧的独立拖动区调整面板宽度（190–420 逻辑像素），避免抢占滚动条操作。
 首次 Codex 在 /hooks 中审查状态 hook。打开窗口直接进入上次选中的 Shell；其余标签按单击打开，不批量启动。首次空工作区直接创建 PowerShell。
 正常退出通过应用窗口；活跃任务先保存／确认。没有全局 stop/reset 命令，不删除用户会话数据。
 
@@ -60,13 +62,17 @@ cmd/bat 由独立 ai-terminal-hook.exe 的 --launch-cli 模式通过 Rust Comman
 
 新会话以 shell 为根进程；0.3.2 起，旧 Codex/Claude 标签在加载时兼容为 PowerShell，保留名称、目录与历史 ID，不自动执行 Agent。Shell 提示符发出 ai-terminal-cwd;<generation>;<sequence>;<directory> 元数据，后台验证代次和目录后更新列表／默认目录。Bash 用内置 pwd -W 报告本机路径。目录更新只发生在提示符边界，不轮询。
 
-每次终端启动在隔离 runtime/<session>/<generation>/bin 生成两份 helper 入口（优先硬链接、跨卷回退复制）。只对本次子进程 PATH 生效，不改用户／系统 PATH、CLI 安装或 profile。输入 codex/claude 调用真实已安装的 CLI，并报告 ShellAgentStarted／ShellAgentEnded；普通输出不决定图标。显式绝对路径、用户自定义别名和其他 Agent 暂不接入自动识别。
+每次终端启动在隔离 runtime/<session>/<generation>/bin 生成已接入程序的 helper 入口（优先硬链接、跨卷回退复制）；Shell 入口仅在发现对应安装后生成。只对本次子进程 PATH 生效，不改用户／系统 PATH、CLI 安装或 profile。输入 codex/claude 调用真实已安装的 CLI，并报告 ShellAgentStarted／ShellAgentEnded；普通输出不决定图标。显式绝对路径、用户自定义别名和其他 Agent 暂不接入自动识别。
 
 图标身份与工作状态分开：身份来自受管 CLI 启停，Working/Waiting/完成仍来自生命周期 hook。HookEvent 增加可选 invocation、process_id，旧事件默认 None。每次调用的 ID 隔离迟到事件和嵌套 Agent；当前进程句柄仅在根 shell 提示符事件上检查，不扫描进程列表。CLI 退出回到终端，保留用户自定义名称。
 
 Claude 状态配置在同一终端启动代次内复用，仅内容变化时写入。新建终端不加载 Agent 或要求配置 hook。用户显式 --settings 保持优先，不覆盖该文件；此时状态连接以实际 CLI 事件为准。所有交互仍由用户处理，不自动信任或发起模型请求。
 
-终端默认保持受控启动：PowerShell -NoProfile、CMD /D、Bash 使用会话 rcfile，不修改或自动载入用户启动文件。关闭终端仍只回收自身 Job Object。运行中的 CLI、控制台句柄、提示词和正文不持久化。
+PowerShell 使用 -NoProfile，CMD 使用 /D。Git Bash 的会话 rcfile 先加载 /etc/profile，再按 Bash 登录配置的优先级加载首个可读的 ~/.bash_profile、~/.bash_login 或 ~/.profile；是否加载 ~/.bashrc 由上述用户配置决定。保留用户 PS1、别名、补全和标量／数组 PROMPT_COMMAND，再追加目录通知；启动配置加载后仅将本会话的 Agent 入口放回子进程 PATH 前端。设置 CHERE_INVOKING 保留选中目录，按安装目录选择 Git 的 MSYSTEM。不写入用户配置文件；用户启动脚本仍会执行其自身行为。关闭终端仍只回收自身 Job Object。运行中的 CLI、控制台句柄、提示词和正文不持久化。
+
+菜单中的 Git Bash 需要真正的 Git for Windows 安装：支持当前／持久 PATH（包括 Git 的 cmd 目录）、HKCU/HKLM 两种注册表视图中的 GitForWindows/InstallPath、环境变量提供的系统／用户安装目录及用户 Scoop 路径；便携安装需将 Git 的 cmd 或 bin 加入 PATH。不扫描磁盘，不把 WSL 的 bash.exe 别名或无 Git 配置的其他 Bash 当作 Git Bash。缺失时明确提示并提供改用 PowerShell 的按钮，PowerShell 也缺失则提供 CMD；点击后更新真实会话类型、默认名称和图标，保留 UUID、目录、颜色、自定义名称与对话 ID。没有可用回退时保留错误，不自动安装软件。
+
+会话级入口还识别 powershell、cmd、bash 的交互式嵌套调用；按原参数启动程序，进入时发送 ShellStarted，结束时发送 ShellEnded。头像优先显示前台 Agent，其次是当前嵌套 Shell，最后是创建会话时的 Shell；exit 逐层恢复，侧栏和浮窗共用该身份。仅支持已接入入口和明确的交互式参数；单次 -Command／-File／/c／-c、重定向、Agent 工具内部的 Shell 不切换头像。启动时仅查询自身控制台的进程 ID，以确认同属根 PTY；不扫描系统进程，不读取输入或猜测输出。最多保留 32 层临时身份；过期代次、父调用不符、脱离当前控制台的通知被拒绝。嵌套身份不改变或持久化根 Shell 类型，也不表示 AI 任务开始／完成。原始启动参数保持不变，目录通知仍以实际提示符集成为准；绝对路径和自定义别名不会被伪装成已接入入口。
 
 ## 0.3.3 普通滚轮
 
@@ -86,6 +92,8 @@ Codex 状态命令固定为 `& $env:AI_TERMINAL_HELPER --hook`，helper 路径�
 从另一个受管终端启动管理器时，CLI 发现及子 PATH 会排除继承的 AI_TERMINAL_SHIM_DIR，避免把旧会话的 helper 当作真实 Agent。helper 忽略带非空 agent_id 的子 Agent 事件；单独 agent_type（根会话 --agent）仍保留。
 滚轮在应用明确开启 MOUSE_MODE 时使用真实鼠标滚轮协议，由 Claude 全屏界面等自行翻页；其余情况滚动本地历史。Shift 强制本地历史，Ctrl／Command 仍交给宿主整体缩放，不再模拟上下方向键。无需更改 Claude 用户配置或强制退出全屏。
 
+
+已识别的 Codex／Claude 会话优先用普通左键拖动选择终端文字，Ctrl+C 复制选区；没有选区时 Ctrl+C 仍中断 CLI。应用鼠标模式下，按下后移动至少 3 逻辑像素才进入本地拖选，不向 CLI 泄漏点击／拖动事件；没有拖动的单击在松开时发送真实按下与释放。滚轮仍由应用处理。其他终端程序保留原有鼠标协议，可按住 Shift 强制本地选择。使用现有终端网格和选区，不新增对话记录。
 
 ## 0.3.7 原生 Codex 与图片粘贴
 
@@ -118,3 +126,11 @@ Claude 的 PermissionRequest／Elicitation 本身也可能被其他 hook 自动�
 ## Windows OpenGL 缓冲区
 
 原生字形绘制可能在部分 Windows OpenGL 驱动中触发进程私有内存持续增长。项目维护的 `egui_glow` 补丁按需扩容并复用顶点和索引缓冲区，保留原有纹理、绘制顺序及字形内容；其他平台使用上游方式。内存回归应区分管理器和 Agent 子进程，并使用隔离会话及真实原生窗口验证。
+
+## Windows 兼容性修复（未发布）
+
+默认随包使用 Microsoft.Windows.Console.ConPTY 1.25.260930003 的 x64 conpty.dll 和 OpenConsole.exe。Windows 10 内置控制台在原生样例中丢失全屏／鼠标模式，同一程序改用固定组件后通过。组件与程序同目录，不修改系统控制台、默认终端、PATH 或用户配置；会话创建前缺失组件会明确报错。build.rs 按实际 Cargo profile 为程序、examples 和 deps 准备组件，相同内容不重写。
+
+深色标题栏通过当前窗口的 DwmSetWindowAttribute 请求，优先属性 20、再尝试旧 Windows 10 属性 19。窗口子类在 WM_THEMECHANGED／WM_SETTINGCHANGE 的默认处理结束后重新应用，在 WM_NCDESTROY 移除；没有空闲轮询或全局个性化更改。不支持该属性的窗口保留后端主题。
+
+CLI 发现跳过已确认目标缺失的标准 npm .cmd／.bat 启动器，继续按原目录优先级查找。不运行探测命令，不猜测包私有布局：仅检查公开标准启动器中明确的字面目标。自定义、无法理解或不可读取的脚本保留优先级；不能因 CLI 返回非零状态就再次执行另一入口。全部标准入口失效时，错误列出启动器与缺失目标；会话中缓存的入口也在实际调用时复核。

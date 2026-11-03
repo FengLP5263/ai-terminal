@@ -33,3 +33,11 @@ Packaging obtains `target_directory` from Cargo metadata and honors `CARGO_TARGE
 0.4.0 adds UI `language` (`system`/`zh_cn`/`en`, default `system`), `floating_enabled` (default false), old optional logical `floating_position`, and physical-pixel `floating_position_pixels` (migrated from the old field). Old data uses defaults; language/float settings use delayed atomic persistence. Floating snapshots contain only ID, name, Agent, color, status, and unread state, never task text. The capsule and gear are drawn in code without new image/font/browser dependencies.
 
 The 0.4.2 local egui_glow patch records upstream provenance and licenses; artifact source identity includes its Cargo manifest, Rust sources, and GLSL shaders.
+
+## Native console assets and package format
+
+`assets/windows/conpty/SOURCE.json` pins the Microsoft NuGet version, URL, package hash, x64 hashes, minimum Windows build, signature check and license origin. Governance allows only the fixed OpenConsole.exe in this asset directory as a third-party exception; other EXEs remain rejected. The license is preserved verbatim.
+
+New manifests use format_version 2 with native_console identity, both companions, Microsoft-ConPTY-LICENSE.txt and Microsoft-ConPTY-SOURCE.json. Missing files fail verification; older release formats remain verifiable. Source identity includes the entire native asset directory. Packaging rechecks pinned hashes before copying and never takes companions from another version's output directory.
+
+Starting with 0.4.3, both root CHANGELOG files are covered by source identity and shipped in the ZIP. Build checks the current version, matching date, and nonempty categorized changes first. GitHub Releases reuse the same version entry. Read-only integrity verification of older ZIPs still accepts archives without the new changelog files.

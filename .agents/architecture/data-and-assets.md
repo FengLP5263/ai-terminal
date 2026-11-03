@@ -52,3 +52,11 @@ target/、output/、.runtime/、runtime/、.tools/、参考交接文件、数据
 0.4.0 在 ui 中新增 language（system／zh_cn／en，默认 system）、floating_enabled（默认 false）、floating_position（旧版可选逻辑坐标）以及 floating_position_pixels（按显示器物理像素保存，首次从旧坐标迁移）。旧文件通过 serde 默认值继续加载；切换语言与浮窗选项沿用 400ms 延迟原子保存，退出时立即保存。浮窗快照仅包含 ID、名称、Agent、颜色、状态和未读，不持久化任务正文。背景透明胶囊与齿轮都是代码绘制，没有新增图片、系统字体副本或浏览器依赖。
 
 0.4.2 的 egui_glow 本地补丁记录上游来源和许可证；制品源码摘要包含其 Cargo 清单、Rust 源码及 GLSL 着色器。
+
+## 原生控制台资产与制品格式
+
+`assets/windows/conpty/SOURCE.json` 固定微软 NuGet 包版本、下载 URL、包哈希、x64 文件哈希、最低 Windows build、签名核查和许可证来源。治理仅对该目录中固定的 OpenConsole.exe 给予第三方资产例外，其他 EXE 仍被拒绝；许可证保持原文。
+
+新包 manifest 使用 format_version 2，包含 native_console 身份、两个原生组件、Microsoft-ConPTY-LICENSE.txt 和 Microsoft-ConPTY-SOURCE.json；缺失时校验失败。验证器仍接受旧格式发行包。源码摘要包括整个原生资产目录；打包复制前再次核对固定哈希，不从另一版本的输出目录取组件。
+
+0.4.3 起根中英文 CHANGELOG 纳入源码摘要并随 ZIP 分发；构建先核对当前版本、同一日期和非空的分类变更。GitHub Release 沿用相同版本条目。旧 ZIP 的只读完整性校验不因缺少新日志文件而失效。

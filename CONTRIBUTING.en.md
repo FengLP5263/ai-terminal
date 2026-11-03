@@ -32,6 +32,8 @@ Set up Windows, Rust MSVC, C++ Build Tools, Windows SDK, and Python as described
 
 ## Pull requests
 
+Release changes must update [CHANGELOG.md](CHANGELOG.md) and [CHANGELOG.en.md](CHANGELOG.en.md) for the current Cargo version with matching dates, listing actual additions, improvements, fixes, upgrade notes, and verification limits. GitHub Releases reuse that entry; packaging checks the version entry and includes both files. Record ordinary development under Unreleased, then organize it into a version before release. Do not rewrite historical releases as current behavior.
+
 Explain the problem, visible behavior, and validation. Keep small changes concise. Before submitting, run:
 
 ```powershell

@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 import hashlib
 import json
 import os
+import re
 from pathlib import Path, PurePosixPath
 import shutil
 import subprocess
@@ -23,11 +24,36 @@ import uuid
 import zipfile
 
 ROOT=Path(__file__).resolve().parent.parent
+NATIVE_REQUIRED={'conpty.dll','OpenConsole.exe','Microsoft-ConPTY-LICENSE.txt','Microsoft-ConPTY-SOURCE.json'}
+CHANGELOGS=('CHANGELOG.md','CHANGELOG.en.md')
+
+def release_notes(version,root=ROOT):
+    """Require dated, nonempty current-version entries in both languages."""
+    entries={};dates=set()
+    for name in CHANGELOGS:
+        text=(root/name).read_text(encoding='utf-8-sig')
+        heads=list(re.finditer(r'^## \['+re.escape(version)+r'\] - (\d{4}-\d{2}-\d{2})\s*$',text,re.M))
+        if len(heads)!=1:raise ValueError(f'{name}: expected exactly one release entry for {version}')
+        head=heads[0];date=head.group(1)
+        datetime.strptime(date,'%Y-%m-%d');dates.add(date)
+        following=re.search(r'^## ',text[head.end():],re.M)
+        end=head.end()+following.start() if following else len(text)
+        section=text[head.start():end].strip()
+        active=False;has_change=False
+        categories={'新增','改进','修复','安全','弃用','移除','Added','Changed','Fixed','Security','Deprecated','Removed'}
+        for line in section.splitlines():
+            if line.startswith('### '):active=line[4:].strip() in categories
+            elif active and line.startswith('- ') and line[2:].strip():has_change=True
+        if not has_change:raise ValueError(f'{name}: current release has no categorized changes')
+        entries[name]=section
+    if len(dates)!=1:raise ValueError('bilingual release dates differ')
+    return entries
 
 def sha(path):return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 def source_identity(root=ROOT):
-    inputs=[root/'build.rs',root/'Cargo.toml',root/'Cargo.lock',root/'vendor/egui_term/Cargo.toml',root/'vendor/egui-winit/Cargo.toml',root/'vendor/egui_glow/Cargo.toml']+list((root/'src').rglob('*.rs'))+list((root/'vendor/egui_term/src').rglob('*.rs'))+list((root/'vendor/egui-winit/src').rglob('*.rs'))+[p for p in (root/'vendor/egui_glow/src').rglob('*') if p.is_file()]+list((root/'assets/fonts').iterdir())+list((root/'assets/icons').iterdir())+list((root/'assets/branding').iterdir())
+    inputs=[root/'build.rs',root/'Cargo.toml',root/'Cargo.lock',root/'vendor/egui_term/Cargo.toml',root/'vendor/egui-winit/Cargo.toml',root/'vendor/egui_glow/Cargo.toml']+list((root/'src').rglob('*.rs'))+list((root/'vendor/egui_term/src').rglob('*.rs'))+list((root/'vendor/egui-winit/src').rglob('*.rs'))+[p for p in (root/'vendor/egui_glow/src').rglob('*') if p.is_file()]+list((root/'assets/fonts').iterdir())+list((root/'assets/icons').iterdir())+list((root/'assets/branding').iterdir())+[p for p in (root/'assets/windows/conpty').rglob('*') if p.is_file()]
+    inputs += [root/name for name in CHANGELOGS]
     digest=hashlib.sha256()
     for item in sorted(inputs,key=lambda p:p.relative_to(root).as_posix()):
         digest.update(item.relative_to(root).as_posix().encode());digest.update(b'\0');digest.update(item.read_bytes());digest.update(b'\0')
@@ -54,10 +80,23 @@ def verify_archive(path):
         if expected!=set(names):raise ValueError('archive and manifest member sets differ')
         if not {'ai-terminal.exe','ai-terminal-hook.exe','LICENSE.txt','Hack-LICENSE.txt','egui-term-LICENSE.txt'}.issubset(expected):
             raise ValueError('program/helper/license incomplete')
+        if manifest.get('format_version',1)>=2 and not NATIVE_REQUIRED.issubset(expected):raise ValueError('native console runtime/license incomplete')
         for name,record in manifest['files'].items():
             data=archive.read(name)
             if len(data)!=record['bytes'] or hashlib.sha256(data).hexdigest()!=record['sha256']:raise ValueError('checksum mismatch: '+name)
     return {'ok':True,'archive':path.name,'sha256':sha(path),'files':len(names),'version':manifest['version']}
+
+def native_console_assets(folder,root=ROOT):
+    source=root/'assets/windows/conpty'
+    record=json.loads((source/'SOURCE.json').read_text(encoding='utf-8'))
+    if set(record['files'])!={'x64/conpty.dll','x64/OpenConsole.exe','LICENSE.txt'}:raise ValueError('unexpected native console asset set')
+    for name,expected in record['files'].items():
+        path=source/name
+        if path.stat().st_size!=expected['bytes'] or sha(path)!=expected['sha256']:raise ValueError('native console identity mismatch: '+name)
+    for name in ('conpty.dll','OpenConsole.exe'):shutil.copy2(source/'x64'/name,folder/name)
+    shutil.copy2(source/'LICENSE.txt',folder/'Microsoft-ConPTY-LICENSE.txt')
+    shutil.copy2(source/'SOURCE.json',folder/'Microsoft-ConPTY-SOURCE.json')
+    return {'package':record['package'],'version':record['version'],'architecture':record['architecture']}
 
 def write_archive(folder,path):
     # Cargo registry license files may retain a reproducible Unix epoch mtime.
@@ -95,23 +134,27 @@ def build(allow_dirty=False):
     git=command(['git','status','--porcelain=v1','--untracked-files=normal']).stdout
     dirty=bool(git.strip())
     if dirty and not allow_dirty:raise ValueError('worktree is dirty; commit first or explicitly use --allow-dirty for local acceptance')
+    version=tomllib.loads((ROOT/'Cargo.toml').read_text(encoding='utf-8'))['package']['version']
+    release_notes(version)
     cargo=['cargo']
     local_network=ROOT/'.tools/cargo-network.toml'
     if local_network.exists():cargo+=['--config',str(local_network)]
     # Cargo is the build authority; never copy a potentially stale previous preview.
     result=subprocess.run(cargo+['build','--locked','--release','-j','4'],cwd=ROOT)
     if result.returncode:raise RuntimeError('release build failed')
-    version=tomllib.loads((ROOT/'Cargo.toml').read_text(encoding='utf-8'))['package']['version']
     label=f"ai-terminal-v{version}-windows-x64-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}-{uuid.uuid4().hex[:6]}"
     folder=ROOT/'output/packages'/label;folder.mkdir(parents=True,exist_ok=False)
     # Cargo metadata is authoritative, including CARGO_TARGET_DIR / build.target-dir.
     target=Path(json.loads(command(cargo+['metadata','--no-deps','--locked','--offline','--format-version','1']).stdout)['target_directory'])/'release'
     for name in ['ai-terminal.exe','ai-terminal-hook.exe']:shutil.copy2(target/name,folder/name)
+    for name in CHANGELOGS:shutil.copy2(ROOT/name,folder/name)
+    native=native_console_assets(folder)
     for source,destination in [('LICENSE','LICENSE.txt'),('vendor/egui_term/LICENSE','egui-term-LICENSE.txt'),('assets/fonts/LICENSE.md','Hack-LICENSE.txt'),('assets/icons/LICENSE-lobe-icons','Lobe-Icons-LICENSE.txt'),('THIRD_PARTY_NOTICES.md','THIRD_PARTY_NOTICES.md')]:shutil.copy2(ROOT/source,folder/destination)
-    (folder/'README.txt').write_text('ai-terminal '+version+'\n\n两个 exe 请放在同一目录。双击 ai-terminal.exe 默认进入 PowerShell；左上角＋可新建 PowerShell、CMD 或 Bash，在终端中输入 codex 或 claude。\n会话数据在 %LOCALAPPDATA%/ai-terminal；退出会回收本程序拥有的会话进程。\nCodex 欢迎页显示等待任务通知；首轮任务后仍无通知时，可在 /hooks 检查状态 hook，只有未启用时需要审查。版本与源码身份见 manifest.json；发行说明与更新见 GitHub 的 FengLP5263/ai-terminal 仓库。\n',encoding='utf-8')
+    (folder/'README.txt').write_text('ai-terminal '+version+'\n\n请完整解压。ai-terminal.exe、ai-terminal-hook.exe、conpty.dll 和 OpenConsole.exe 必须放在同一目录。双击 ai-terminal.exe 默认进入 PowerShell；左上角＋可新建 PowerShell、CMD 或 Git Bash，在终端中输入 codex 或 claude。\n会话数据在 %LOCALAPPDATA%/ai-terminal；退出只回收本程序拥有的会话进程。\nCodex 欢迎页等待任务通知；任务后仍无通知时，可在 /hooks 审查状态 hook。版本、源码与原生组件身份见 manifest.json；许可证随包携带。\n\nExtract the complete archive. Keep ai-terminal.exe, ai-terminal-hook.exe, conpty.dll and OpenConsole.exe together. Double-click ai-terminal.exe for PowerShell; use + for PowerShell, CMD or Git Bash, then run codex or claude.\nSession data: %LOCALAPPDATA%/ai-terminal. Exit closes only owned sessions. The Codex welcome screen waits for task notifications; review /hooks if notifications remain absent after work begins. See manifest.json and the included licenses for source/runtime identity.\n',encoding='utf-8')
     dependencies(cargo,folder)
     head=command(['git','rev-parse','--verify','HEAD'],check=False)
-    manifest={'format_version':1,'version':version,'platform':'windows-x64','git_commit':head.stdout.strip() if head.returncode==0 else None,'dirty':dirty,'rustc':command(['rustc','-V']).stdout.strip(),'source_sha256':source_identity(),'source_scope':'Cargo manifests/lock, build.rs, production Rust, local egui_glow sources and shaders, font/icon/branding assets','build':'cargo build --locked --release','published':False,'files':{}}
+    manifest={'format_version':2,'version':version,'platform':'windows-x64','git_commit':head.stdout.strip() if head.returncode==0 else None,'dirty':dirty,'rustc':command(['rustc','-V']).stdout.strip(),'source_sha256':source_identity(),'source_scope':'Cargo manifests/lock, build.rs, production Rust, local egui_glow sources and shaders, font/icon/branding/native-console assets','native_console':native,'build':'cargo build --locked --release','published':False,'files':{}}
+    manifest['source_scope']+=', bilingual changelog'
     for item in sorted(folder.rglob('*')):
         if item.is_file():manifest['files'][item.relative_to(folder).as_posix()]={'bytes':item.stat().st_size,'sha256':sha(item)}
     (folder/'manifest.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2),encoding='utf-8')
