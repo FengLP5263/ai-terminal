@@ -325,24 +325,41 @@ impl Engine {
                 .PushAxisAlignedClip(&clip, D2D1_ANTIALIAS_MODE_ALIASED);
             self.target.Clear(Some(&color(key.bg)));
             self.brush.SetColor(&color(key.fg));
-            let left = if key.text.chars().any(|c| c as u32 >= 0x2E80) {
+            let mut left = if key.text.chars().any(|c| c as u32 >= 0x2E80) {
                 ((key.width as f32 - natural_width) / 2.0).max(0.0).round()
             } else {
                 0.0
             };
+            let mut emoji_scale = 1.0;
             let top = if key.style & 4 != 0 {
                 let mut metrics = DWRITE_TEXT_METRICS::default();
                 layout.GetMetrics(&mut metrics)?;
-                ((key.height as f32 - metrics.height) / 2.0).round()
+                // Fallback emoji line boxes can exceed both a narrow cell and
+                // Hack's row. Fit the complete shaped cluster, never crop it.
+                emoji_scale = ((key.width as f32 - 2.0).max(1.0) / natural_width.max(1.0))
+                    .min((key.height as f32 - 2.0).max(1.0) / metrics.height.max(1.0))
+                    .min(1.0);
+                left = ((key.width as f32 - natural_width * emoji_scale) / 2.0).round();
+                ((key.height as f32 - metrics.height * emoji_scale) / 2.0).round()
             } else {
                 key.baseline as f32 - baseline
             };
+            self.target.SetTransform(&windows_numerics::Matrix3x2 {
+                M11: emoji_scale,
+                M12: 0.0,
+                M21: 0.0,
+                M22: emoji_scale,
+                M31: left,
+                M32: top,
+            });
             self.target.DrawTextLayout(
-                windows_numerics::Vector2 { X: left, Y: top },
+                windows_numerics::Vector2 { X: 0.0, Y: 0.0 },
                 &layout,
                 &self.brush,
                 D2D1_DRAW_TEXT_OPTIONS_ENABLE_COLOR_FONT | D2D1_DRAW_TEXT_OPTIONS_CLIP,
             );
+            self.target
+                .SetTransform(&windows_numerics::Matrix3x2::identity());
             self.target.PopAxisAlignedClip();
             self.target.EndDraw(None, None)?;
             let mut bgra = vec![0; key.width as usize * key.height as usize * 4];
@@ -453,7 +470,9 @@ pub fn shape(
     let key = Key {
         text: text.into(),
         pixels: (size * scale).round().clamp(1.0, 128.0) as u16,
-        style: u8::from(bold) | u8::from(italic) << 1,
+        style: u8::from(bold)
+            | u8::from(italic) << 1
+            | u8::from(crate::view::emoji_presentation(text)) << 2,
         width,
         height,
         baseline: (baseline * scale).round() as u16,
@@ -519,6 +538,40 @@ mod tests {
         NativeFont {
             family: "Consolas".into(),
             faces: &[],
+        }
+    }
+    #[test]
+    fn emoji_fits_narrow_cells_without_cutting_off_ink() {
+        let mut engine = Engine::new(&native()).unwrap();
+        for text in ["⏸", "⏸️", "⏵", "⚠️", "👩‍💻", "❤️"] {
+            for width in [14, 28] {
+                let key = Key {
+                    text: text.into(),
+                    pixels: 32,
+                    style: 4,
+                    width,
+                    height: 30,
+                    baseline: 0,
+                    fg: [255; 4],
+                    bg: [0; 4],
+                };
+                let rgba = engine.raster(&key).unwrap();
+                let pixels = rgba.as_chunks::<4>().0;
+                assert!(
+                    pixels.iter().filter(|p| p[3] > 32).count() > 12,
+                    "missing badge: {text}"
+                );
+                let edge_ink = pixels
+                    .iter()
+                    .enumerate()
+                    .filter(|(i, p)| {
+                        let x = i % width as usize;
+                        let y = i / width as usize;
+                        (x == 0 || x + 1 == width as usize || y == 0 || y == 29) && p[3] > 32
+                    })
+                    .count();
+                assert_eq!(edge_ink, 0, "clipped emoji {text}, width {width}");
+            }
         }
     }
     #[test]

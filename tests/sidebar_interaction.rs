@@ -16,6 +16,7 @@ struct Harness {
     unread: bool,
     extra: Vec<String>,
     width: f32,
+    height: f32,
 }
 impl Harness {
     fn new() -> Self {
@@ -32,12 +33,16 @@ impl Harness {
             unread: false,
             extra: Vec::new(),
             width: 238.0,
+            height: 600.0,
         }
     }
     fn frame(&mut self, events: Vec<Event>, collapsed: bool) -> Actions {
         self.tick += 1;
         let input = egui::RawInput {
-            screen_rect: Some(Rect::from_min_size(Pos2::ZERO, egui::vec2(900.0, 600.0))),
+            screen_rect: Some(Rect::from_min_size(
+                Pos2::ZERO,
+                egui::vec2(900.0, self.height),
+            )),
             events,
             time: Some(self.tick as f64 * 0.1),
             ..Default::default()
@@ -107,6 +112,48 @@ impl Harness {
 }
 
 #[test]
+fn collapsed_sidebar_geometry_settles_near_the_scrollbar_threshold() {
+    for (count, height, zoom) in [
+        (7, 550.0, 1.0),
+        (8, 600.0, 0.71),
+        (10, 720.0, 1.21),
+        (12, 840.0, 1.42),
+    ] {
+        let mut h = Harness::new();
+        h.ctx.set_zoom_factor(zoom);
+        h.height = height * zoom;
+        h.extra = (3..count).map(|i| format!("session-{i}")).collect();
+        for _ in 0..8 {
+            h.frame(vec![], true);
+        }
+        let expected = h.row("a");
+        for frame in 0..24 {
+            h.frame(vec![], true);
+            assert_eq!(
+                h.row("a"),
+                expected,
+                "idle layout oscillation: sessions={count}, height={height}, frame={frame}"
+            );
+            assert!(
+                h.output
+                    .as_ref()
+                    .unwrap()
+                    .viewport_output
+                    .values()
+                    .all(|v| !v.repaint_delay.is_zero()),
+                "idle scrollbar must not create a continuous repaint loop"
+            );
+        }
+        for pointer in [egui::pos2(58.0, 200.0), egui::pos2(400.0, 200.0)] {
+            for _ in 0..12 {
+                h.frame(vec![Event::PointerMoved(pointer)], true);
+                assert_eq!(h.row("a"), expected, "hover must not change rail geometry");
+            }
+        }
+    }
+}
+
+#[test]
 fn sidebar_scrollbar_stays_thin_and_clear_of_rows_during_hover_wheel_and_drag() {
     fn handle(shape: &egui::Shape, row_right: f32, panel_right: f32) -> Option<Rect> {
         match shape {
@@ -144,8 +191,23 @@ fn sidebar_scrollbar_stays_thin_and_clear_of_rows_during_hover_wheel_and_drag() 
                 width = h.frame(vec![], collapsed).width;
             }
             let first = h.row("a");
+            if collapsed {
+                assert!((first.width() - first.height()).abs() < 0.01, "{first:?}");
+            }
+            assert!(
+                !h.output.as_ref().unwrap().shapes.iter().any(|shape| handle(
+                    &shape.shape,
+                    first.right(),
+                    width
+                )
+                .is_some()),
+                "idle scrollbar must be hidden"
+            );
+            let pointer = egui::pos2(width - 2.5, first.top() + 20.0);
+            for _ in 0..6 {
+                h.frame(vec![Event::PointerMoved(pointer)], collapsed);
+            }
             let idle = bar(&h, width);
-            assert!(idle.width() <= 3.01, "idle: {idle:?}");
             assert!(
                 idle.left() > first.right(),
                 "scrollbar must have its own gutter"
@@ -205,6 +267,21 @@ fn sidebar_scrollbar_stays_thin_and_clear_of_rows_during_hover_wheel_and_drag() 
             );
             assert!(action.select.is_none() && action.reorder.is_none());
             assert!(bar(&h, width).width() <= 3.01);
+            for _ in 0..6 {
+                h.frame(
+                    vec![Event::PointerMoved(egui::pos2(width + 80.0, 300.0))],
+                    collapsed,
+                );
+            }
+            assert!(
+                !h.output.as_ref().unwrap().shapes.iter().any(|shape| handle(
+                    &shape.shape,
+                    h.row("a").right(),
+                    width
+                )
+                .is_some()),
+                "scrollbar must disappear after pointer leaves"
+            );
             assert_ne!(
                 h.ctx.style_of(egui::Theme::Dark).spacing.scroll.bar_width,
                 3.0,
@@ -280,9 +357,63 @@ fn collapsed_rail_keeps_clickable_agent_rows_and_expands_again() {
     );
     let b = h.row("b");
     assert_eq!(h.click(b.center(), true).select.as_deref(), Some("b"));
+    assert!(
+        (b.width() - b.height()).abs() < 0.01,
+        "collapsed session must be square: {b:?}"
+    );
     h.frame(vec![], false);
     h.frame(vec![], false);
     assert!(h.row("a").width() > 180.0);
+}
+
+#[test]
+fn expanded_cards_keep_equal_side_insets_with_and_without_overflow() {
+    for zoom in [0.71, 1.0, 1.42, 2.0] {
+        for count in [0, 30] {
+            let mut h = Harness::new();
+            h.ctx.set_zoom_factor(zoom);
+            h.extra = (0..count).map(|i| format!("extra-{i}")).collect();
+            for _ in 0..6 {
+                h.frame(vec![], false);
+            }
+            let row = h.row("a");
+            let tolerance = 1.0 / h.ctx.pixels_per_point() + 0.01;
+            assert!((row.left() - 8.0).abs() <= tolerance);
+            assert!(
+                (h.width - row.right() - 8.0).abs() <= tolerance,
+                "zoom {zoom}, extra {count}: row {row:?}, panel {}",
+                h.width
+            );
+        }
+    }
+}
+
+#[test]
+fn collapsed_toolbar_matches_session_tiles_and_keeps_a_compact_pitch() {
+    for zoom in [0.71, 1.0, 1.42, 2.0] {
+        let mut h = Harness::new();
+        h.ctx.set_zoom_factor(zoom);
+        h.frame(vec![], true);
+        h.frame(vec![], true);
+        let session = h.row("a");
+        let tolerance = 1.0 / h.ctx.pixels_per_point() + 0.01;
+        let controls = [
+            "settings-button",
+            ai_terminal::chrome::NEW_TERMINAL_ID,
+            "sidebar-toggle",
+        ]
+        .map(|id| h.ctx.read_response(egui::Id::new(id)).unwrap().rect);
+        for rect in controls {
+            assert_eq!(rect.size(), session.size());
+            assert!(
+                (rect.center().x - session.center().x).abs() <= tolerance,
+                "zoom {zoom}: control {rect:?}, session {session:?}"
+            );
+        }
+        assert!((controls[1].top() - controls[0].bottom() - 4.0).abs() <= tolerance);
+        assert!((controls[2].top() - controls[1].bottom() - 4.0).abs() <= tolerance);
+        assert!((h.row("b").top() - session.bottom() - 4.0).abs() <= tolerance);
+    }
 }
 
 fn text_rect(output: &egui::FullOutput, wanted: &str) -> Option<Rect> {
@@ -397,7 +528,7 @@ fn right_click_palette_sets_and_resets_color_without_selecting_another_tab() {
 fn completion_indicator_disappears_after_reading_in_both_sidebar_sizes() {
     fn green_dot(shape: &egui::Shape) -> bool {
         match shape {
-            egui::Shape::Circle(circle) => circle.fill == egui::Color32::from_rgb(88, 191, 141),
+            egui::Shape::Circle(circle) => circle.fill == ai_terminal::chrome::COMPLETED,
             egui::Shape::Vec(shapes) => shapes.iter().any(green_dot),
             _ => false,
         }

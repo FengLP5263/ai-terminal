@@ -43,3 +43,11 @@ scroll_probe 使用独立 raw-console 本地消息样例验收应用内部滚轮
 0.4.0 设置／浮窗核查另跑 examples/island_probe.rs 的原生多窗口探针（参数为独立 output 目录）。覆盖中英文截图、主窗口最小化、浮窗可见／置顶、点击恢复及关闭／重开，数据为合成任务状态，不启动 Agent 或模型。tests/settings_floating.rs 覆盖旧设置兼容、偏好保存、实际控件选择、横向滚动后的点击；App 测试保留实际 PTY PID 核查。探针只读取自身窗口属性，不向系统注入输入，不触碰用户窗口。
 
 Windows 10／11 分别运行 composer_probe、titlebar_probe 和 discovery_probe，命令见 scripts/README.md。composer_probe 检查恢复到 151.13608% 后的输入区及 125%／150%／151.13608% 切换、末行与视口边界；titlebar_probe 只捕获自身窗口，检查初始及主题通知后的标题栏背景和按钮；discovery_probe 仅查询 --version，不把它当作模型回合。可用 AI_TERMINAL_MOUSE_TRACE 为独立 mouse_console 样例记录模式和最多 256 字节的合成输入，不用于用户 CLI 或真实会话。升级控制台组件后同时核查实际关闭和自身 PTY 回收。
+浮窗跨屏核查：构建并运行 examples/island_move_probe.rs（命令见 scripts/README.md），至少两块真实显示器；只移动探针自己的原生窗口，检查 71%、142%、200% 等缩放下的客户区尺寸与头像截图，不注入用户输入、不启动 Agent。缺少第二屏明确失败。
+收起侧栏修复必须覆盖刚好溢出的边界：运行 sidebar_interaction 的多帧／空闲重绘回归，以及 workspace_probe 的 threshold 模式（scripts/README.md）。many 模式的长列表截图无法证明临界点不发生滚动条与行高的反馈循环。
+
+浮窗的程序化移动与真实鼠标拖动必须分别记录。island_move_probe 单独测试原生进入／退出移动通知、程序化跨屏、移动后多帧位置保持及异常客户区尺寸恢复；不得将其标成已模拟 Windows 鼠标模态拖动。工具通道不可用时明确保留真实拖动的验收边界，不因探针通过就声明用户现象全部解决。
+
+preview.4 的 island_move_probe 会保持原生移动状态跨越实际 DPI 边界，同时检查主窗口与浮窗，记录建议／实际矩形的差值、DPI 递归深度、拖动期间不额外修正尺寸、松手后恢复及重复跨屏尺寸稳定。该测试仍不注入系统鼠标，不等同于真实鼠标模态拖动；旧 preview.3 仅在跨屏前分别发送进入／退出通知的证据不能代替它。
+
+公开 README 截图用 Release 的 readme_capture 与 island_probe 分开生成；命令见 scripts/README.md。复用正式侧栏／终端／浮窗组件，只用固定合成文本、示例目录和模拟状态，不读取用户 profile、不启动 Agent 或模型。核对正常退出、原生 PNG 和隐私后原样复制，更新 assets/readme/SOURCE.json；不能用公开展示样例代替真实 Agent 验收。

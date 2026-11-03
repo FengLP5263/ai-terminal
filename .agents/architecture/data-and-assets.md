@@ -60,3 +60,7 @@ target/、output/、.runtime/、runtime/、.tools/、参考交接文件、数据
 新包 manifest 使用 format_version 2，包含 native_console 身份、两个原生组件、Microsoft-ConPTY-LICENSE.txt 和 Microsoft-ConPTY-SOURCE.json；缺失时校验失败。验证器仍接受旧格式发行包。源码摘要包括整个原生资产目录；打包复制前再次核对固定哈希，不从另一版本的输出目录取组件。
 
 0.4.3 起根中英文 CHANGELOG 纳入源码摘要并随 ZIP 分发；构建先核对当前版本、同一日期和非空的分类变更。GitHub Release 沿用相同版本条目。旧 ZIP 的只读完整性校验不因缺少新日志文件而失效。
+
+Agent 头像源图保留 640×640；按实际物理尺寸做面积过滤，每种头像最多共享缓存 12 个尺寸，整数像素对齐，不在每帧缩图。原生表情图块完整适配单元格，VS15 保留文字呈现，不改变终端网格坐标。
+
+新增本地 winit 0.30.13（Apache-2.0）补丁的来源及归档哈希见 vendor/winit/UPSTREAM.zh.md，原始 LICENSE 保留。制品源码身份包含它的 Cargo.toml、build.rs 及 src 下的源码／嵌入资产；依赖清单自动记录本地补丁并收集该 LICENSE。

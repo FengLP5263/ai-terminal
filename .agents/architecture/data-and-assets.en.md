@@ -41,3 +41,7 @@ The 0.4.2 local egui_glow patch records upstream provenance and licenses; artifa
 New manifests use format_version 2 with native_console identity, both companions, Microsoft-ConPTY-LICENSE.txt and Microsoft-ConPTY-SOURCE.json. Missing files fail verification; older release formats remain verifiable. Source identity includes the entire native asset directory. Packaging rechecks pinned hashes before copying and never takes companions from another version's output directory.
 
 Starting with 0.4.3, both root CHANGELOG files are covered by source identity and shipped in the ZIP. Build checks the current version, matching date, and nonempty categorized changes first. GitHub Releases reuse the same version entry. Read-only integrity verification of older ZIPs still accepts archives without the new changelog files.
+
+Agent source icons remain 640×640. Area-filter them at the physical display size, sharing at most 12 cached sizes per avatar and aligning to integer pixels; no per-frame resampling. Native emoji tiles fit complete clusters inside cells, preserve VS15 text presentation, and keep emulator coordinates unchanged.
+
+Provenance and the registry archive hash for the local winit 0.30.13 patch (Apache-2.0) are in vendor/winit/UPSTREAM.md; the original LICENSE is retained. Package source identity covers its Cargo.toml, build.rs, and sources/embedded assets under src. The dependency inventory records the local patch and collects that LICENSE automatically.

@@ -5,7 +5,9 @@ use crate::{
 };
 use egui::{Color32, Pos2, Rect, Sense, Stroke, Vec2};
 use std::{
+    collections::VecDeque,
     io::{BufReader, Cursor},
+    sync::{Arc, Mutex},
     time::Duration,
 };
 
@@ -38,12 +40,66 @@ struct DragSession(String);
 
 #[derive(Clone)]
 pub struct Icons {
-    codex: egui::TextureHandle,
-    claude: egui::TextureHandle,
+    codex: Arc<Mutex<IconRaster>>,
+    claude: Arc<Mutex<IconRaster>>,
 }
+struct IconRaster {
+    name: &'static str,
+    source: egui::ColorImage,
+    sizes: VecDeque<(usize, egui::TextureHandle)>,
+}
+impl IconRaster {
+    fn texture(&mut self, ctx: &egui::Context, pixels: usize) -> egui::TextureId {
+        if let Some((_, texture)) = self.sizes.iter().find(|(size, _)| *size == pixels) {
+            return texture.id();
+        }
+        let image = minify_icon(&self.source, pixels);
+        let texture = ctx.load_texture(
+            format!("{}-{pixels}", self.name),
+            image,
+            egui::TextureOptions::LINEAR,
+        );
+        let id = texture.id();
+        if self.sizes.len() == 12 {
+            self.sizes.pop_front();
+        }
+        self.sizes.push_back((pixels, texture));
+        id
+    }
+}
+
+/// Area filtering preserves thin strokes when a 640px source becomes a 20px avatar.
+/// Run once per physical size, sharing a bounded cache across all viewports.
+fn minify_icon(source: &egui::ColorImage, size: usize) -> egui::ColorImage {
+    let mut output = egui::ColorImage::filled([size, size], Color32::TRANSPARENT);
+    let ratio_x = source.width() as f32 / size as f32;
+    let ratio_y = source.height() as f32 / size as f32;
+    for y in 0..size {
+        let top = y as f32 * ratio_y;
+        let bottom = (y + 1) as f32 * ratio_y;
+        for x in 0..size {
+            let left = x as f32 * ratio_x;
+            let right = (x + 1) as f32 * ratio_x;
+            let mut rgba = [0.0_f32; 4];
+            for sy in top.floor() as usize..(bottom.ceil() as usize).min(source.height()) {
+                let wy = (bottom.min((sy + 1) as f32) - top.max(sy as f32)).max(0.0);
+                for sx in left.floor() as usize..(right.ceil() as usize).min(source.width()) {
+                    let weight = wy * (right.min((sx + 1) as f32) - left.max(sx as f32)).max(0.0);
+                    for (sum, value) in rgba.iter_mut().zip(source[(sx, sy)].to_array()) {
+                        *sum += value as f32 * weight;
+                    }
+                }
+            }
+            let rgba = rgba.map(|sum| (sum / (ratio_x * ratio_y)).round() as u8);
+            output[(x, y)] = Color32::from_rgba_premultiplied(rgba[0], rgba[1], rgba[2], rgba[3]);
+        }
+    }
+    output
+}
+
 impl Icons {
     pub fn new(ctx: &egui::Context) -> Self {
-        fn load(ctx: &egui::Context, name: &str, bytes: &[u8]) -> egui::TextureHandle {
+        fn load(name: &'static str, bytes: &[u8]) -> Arc<Mutex<IconRaster>> {
             let mut decoder = png::Decoder::new(BufReader::new(Cursor::new(bytes)));
             decoder
                 .set_transformations(png::Transformations::EXPAND | png::Transformations::STRIP_16);
@@ -59,24 +115,31 @@ impl Icons {
                 png::ColorType::Rgb => egui::ColorImage::from_rgb(size, pixels),
                 _ => panic!("embedded icon must be RGB/RGBA"),
             };
-            ctx.load_texture(name, image, egui::TextureOptions::LINEAR)
+            Arc::new(Mutex::new(IconRaster {
+                name,
+                source: image,
+                sizes: VecDeque::new(),
+            }))
         }
+        let _ = ctx;
         Self {
-            codex: load(
-                ctx,
-                "agent-codex",
-                include_bytes!("../assets/icons/openai.png"),
-            ),
+            codex: load("agent-codex", include_bytes!("../assets/icons/openai.png")),
             claude: load(
-                ctx,
                 "agent-claude",
                 include_bytes!("../assets/icons/claude-color.png"),
             ),
         }
     }
     pub fn paint(&self, painter: &egui::Painter, rect: Rect, agent: Agent) {
+        let snap_square = |center: Pos2, side: f32| {
+            let ppp = painter.pixels_per_point();
+            let side = (side * ppp).round().max(1.0);
+            let min = (center * ppp - Vec2::splat(side / 2.0)).round() / ppp;
+            Rect::from_min_size(min, Vec2::splat(side / ppp))
+        };
+        let rect = snap_square(rect.center(), rect.width());
         painter.circle_filled(rect.center(), rect.width() / 2.0, Color32::from_gray(29));
-        let icon = Rect::from_center_size(rect.center(), Vec2::splat(chrome::AVATAR_ICON));
+        let icon = snap_square(rect.center(), chrome::AVATAR_ICON);
         match agent {
             Agent::Codex | Agent::Claude => {
                 let texture = if agent == Agent::Codex {
@@ -85,7 +148,12 @@ impl Icons {
                     &self.claude
                 };
                 painter.image(
-                    texture.id(),
+                    texture.lock().unwrap().texture(
+                        painter.ctx(),
+                        (icon.width() * painter.pixels_per_point())
+                            .round()
+                            .clamp(1.0, 256.0) as usize,
+                    ),
                     icon,
                     Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)),
                     Color32::WHITE,
@@ -111,7 +179,7 @@ pub fn paint_status(ui: &egui::Ui, avatar: Rect, activity: Activity, unread: boo
             .collect();
         ui.painter().add(egui::Shape::line(
             points,
-            Stroke::new(1.5, Color32::from_rgb(136, 180, 246)),
+            Stroke::new(1.75, chrome::WORKING),
         ));
         ui.ctx().request_repaint_after(Duration::from_millis(80));
     } else if matches!(activity, Activity::Waiting | Activity::Failed) || unread {
@@ -120,11 +188,11 @@ pub fn paint_status(ui: &egui::Ui, avatar: Rect, activity: Activity, unread: boo
             indicator,
             3.5,
             if activity == Activity::Failed {
-                Color32::from_rgb(244, 117, 117)
+                chrome::FAILED
             } else if activity == Activity::Waiting {
-                Color32::from_rgb(235, 184, 82)
+                chrome::WAITING
             } else {
-                Color32::from_rgb(88, 191, 141)
+                chrome::COMPLETED
             },
         );
     }
@@ -145,7 +213,7 @@ pub fn show(
         "sessions"
     })
     .exact_size(if collapsed {
-        52.0
+        chrome::RAIL_ROW + 16.0
     } else {
         width.clamp(
             crate::model::UiSettings::MIN_SIDEBAR_WIDTH,
@@ -165,8 +233,16 @@ pub fn show(
             }),
     );
     let response = panel.show(ui, |ui| {
+        if collapsed {
+            ui.spacing_mut().item_spacing.y = 4.0;
+        }
         ui.horizontal(|ui| {
-            actions.settings = chrome::icon_button(
+            let button = if collapsed {
+                chrome::rail_button
+            } else {
+                chrome::icon_button
+            };
+            actions.settings = button(
                 ui,
                 egui::Id::new("settings-button"),
                 chrome::ActionIcon::Settings,
@@ -189,25 +265,20 @@ pub fn show(
                 .clicked();
             }
         });
-        ui.add_space(12.0);
         if collapsed {
-            ui.horizontal(|ui| {
-                ui.add_space(2.0);
-                actions.create = new_session_menu(ui);
-            });
-            ui.horizontal(|ui| {
-                ui.add_space(2.0);
-                actions.toggle = chrome::icon_button(
-                    ui,
-                    egui::Id::new("sidebar-toggle"),
-                    chrome::ActionIcon::Expand,
-                    crate::i18n::tr(ui.ctx(), "展开会话面板", "Expand sidebar"),
-                )
-                .clicked();
-            });
-            ui.add_space(8.0);
+            actions.create =
+                new_session_menu_inner(ui, egui::Id::new(chrome::NEW_TERMINAL_ID), true);
+            actions.toggle = chrome::rail_button(
+                ui,
+                egui::Id::new("sidebar-toggle"),
+                chrome::ActionIcon::Expand,
+                crate::i18n::tr(ui.ctx(), "展开会话面板", "Expand sidebar"),
+            )
+            .clicked();
         }
-        // Keep an unobtrusive gutter beside the avatars; hover changes opacity only.
+        ui.add_space(8.0);
+        // Keep a permanent gutter without painting a scrollbar outside the panel.
+        let pointer_inside = ui.rect_contains_pointer(ui.max_rect());
         let scroll_style = &mut ui.style_mut().spacing.scroll;
         scroll_style.floating = true;
         scroll_style.bar_width = 3.0;
@@ -218,23 +289,29 @@ pub fn show(
         scroll_style.dormant_background_opacity = 0.0;
         scroll_style.active_background_opacity = 0.0;
         scroll_style.interact_background_opacity = 0.0;
-        scroll_style.dormant_handle_opacity = 0.25;
-        scroll_style.active_handle_opacity = 0.45;
-        scroll_style.interact_handle_opacity = 0.7;
+        scroll_style.dormant_handle_opacity = 0.0;
+        scroll_style.active_handle_opacity = if pointer_inside { 0.55 } else { 0.0 };
+        scroll_style.interact_handle_opacity = if pointer_inside { 0.8 } else { 0.0 };
+        // Keep the card inset even when the floating scrollbar is hidden.
+        // The scrollbar itself remains next to the divider in this gutter.
+        let row_right = ui.max_rect().right() - 7.0;
         egui::ScrollArea::vertical()
             .id_salt("session-list-scroll")
             .auto_shrink([false, false])
             .show(ui, |ui| {
                 for (index, entry) in entries.iter().enumerate() {
-                    let height = if collapsed {
-                        chrome::RAIL_ROW
+                    // A scrollbar can change available width from 51 to 44.
+                    // Deriving square row height from it toggles overflow forever
+                    // near the fit threshold. Keep the rail tile independent.
+                    let size = if collapsed {
+                        Vec2::splat(chrome::RAIL_ROW)
                     } else {
-                        chrome::ROW
+                        Vec2::new(
+                            (row_right - ui.available_rect_before_wrap().left()).max(1.0),
+                            chrome::ROW,
+                        )
                     };
-                    let (rect, _) = ui.allocate_exact_size(
-                        Vec2::new(ui.available_width(), height),
-                        Sense::hover(),
-                    );
+                    let (rect, _) = ui.allocate_exact_size(size, Sense::hover());
                     let response = ui.interact(
                         rect,
                         egui::Id::new(("session-row", entry.id)),
@@ -254,7 +331,11 @@ pub fn show(
                     }
                     let avatar = Rect::from_center_size(
                         Pos2::new(
-                            rect.left() + if collapsed { 18.0 } else { 24.0 },
+                            if collapsed {
+                                rect.center().x
+                            } else {
+                                rect.left() + 24.0
+                            },
                             rect.center().y,
                         ),
                         Vec2::splat(chrome::AVATAR),
@@ -392,11 +473,13 @@ pub fn show(
                     if index + 1 < entries.len() {
                         ui.painter().hline(
                             rect.left() + 4.0..=rect.right() - 4.0,
-                            rect.bottom() + 5.0,
+                            rect.bottom() + if collapsed { 2.0 } else { 5.0 },
                             Stroke::new(1.0 / ui.ctx().pixels_per_point(), Color32::from_gray(40)),
                         );
                     }
-                    ui.add_space(4.0);
+                    if !collapsed {
+                        ui.add_space(4.0);
+                    }
                 }
             });
     });
@@ -427,7 +510,16 @@ pub fn new_session_menu(ui: &mut egui::Ui) -> Option<Agent> {
 }
 
 pub fn new_session_menu_with_id(ui: &mut egui::Ui, id: egui::Id) -> Option<Agent> {
-    let trigger = chrome::icon_button(
+    new_session_menu_inner(ui, id, false)
+}
+
+fn new_session_menu_inner(ui: &mut egui::Ui, id: egui::Id, rail: bool) -> Option<Agent> {
+    let button = if rail {
+        chrome::rail_button
+    } else {
+        chrome::icon_button
+    };
+    let trigger = button(
         ui,
         id,
         chrome::ActionIcon::Add,
@@ -498,4 +590,29 @@ fn color_swatch(
         );
     }
     response.on_hover_text(label)
+}
+
+#[cfg(test)]
+mod icon_tests {
+    use super::*;
+    #[test]
+    fn small_avatars_retain_thin_source_strokes_and_transparency() {
+        let mut source = egui::ColorImage::filled([64, 64], Color32::TRANSPARENT);
+        for y in 0..64 {
+            source[(0, y)] = Color32::WHITE;
+        }
+        let filtered = minify_icon(&source, 4);
+        for y in 0..4 {
+            assert!(
+                (15..=17).contains(&filtered[(0, y)].a()),
+                "thin stroke vanished"
+            );
+            assert_eq!(
+                filtered[(0, y)].r(),
+                filtered[(0, y)].a(),
+                "premultiplied edge lost brightness"
+            );
+            assert_eq!(filtered[(1, y)], Color32::TRANSPARENT);
+        }
+    }
 }

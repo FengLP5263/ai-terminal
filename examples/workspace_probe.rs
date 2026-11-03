@@ -32,6 +32,9 @@ struct Probe {
     zoom_verified: bool,
     many_sessions: bool,
     rail_scrolled: bool,
+    threshold_mode: bool,
+    stable_rect: Option<(usize, egui::Rect)>,
+    stability_checks: usize,
 }
 impl Probe {
     fn tick(&mut self, ctx: &egui::Context) {
@@ -60,6 +63,12 @@ impl eframe::App for Probe {
             .entry(egui::ViewportId::ROOT)
             .or_default()
             .focused = Some(true);
+        if self.threshold_mode && self.stage == 2 && !self.rail_scrolled {
+            self.rail_scrolled = true;
+            ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(egui::vec2(900.0, 550.0)));
+            self.stage_started = Instant::now();
+            self.stage_frame = ctx.cumulative_frame_nr();
+        }
         if self.many_sessions && self.stage == 2 {
             input
                 .events
@@ -133,6 +142,22 @@ impl eframe::App for Probe {
             self.preferences.sidebar_width,
             &self.icons,
         );
+        if self.threshold_mode && ctx.cumulative_frame_nr().saturating_sub(self.stage_frame) >= 8 {
+            let rect = ctx
+                .read_response(egui::Id::new(("session-row", "codex")))
+                .unwrap()
+                .rect;
+            if let Some((stage, expected)) = self.stable_rect
+                && stage == self.stage
+            {
+                assert_eq!(
+                    rect, expected,
+                    "native collapsed sidebar geometry oscillates"
+                );
+            }
+            self.stable_rect = Some((self.stage, rect));
+            self.stability_checks += 1;
+        }
         if !self.preferences.sidebar_collapsed {
             self.preferences.sidebar_width = actions.width;
         }
@@ -219,7 +244,7 @@ impl eframe::App for Probe {
                 self.preferences.sidebar_collapsed = true;
             }
             if self.stage == 3 {
-                std::fs::write(self.output.join("result.json"),serde_json::to_vec_pretty(&serde_json::json!({"ok":self.zoom_verified,"ui_scale":self.preferences.ui_scale,"collapsed":self.preferences.sidebar_collapsed,"pixels_per_point":ctx.pixels_per_point(),"pty_pid":self.terminal.pty_id(),"model_request_sent":false})).unwrap()).unwrap();
+                std::fs::write(self.output.join("result.json"),serde_json::to_vec_pretty(&serde_json::json!({"ok":self.zoom_verified,"ui_scale":self.preferences.ui_scale,"collapsed":self.preferences.sidebar_collapsed,"pixels_per_point":ctx.pixels_per_point(),"pty_pid":self.terminal.pty_id(),"model_request_sent":false,"threshold_mode":self.threshold_mode,"stability_checks":self.stability_checks})).unwrap()).unwrap();
                 ctx.send_viewport_cmd(egui::ViewportCommand::Close);
             }
         }
@@ -228,6 +253,8 @@ impl eframe::App for Probe {
             && self.terminal.plain_text().contains("FIXTURE_READY")
             && self.stage_started.elapsed() > Duration::from_secs(1)
             && ctx.cumulative_frame_nr().saturating_sub(self.stage_frame) >= 3
+            && (!self.threshold_mode
+                || ctx.cumulative_frame_nr().saturating_sub(self.stage_frame) >= 32)
         {
             self.pending = Some(["expanded.png", "zoom.png", "collapsed.png"][self.stage]);
             ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::default()));
@@ -249,13 +276,14 @@ fn main() -> eframe::Result {
         .unwrap_or(1160.0)
         .clamp(720.0, 1600.0);
     let many_sessions = std::env::args().nth(3).as_deref() == Some("many");
+    let threshold_mode = std::env::args().nth(3).as_deref() == Some("threshold");
     eframe::run_native(
         "ai-terminal workspace visual probe",
         eframe::NativeOptions {
             renderer: eframe::Renderer::Glow,
             viewport: egui::ViewportBuilder::default()
                 .with_icon(ai_terminal::appearance::window_icon())
-                .with_inner_size([width, 760.0]),
+                .with_inner_size([width, if threshold_mode { 550.0 } else { 760.0 }]),
             ..Default::default()
         },
         Box::new(move |cc| {
@@ -277,11 +305,23 @@ fn main() -> eframe::Result {
                 renderer: egui_term::TextRendererSession::new(&cc.egui_ctx),
                 terminal,
                 icons: Icons::new(&cc.egui_ctx),
-                preferences: UiSettings::default(),
+                preferences: UiSettings {
+                    sidebar_collapsed: threshold_mode,
+                    ..Default::default()
+                },
                 ids: ["codex", "claude", "shell", "cmd", "bash"]
                     .into_iter()
                     .map(String::from)
-                    .chain((0..if many_sessions { 25 } else { 0 }).map(|i| format!("shell-{i}")))
+                    .chain(
+                        (0..if many_sessions {
+                            25
+                        } else if threshold_mode {
+                            2
+                        } else {
+                            0
+                        })
+                            .map(|i| format!("shell-{i}")),
+                    )
                     .collect(),
                 active: "claude".into(),
                 output,
@@ -297,6 +337,9 @@ fn main() -> eframe::Result {
                 zoom_verified: false,
                 many_sessions,
                 rail_scrolled: false,
+                threshold_mode,
+                stable_rect: None,
+                stability_checks: 0,
             }))
         }),
     )

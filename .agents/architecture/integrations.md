@@ -41,3 +41,5 @@ Codex 的会话级 hook 以固定命令读取 AI_TERMINAL_HELPER，不将安装�
 Microsoft.Windows.Console.ConPTY 是固定版本的本地运行依赖，来源和 MIT 许可保存在 assets/windows/conpty，不是模型代理或关联源码仓库。它以程序旁的文件运行，遵循现有 ConPTY／Job 生命周期。
 
 标准 npm 启动器的字面目标核查不执行脚本、不读取 CLI 认证／模型设置、不修改全局 PATH，也不根据任意退出码重试模型命令。未知包装器保持原来的调用方式。
+
+2026-11-03 用户取舍：Codex 优先保留准确的状态提示，暂不启用共享 agents 入口。保持独立模式和会话级 hook；不要仅为恢复 for agents 删除注入参数、改用户配置或退回输出猜测。0.166.0 启动源码仍对不兼容的会话级配置排除共享后台。后续恢复入口必须同时验证跨终端状态归属、切换对话与关闭回收；记录见 [界面核查](../../docs/ui-rendering.md)。

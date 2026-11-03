@@ -6,7 +6,75 @@ Record user-visible additions, improvements, fixes, and compatibility changes fo
 
 ## [Unreleased]
 
-No confirmed changes for the next version yet.
+No confirmed changes for a subsequent version yet.
+
+## [0.4.4] - 2026-11-03
+
+### Improved
+
+- Prefilter, cache and pixel-align Agent avatars at their physical display size for sharper thin strokes and zoomed rendering. Refresh the README with native high-resolution captures using synthetic, private-data-free content.
+- Refresh session colors, selected borders and status brightness. Match collapsed-rail settings/new/expand controls to session-avatar size and balance expanded-card side insets.
+
+### Fixed
+
+- Stop collapsed-sidebar jitter near the overflow threshold. Fixed square tiles keep row height independent of scrollbar visibility; the scrollbar disappears when the pointer leaves.
+- Correct old-monitor nudges, flicker, abnormal resizing and mouse-anchor jumps during mixed-DPI main/floating-window dragging. Native movement follows the OS-suggested rectangle; extra floating-size repairs wait until release.
+- Separate floating-position observations from placement commands to prevent snapback, stretched containers and clipped avatars, while retaining zoom centering, up to ten visible sessions and drag browsing.
+- Fit complete native emoji tiles, improving Claude manual-mode badges and narrow-emoji clipping while preserving composed clusters and text-presentation selectors.
+
+### Upgrade and verification scope
+
+- Fully extract the Windows x64 ZIP and keep both EXEs with conpty.dll/OpenConsole.exe. Existing session data remains compatible and user-level CLI settings are unchanged.
+- Offline regressions, native smoke and two-monitor DPI/zoom/sidebar checks passed; the user confirmed physical cross-monitor dragging locally. This release did not repeat remote Windows 10 hardware acceptance or real-model turns; older evidence is not presented as current testing.
+- Retain Codex independent mode and accurate status indicators under the current tradeoff. The shared `for agents` entry remains deferred.
+
+## [0.4.4-preview.4] - 2026-11-03
+
+Local repair preview, not a stable release; the date identifies this preview build.
+
+### Fixed
+
+- Correct the winit 0.30.13 path that repeatedly pushes Windows native drags back across mixed-DPI monitors. Apply the OS-suggested rectangle directly for both main and floating windows, addressing flicker, resizing and mouse-anchor jumps.
+- Pause additional floating-window size repairs during native movement and reconcile after release. Extend the two-window probe to keep move state active across DPI boundaries and compare suggested/actual rectangles and recursive transitions.
+- Keep equal space on both sides of expanded-sidebar cards while retaining the scrollbar beside the divider and the compact collapsed rail.
+
+## [0.4.4-preview.3] - 2026-11-03
+
+Local repair preview, not a stable release; the date identifies this preview build.
+
+### Fixed
+
+- Separate floating-window position observations from placement commands so a cross-monitor move is not pulled back to an old position. Reconcile the client area from that window's native DPI/size events to prevent stretched containers and clipped avatars, without idle polling.
+- Give collapsed-sidebar settings, new-terminal and expand controls the same circular surface, glyph size and square tile as session avatars, with tighter vertical spacing.
+- Add native two-monitor movement, position retention after movement, oversized-client recovery, zoom and close/reopen checks. Automated probes do not replace physical mouse-drag acceptance.
+
+## [0.4.4-preview.2] - 2026-11-03
+
+Local repair preview, not a stable release; the date identifies this preview build.
+
+### Fixed
+
+- Stop continuous collapsed-sidebar jitter caused by row geometry and scrollbar visibility influencing each other. Session tiles remain 44×44 logical pixels; scrollbar visibility no longer changes row height.
+- Add multi-frame, zoom, hover, and idle-repaint regressions near the overflow threshold, plus native-window geometry and screenshot checks.
+
+## [0.4.4-preview.1] - 2026-11-03
+
+Local preview, not a stable release; the date identifies this preview build.
+
+### Improved
+
+- Refresh session colors and selected borders, and brighten working, attention, failure, and unread-completion indicators.
+- Prefilter Agent avatars at their physical display size and cache the results, preserving thin strokes when reducing large source images.
+
+### Fixed
+
+- Keep collapsed-sidebar selection tiles square; hide the scrollbar when the pointer leaves the sidebar without changing its reserved gutter.
+- Fit complete emoji into terminal cells, improving Claude mode badges and narrow emoji clipping.
+- Reapply floating-window dimensions and position conversions using its own DPI when moving between monitors.
+
+### Known limitations
+
+- Keep Codex independent mode and accurate state indicators per the current decision. Shared `for agents` integration is deferred and is not a fix delivered in this preview.
 
 ## [0.4.3] - 2026-11-03
 

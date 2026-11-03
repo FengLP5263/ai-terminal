@@ -15,5 +15,6 @@ pub mod window_frame;
 pub mod zoom;
 
 pub mod floating;
+mod floating_native;
 pub mod i18n;
 pub mod settings;

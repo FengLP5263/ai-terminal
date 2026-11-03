@@ -15,6 +15,7 @@ VENDOR_PAIRS = (
     ('vendor/egui_term/UPSTREAM.zh.md', 'vendor/egui_term/UPSTREAM.en.md'),
     ('vendor/egui-winit/UPSTREAM.zh.md', 'vendor/egui-winit/UPSTREAM.md'),
     ('vendor/egui_glow/UPSTREAM.zh.md', 'vendor/egui_glow/UPSTREAM.md'),
+    ('vendor/winit/UPSTREAM.zh.md', 'vendor/winit/UPSTREAM.md'),
 )
 
 

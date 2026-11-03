@@ -26,15 +26,15 @@ class ArchiveVerification(unittest.TestCase):
             self.assertTrue(packaging.verify_archive(good)['ok'])
             with self.assertRaisesRegex(ValueError,'checksum mismatch'):packaging.verify_archive(bad)
 
-    def test_source_identity_covers_glow_patch_and_shaders(self):
+    def test_source_identity_covers_window_backend_build_sources_and_glow_shaders(self):
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder)
-            names=['CHANGELOG.md','CHANGELOG.en.md','build.rs','Cargo.toml','Cargo.lock','vendor/egui_term/Cargo.toml','vendor/egui-winit/Cargo.toml','vendor/egui_glow/Cargo.toml','vendor/egui_glow/src/painter.rs','vendor/egui_glow/src/shader/fragment.glsl']
+            names=['CHANGELOG.md','CHANGELOG.en.md','build.rs','Cargo.toml','Cargo.lock','vendor/egui_term/Cargo.toml','vendor/egui-winit/Cargo.toml','vendor/winit/Cargo.toml','vendor/winit/build.rs','vendor/winit/src/platform_impl/windows/event_loop.rs','vendor/egui_glow/Cargo.toml','vendor/egui_glow/src/painter.rs','vendor/egui_glow/src/shader/fragment.glsl']
             for name in names:
                 path=root/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(b'original')
             for name in ['src','vendor/egui_term/src','vendor/egui-winit/src','assets/fonts','assets/icons','assets/branding']:(root/name).mkdir(parents=True,exist_ok=True)
             original=packaging.source_identity(root)
-            for name in names[:2]+names[-3:]:
+            for name in names[:2]+names[-6:]:
                 path=root/name;path.write_bytes(b'changed')
                 self.assertNotEqual(original,packaging.source_identity(root),name)
                 path.write_bytes(b'original')
@@ -64,7 +64,7 @@ class ArchiveVerification(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder)/'repo';out=Path(folder)/'package';out.mkdir()
             for name in ['src','vendor/egui_term/src','vendor/egui-winit/src','assets/fonts','assets/icons','assets/branding','assets/windows/conpty/x64']:(root/name).mkdir(parents=True,exist_ok=True)
-            for name in ['CHANGELOG.md','CHANGELOG.en.md','build.rs','Cargo.toml','Cargo.lock','vendor/egui_term/Cargo.toml','vendor/egui-winit/Cargo.toml','vendor/egui_glow/Cargo.toml']:
+            for name in ['CHANGELOG.md','CHANGELOG.en.md','build.rs','Cargo.toml','Cargo.lock','vendor/egui_term/Cargo.toml','vendor/egui-winit/Cargo.toml','vendor/egui_glow/Cargo.toml','vendor/winit/Cargo.toml','vendor/winit/build.rs']:
                 p=root/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(b'fixture')
             native=root/'assets/windows/conpty';files={}
             for name in ['x64/conpty.dll','x64/OpenConsole.exe','LICENSE.txt']:

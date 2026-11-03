@@ -15,7 +15,7 @@ Windows-native Agent terminal manager. The project focuses on project/session na
 
 ## Source and compatibility
 
-- Production source is `src/`, `vendor/egui_term/src/`, and `vendor/egui-winit/src/`; fonts are in `assets/fonts/`. Do not rearrange production source for governance.
+- Production source is `src/` and the local patches under `vendor/egui_term/src/`, `vendor/egui-winit/src/`, `vendor/egui_glow/src/`, and `vendor/winit/src/`; fonts are in `assets/fonts/`. Do not rearrange production source for governance.
 - `src/bin/ai-terminal-hook.rs` must stay independent and lightweight, without initializing fonts or the GPU.
 - Derive status only from explicit Agent lifecycle/interaction notifications and process exit; do not infer completion from silence, a bell, or process existence.
 - Selecting an active session preserves its process; an unopened session opens its shell directly and clears unread state. A green dot marks an unread completed turn and disappears when viewed; it does not mean project acceptance.
