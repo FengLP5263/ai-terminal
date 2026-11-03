@@ -35,3 +35,9 @@ Codex 的会话级 hook 以固定命令读取 AI_TERMINAL_HELPER，不将安装�
 0.4.0 HookEvent 新增可选 exit_code；旧发送端缺失时兼容 None，受管 ShellAgentEnded 传递真实退出码。StopFailure（现有 Claude 配置）和非中断的非零进程退出标记 Failed；工具失败但 Agent 继续恢复时仍保持 Working。用户中断退出码不当作失败。当前 Codex hook 接口没有 StopFailure，未被官方事件导出的 CLI 内部错误不会通过解析屏幕或静默超时猜为失败；具体状态仍应在原 CLI 中核实。
 
 原生浮窗只导航当前管理器的会话，不接管其他进程中的旧版会话，也不修改用户级 CLI 配置或信任。
+
+## 原生控制台与公开启动器
+
+Microsoft.Windows.Console.ConPTY 是固定版本的本地运行依赖，来源和 MIT 许可保存在 assets/windows/conpty，不是模型代理或关联源码仓库。它以程序旁的文件运行，遵循现有 ConPTY／Job 生命周期。
+
+标准 npm 启动器的字面目标核查不执行脚本、不读取 CLI 认证／模型设置、不修改全局 PATH，也不根据任意退出码重试模型命令。未知包装器保持原来的调用方式。

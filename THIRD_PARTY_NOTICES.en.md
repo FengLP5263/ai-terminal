@@ -19,3 +19,4 @@ OpenAI and Claude icons come from [Lobe Icons](https://github.com/lobehub/lobe-i
 - egui-winit 0.35.0: local paste-event compatibility patch, MIT OR Apache-2.0. See `vendor/egui-winit/UPSTREAM.md` and its included license files. The packaged dependency inventory includes this patched crate.
 
 - egui_glow 0.35.0: local OpenGL buffer-reuse patch, MIT OR Apache-2.0. See `vendor/egui_glow/UPSTREAM.md` and its included licenses; the artifact dependency inventory records this patch.
+- Microsoft.Windows.Console.ConPTY 1.25.260930003: MIT, Microsoft's official x64 native console runtime. See [provenance and checks](assets/windows/conpty/SOURCE.json) and the [original license](assets/windows/conpty/LICENSE.txt). Packages contain conpty.dll, OpenConsole.exe and license/provenance copies; this dependency is recorded separately in manifest.json under native_console.

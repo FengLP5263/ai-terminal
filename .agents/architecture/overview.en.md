@@ -27,3 +27,9 @@ Preserve `src/`, `vendor/`, `tests/`, and `examples/` layout. Module tests stay 
 The 0.4.0 `i18n.rs` manages system/Chinese/English preferences; `settings.rs` provides settings; `floating.rs` creates a transparent always-on-top deferred viewport. Windows share only a session metadata snapshot and a bounded 32-item message channel, not terminal contents. Root logic continues when minimized; PTY and bridge notifications explicitly wake ROOT so events continue to be reduced.
 
 Known limits: all physical IME combinations, all image clipboard sources, sustained high session concurrency, and future CLI protocol versions need further acceptance. Claude fullscreen startup and MOUSE_MOTION/SGR wheel protocol were checked, not all long-term interactions. The [GitHub repository](https://github.com/FengLP5263/ai-terminal) uses MIT; see the [contribution guide](../../CONTRIBUTING.en.md). Windows releases are on GitHub Releases; no cloud CI, automatic publishing, or product server is established. Earlier measurement records are not evidence for the current build.
+
+## Windows compatibility fixes (unreleased)
+
+`src/window_frame.rs` requests dark DWM captions for the application's own window and restores the policy after native theme/settings notifications. `src/native_console.rs` checks bundled companions before creating a session. `assets/windows/conpty/` contains the pinned Microsoft native console, license and provenance. Alacritty loads it from the executable directory; build.rs stages the same version for the app, tests and examples.
+
+`examples/composer_probe.rs` covers restored 151.13608% zoom followed by 125%, 150% and 151.13608% fullscreen composers. `titlebar_probe.rs` captures only its own native window and caption. `discovery_probe.rs` calls installed CLIs only with public --version. Record synthetic fixtures, public version checks and actual model turns separately.

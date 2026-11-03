@@ -29,12 +29,12 @@ class ArchiveVerification(unittest.TestCase):
     def test_source_identity_covers_glow_patch_and_shaders(self):
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder)
-            names=['build.rs','Cargo.toml','Cargo.lock','vendor/egui_term/Cargo.toml','vendor/egui-winit/Cargo.toml','vendor/egui_glow/Cargo.toml','vendor/egui_glow/src/painter.rs','vendor/egui_glow/src/shader/fragment.glsl']
+            names=['CHANGELOG.md','CHANGELOG.en.md','build.rs','Cargo.toml','Cargo.lock','vendor/egui_term/Cargo.toml','vendor/egui-winit/Cargo.toml','vendor/egui_glow/Cargo.toml','vendor/egui_glow/src/painter.rs','vendor/egui_glow/src/shader/fragment.glsl']
             for name in names:
                 path=root/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(b'original')
             for name in ['src','vendor/egui_term/src','vendor/egui-winit/src','assets/fonts','assets/icons','assets/branding']:(root/name).mkdir(parents=True,exist_ok=True)
             original=packaging.source_identity(root)
-            for name in names[-3:]:
+            for name in names[:2]+names[-3:]:
                 path=root/name;path.write_bytes(b'changed')
                 self.assertNotEqual(original,packaging.source_identity(root),name)
                 path.write_bytes(b'original')
@@ -44,6 +44,38 @@ class ArchiveVerification(unittest.TestCase):
             nested=Path(folder)/'nested';nested.mkdir();path=nested/'unsafe.zip';self.fixture(path,unsafe=True)
             with self.assertRaisesRegex(ValueError,'unsafe archive member'):packaging.verify_archive(path)
             self.assertFalse((Path(folder)/'outside.txt').exists())
+
+    def test_new_package_requires_native_console_companions_and_licenses(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path=Path(folder)/'incomplete.zip';self.fixture(path)
+            with zipfile.ZipFile(path) as original:files={n:original.read(n) for n in original.namelist() if n!='manifest.json'}
+            records={name:{'bytes':len(data),'sha256':hashlib.sha256(data).hexdigest()} for name,data in files.items()}
+            with zipfile.ZipFile(path,'w') as archive:
+                for name,data in files.items():archive.writestr(name,data)
+                archive.writestr('manifest.json',json.dumps({'format_version':2,'version':'test','files':records}))
+            with self.assertRaisesRegex(ValueError,'native console runtime/license incomplete'):packaging.verify_archive(path)
+            for name in packaging.NATIVE_REQUIRED:files[name]=b'native fixture'
+            with zipfile.ZipFile(path,'w') as archive:
+                for name,data in files.items():archive.writestr(name,data)
+                archive.writestr('manifest.json',json.dumps({'format_version':2,'version':'test','files':{name:{'bytes':len(data),'sha256':hashlib.sha256(data).hexdigest()} for name,data in files.items()}}))
+            self.assertTrue(packaging.verify_archive(path)['ok'])
+
+    def test_native_assets_affect_source_identity_and_are_verified_before_copying(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder)/'repo';out=Path(folder)/'package';out.mkdir()
+            for name in ['src','vendor/egui_term/src','vendor/egui-winit/src','assets/fonts','assets/icons','assets/branding','assets/windows/conpty/x64']:(root/name).mkdir(parents=True,exist_ok=True)
+            for name in ['CHANGELOG.md','CHANGELOG.en.md','build.rs','Cargo.toml','Cargo.lock','vendor/egui_term/Cargo.toml','vendor/egui-winit/Cargo.toml','vendor/egui_glow/Cargo.toml']:
+                p=root/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(b'fixture')
+            native=root/'assets/windows/conpty';files={}
+            for name in ['x64/conpty.dll','x64/OpenConsole.exe','LICENSE.txt']:
+                (native/name).write_bytes(b'fixture');files[name]={'bytes':7,'sha256':hashlib.sha256(b'fixture').hexdigest()}
+            (native/'SOURCE.json').write_text(json.dumps({'package':'test','version':'test','architecture':'x86_64','files':files}),encoding='utf-8')
+            original=packaging.source_identity(root)
+            packaging.native_console_assets(out,root)
+            self.assertEqual(b'fixture',(out/'conpty.dll').read_bytes())
+            (native/'x64/conpty.dll').write_bytes(b'tampered')
+            self.assertNotEqual(original,packaging.source_identity(root))
+            with self.assertRaisesRegex(ValueError,'native console identity mismatch'):packaging.native_console_assets(out,root)
 
     def test_old_license_timestamp_can_be_packaged_and_verified(self):
         with tempfile.TemporaryDirectory() as folder:

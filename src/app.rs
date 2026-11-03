@@ -297,6 +297,7 @@ impl App {
         idle_benchmark: bool,
     ) -> Self {
         ai_terminal::appearance::setup(&cc.egui_ctx);
+        ai_terminal::window_frame::apply_dark(cc);
         cc.egui_ctx
             .send_viewport_cmd(egui::ViewportCommand::SetTheme(egui::SystemTheme::Dark));
         let mut error = None;
@@ -417,6 +418,7 @@ impl App {
         session.terminal_id = uuid::Uuid::new_v4().as_u128() as u64;
         let result =
             (|| -> Result<(TerminalBackend, crate::platform::ProcessJob, String), String> {
+                ai_terminal::native_console::validate_installation()?;
                 let helper = self.helper.as_ref().map_err(Clone::clone)?;
                 if !helper.is_file() {
                     return Err(tr(
@@ -999,10 +1001,11 @@ impl App {
                         ui.hyperlink_to("Git for Windows", "https://gitforwindows.org/");
                     }
                 }
-                let native_image_paste = !session.display_agent().is_shell();
+                let coding_cli = !session.display_agent().is_shell();
                 if let Some(backend) = &mut session.backend {
                     let view = TerminalView::new(ui, backend)
-                        .set_native_image_paste(native_image_paste)
+                        .set_native_image_paste(coding_cli)
+                        .set_drag_selection(coding_cli)
                         .set_theme(self.theme.clone())
                         .set_font(self.font.clone())
                         .set_snapshot_only(self.confirm_exit)

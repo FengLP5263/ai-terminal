@@ -12,7 +12,7 @@
 [![Platform](https://img.shields.io/badge/platform-Windows%20x64-0078D4)](#平台支持)
 [![License](https://img.shields.io/badge/license-MIT-5c8a66)](LICENSE)
 
-[下载使用](#快速开始) · [功能介绍](#为多会话而设计) · [常见问题](#常见问题) · [参与贡献](CONTRIBUTING.md)
+[下载使用](#快速开始) · [功能介绍](#为多会话而设计) · [更新日志](CHANGELOG.md) · [常见问题](#常见问题) · [参与贡献](CONTRIBUTING.md)
 
 简体中文 | [English](README.en.md)
 
@@ -57,7 +57,7 @@ AI 任务可能运行很久。打开多个窗口后，来回确认哪个会话�
 
 ### 1. 下载并启动
 
-从 [GitHub Releases](https://github.com/FengLP5263/ai-terminal/releases/latest) 下载 Windows x64 ZIP，**完整解压**后运行 `ai-terminal.exe`。请保持 `ai-terminal-hook.exe` 与它位于同一目录。运行发行包不需要安装 Rust、Python 或 Electron。
+从 [GitHub Releases](https://github.com/FengLP5263/ai-terminal/releases/latest) 下载 Windows x64 ZIP，**完整解压**后运行 `ai-terminal.exe`。0.4.3 起请将 `ai-terminal.exe`、`ai-terminal-hook.exe`、`conpty.dll` 和 `OpenConsole.exe` 保留在同一目录。运行发行包不需要安装 Rust、Python 或 Electron。
 
 ### 2. 创建终端，启动 Agent
 
@@ -126,3 +126,7 @@ rustup component add rustfmt clippy
 ## 许可证
 
 项目代码使用 [MIT License](LICENSE)。第三方组件保留各自的许可证，详见[第三方声明](THIRD_PARTY_NOTICES.md)。
+
+## 0.4.3 更新
+
+改善 Git Bash 启动配置、嵌套 Shell 头像、鼠标拖选和侧栏滚动；修复失效 npm 启动入口与 Windows 10 深色标题栏，并随包提供固定版本的微软原生控制台组件。完整的新增、改进、修复及升级说明见[中英文更新日志](CHANGELOG.md)，验证范围见 [Windows 10 记录](docs/windows10-compatibility.md)。每次发行的 ZIP 均附带两份更新日志。

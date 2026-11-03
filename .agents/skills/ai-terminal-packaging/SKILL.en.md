@@ -16,3 +16,7 @@ Do not overwrite a running preview, alter user data, create tags, or publish wit
 Packaging reads Cargo metadata's `target_directory`, respecting `CARGO_TARGET_DIR` / `build.target-dir`. If a running preview locks the default EXE, set a separate ignored target directory for the package command; never use an old binary by mistake.
 
 Artifact source identity must also cover the local egui_glow Cargo manifest, Rust sources, and GLSL shaders; licenses are gathered through Cargo metadata.
+
+After the native-console upgrade, new packages use format_version 2 and must include conpty.dll, OpenConsole.exe, Microsoft's original license and provenance, all covered by source identity. Verify pinned assets/windows/conpty hashes before copying; missing companions block delivery and cannot be filled from another preview. Preserve read-only verification of older ZIP formats.
+
+Before building, require a unique, dated, categorized, nonempty current Cargo-version entry in both CHANGELOG.md/CHANGELOG.en.md, with matching dates. Reject missing notes, include both full changelogs in the ZIP, and cover their bytes in source identity. Existing governance, ci, and package entry points perform these checks; Windows/POSIX arguments are unchanged.

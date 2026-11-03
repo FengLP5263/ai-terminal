@@ -7,6 +7,7 @@
 ## 开始与协作
 
 - [项目介绍与使用](../README.md) · [贡献指南](../CONTRIBUTING.md) · [项目协作规则](../AGENTS.md)
+- [更新日志与历史版本](../CHANGELOG.md)
 - [Git 分支、PR 与发布流程](../.agents/skills/ai-terminal-git-workflow/SKILL.md)
 - [开发与交付脚本](../scripts/README.md) · [本地开发](../.agents/skills/ai-terminal-development/SKILL.md) · [测试](../.agents/skills/ai-terminal-testing/SKILL.md) · [打包](../.agents/skills/ai-terminal-packaging/SKILL.md)
 
@@ -17,6 +18,8 @@
 - [程序图标](../assets/branding/README.md) · [图标设计候选](../design/icon-concepts/README.md) · [第三方声明](../THIRD_PARTY_NOTICES.md)
 
 ## 历史记录
+
+- [Windows 10 兼容性修复与待验证项](windows10-compatibility.md)
 
 旧的 `docs/` 版本记录和早期架构、治理、验证文档保留在原路径，供追溯使用。请以当前架构记录及源码为准；历史测试不等于当前验证。
 

@@ -24,3 +24,9 @@ Since 0.3.0, session-local `codex`/`claude` entries forward to the installed CLI
 Since 0.3.6, `agent_id` child events do not drive root state; `agent_type` alone does not indicate a child. Claude fullscreen wheel events use its requested mouse protocol without changing the user's renderer preference. Since 0.3.7, Codex keeps its native TUI and own engine; SessionStart may wait until the first task. A real CLI with a loopback fake Responses service must be called an offline fake-model test, not real-model acceptance. Windows image paste forwards native Alt+V after a format check; the CLI handles the image.
 
 0.4.0 adds optional `exit_code` to HookEvent; old senders default to None and managed ShellAgentEnded forwards the real code. Claude StopFailure and non-interrupted nonzero exits mark Failed. A tool error followed by recovery remains Working; user interruption is not failure. Current Codex hooks do not expose StopFailure, so internal errors absent from official events are not guessed from output or silence. Verify details in the CLI. The floating monitor navigates only the current manager's sessions, without taking over another process or changing user CLI trust/configuration.
+
+## Native console and public launchers
+
+Microsoft.Windows.Console.ConPTY is a pinned local runtime dependency with provenance and MIT license in assets/windows/conpty, not a model proxy or related source repository. It runs from files beside the app and follows the existing ConPTY/Job lifecycle.
+
+Literal-target checks for standard npm launchers execute no script, read no CLI authentication/model settings, change no global PATH, and never retry model commands based on arbitrary exit codes. Unknown wrappers retain their original invocation behavior.

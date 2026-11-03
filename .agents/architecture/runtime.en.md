@@ -30,6 +30,8 @@ The manager does not implement a separate model connection or API-key template. 
 
 `scripts/windows/project.ps1 run` builds and opens the interactive window. The plus menu chooses PowerShell, CMD, or Git Bash, with no directory or Agent form. The initial directory is the user home; later sessions use the current/recent valid directory. Reorder sessions by drag, edit names via pencil or context menu, collapse/expand the sidebar and resize its right edge. The context menu offers seven colors or default; selected rows are brighter and separators one physical pixel.
 
+Expanded and collapsed sidebars share a fixed 3-point scrollbar, about one logical point inside the divider. Hovering/scrolling changes opacity without widening it. A dedicated gutter keeps it clear of avatars and status dots; wheel and thumb dragging remain available. This style is scoped to the sidebar. When expanded, a separate drag target outside the divider resizes the panel (190–420 logical points) without stealing scrollbar input.
+
 Ctrl+wheel or Ctrl+plus/minus scales the entire window (50%–250%); Ctrl+0 or the title-bar scale control resets it. The terminal recomputes its grid from remaining space. Opening the app starts only the last selected shell; others open when selected. Review Codex hooks in `/hooks` when necessary. Exit through the window after saving active work; no global reset deletes session data.
 
 Readiness means an actual window/terminal and status message, not merely an existing process. Isolated smoke, measurements, and probes write JSON/PNG to unique ignored `output/` paths. The first UI marker is not a strict displayed first frame. Standard checks make no model requests; `verify-claude` requires explicit authorization and `AllowModelRequest`. `TextRendererSession` must be released in `on_exit` before TLS destruction; the helper initializes neither text nor GPU.
@@ -56,6 +58,8 @@ Since 0.3.6, clicking status explains the Agent connection and can copy `/hooks`
 
 Since 0.3.7, Codex keeps the default full-screen TUI and native scrolling. `--no-daemon` retains its engine/session environment within its Job; existing shared daemons are not controlled. Codex CLI 0.164.0 was checked; explicit user arguments still belong to the CLI. SessionStart may not appear until the first task, so the welcome page says it is waiting for task notifications; only suggest `/hooks` if events still do not arrive after work begins. The local egui-winit patch retains paste requests with no text. When an identified Codex/Claude terminal receives paste, the manager checks clipboard image-format metadata and sends native Alt+V; the CLI reads the image. Ctrl+V/Shift+Insert remain host entry points; normal shell/text/UI paste remains unchanged. No pixels are read, files created, or clipboard polling performed.
 
+Recognized Codex/Claude sessions prefer ordinary left-drag text selection; Ctrl+C copies the selection and still interrupts the CLI when nothing is selected. With application mouse tracking enabled, movement of at least 3 logical points starts local selection without leaking click/drag reports. A click without dragging forwards a press/release pair on release. Wheel events still go to the application. Other terminal programs retain their mouse protocol, with Shift forcing local selection. This uses the existing terminal grid and selection, without adding conversation logs.
+
 ## 0.4.0 settings and floating monitor
 
 The upper-left gear opens settings whether the sidebar is expanded or collapsed. Language follows Windows `GetUserDefaultUILanguage` or manually selected Simplified Chinese/English; unsupported system languages fall back to English. Selection applies immediately to manager controls/status, not CLI output, user names, or directories.
@@ -78,3 +82,11 @@ Closing first asks for confirmation and does not stop sessions early. The confir
 ## Windows OpenGL buffers
 
 On some Windows OpenGL drivers, native glyph drawing can cause sustained growth in process-private memory. The local `egui_glow` patch reuses and grows vertex and index buffers while preserving textures, draw order, and glyph content; other targets retain the upstream path. Memory checks distinguish the manager from Agent children and use isolated sessions with native windows.
+
+## Windows compatibility fixes (unreleased)
+
+Packages use pinned x64 conpty.dll and OpenConsole.exe from Microsoft.Windows.Console.ConPTY 1.25.260930003. The inbox Windows 10 console drops fullscreen/mouse modes in native fixtures, whereas the same program passes with these companions. They remain beside the app without changing system consoles, default terminal, PATH or user configuration; missing companions produce an explicit error before session creation. build.rs stages them in the actual Cargo profile, examples and deps directories, skipping identical content.
+
+Dark captions use DwmSetWindowAttribute on the current window: attribute 20 first, then legacy Windows 10 attribute 19. A window subclass reapplies this after default handling of WM_THEMECHANGED/WM_SETTINGCHANGE and removes itself on WM_NCDESTROY. There is no idle polling or global personalization change. Unsupported attributes retain the backend theme.
+
+CLI discovery skips standard npm .cmd/.bat launchers whose literal targets are confirmed missing, preserving directory precedence. It executes no health probe and guesses no private package layout, inspecting only literal targets in recognized public templates. Custom, unknown or unreadable scripts retain precedence; nonzero CLI exit codes must never trigger execution of another entry. If all recognized launchers are stale, the error lists launcher/target paths. Cached session entries are rechecked at invocation.

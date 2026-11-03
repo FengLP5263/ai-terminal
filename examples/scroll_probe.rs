@@ -1,4 +1,4 @@
-//! Native, model-free fullscreen scroll + status-help visual acceptance.
+//! Native, model-free fullscreen scroll, drag selection and status-help acceptance.
 use ai_terminal::{appearance, connection_ui, model::Agent, status::Status};
 use egui_term::{BackendSettings, TerminalBackend, TerminalView};
 use std::{
@@ -18,6 +18,8 @@ struct Probe {
     stage: usize,
     sent: bool,
     released: bool,
+    selection_phase: u8,
+    selection_verified: bool,
     pending: bool,
     terminal_rect: egui::Rect,
     status_rect: egui::Rect,
@@ -33,6 +35,18 @@ impl eframe::App for Probe {
     }
     fn logic(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
         if self.began.elapsed() > Duration::from_secs(20) {
+            let content = self.terminal.sync();
+            let failure = serde_json::json!({
+                "ok": false, "stage": self.stage, "input_sent": self.sent,
+                "terminal_mode": format!("{:?}", content.terminal_mode),
+                "terminal_rect": format!("{:?}", self.terminal_rect),
+                "display_offset": content.display_offset,
+                "fixture_text": self.terminal.plain_text(),
+            });
+            let _ = std::fs::write(
+                self.output.join("failure.json"),
+                serde_json::to_vec_pretty(&failure).unwrap(),
+            );
             ctx.send_viewport_cmd(egui::ViewportCommand::Close);
         }
         ctx.request_repaint_after(Duration::from_millis(80));
@@ -55,7 +69,24 @@ impl eframe::App for Probe {
                 phase: egui::TouchPhase::Move,
             });
             self.sent = true;
-        } else if self.stage == 3 && !self.released {
+        } else if self.stage == 3 && self.selection_phase < 3 {
+            let size = self.terminal.last_content().terminal_size;
+            let position = |column| {
+                self.terminal_rect.min
+                    + egui::vec2(column * size.cell_width, 1.5 * size.cell_height)
+            };
+            let pos = position(if self.selection_phase == 0 { 0.1 } else { 14.9 });
+            input.events.push(egui::Event::PointerMoved(pos));
+            if self.selection_phase != 1 {
+                input.events.push(egui::Event::PointerButton {
+                    pos,
+                    button: egui::PointerButton::Primary,
+                    pressed: self.selection_phase == 0,
+                    modifiers: egui::Modifiers::NONE,
+                });
+            }
+            self.selection_phase += 1;
+        } else if self.stage == 4 && !self.released {
             let pos = self.status_rect.center();
             input.events.push(egui::Event::PointerMoved(pos));
             input.events.push(egui::Event::PointerButton {
@@ -75,9 +106,10 @@ impl eframe::App for Probe {
             ui.heading("全屏会话滚轮核查 · 本地样例");
             self.status_rect = connection_ui::show(ui, Agent::Codex, &Status::default()).rect;
         });
-        ui.label("滚轮向上查看旧消息，向下返回；状态说明只提供查看命令。");
+        ui.label("滚轮查看消息；左键拖动选择文字；状态说明只提供查看命令。");
         let view = TerminalView::new(ui, &mut self.terminal)
-            .set_focus(self.stage < 3)
+            .set_drag_selection(true)
+            .set_focus(self.stage < 4)
             .set_font(appearance::terminal_font(14.0));
         self.terminal_rect = ui.add(view).rect;
         let ctx = ui.ctx();
@@ -92,7 +124,13 @@ impl eframe::App for Probe {
                 })
             })
         {
-            let names = ["before.png", "up.png", "down.png", "connection.png"];
+            let names = [
+                "before.png",
+                "up.png",
+                "down.png",
+                "selection.png",
+                "connection.png",
+            ];
             let file = std::fs::File::create(self.output.join(names[self.stage])).unwrap();
             let mut encoder = png::Encoder::new(
                 std::io::BufWriter::new(file),
@@ -115,8 +153,8 @@ impl eframe::App for Probe {
             self.stage += 1;
             self.sent = false;
             self.pending = false;
-            if self.stage == 4 {
-                std::fs::write(self.output.join("result.json"),serde_json::to_vec_pretty(&serde_json::json!({"ok":true,"fullscreen_mouse_scroll_verified":true,"connection_popup_opened":true,"model_request_sent":false,"pty_pid":self.terminal.pty_id()})).unwrap()).unwrap();
+            if self.stage == 5 {
+                std::fs::write(self.output.join("result.json"),serde_json::to_vec_pretty(&serde_json::json!({"ok":self.selection_verified,"fullscreen_mouse_scroll_verified":true,"drag_selection_verified":self.selection_verified,"connection_popup_opened":true,"model_request_sent":false,"pty_pid":self.terminal.pty_id()})).unwrap()).unwrap();
                 ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                 return;
             }
@@ -124,7 +162,12 @@ impl eframe::App for Probe {
         let ready = match self.stage {
             0 | 2 => self.terminal.plain_text().contains("history offset 100"),
             1 => self.terminal.plain_text().contains("history offset 85"),
-            3 => egui::Popup::is_any_open(ctx),
+            3 => {
+                self.selection_verified = self.selection_phase == 3
+                    && self.terminal.selectable_content() == "TOP_MESSAGE_100";
+                self.selection_verified
+            }
+            4 => egui::Popup::is_any_open(ctx),
             _ => false,
         };
         if !self.pending && ready && self.began.elapsed() > Duration::from_secs(1) {
@@ -174,6 +217,8 @@ fn main() -> eframe::Result {
                 stage: 0,
                 sent: false,
                 released: false,
+                selection_phase: 0,
+                selection_verified: false,
                 pending: false,
                 terminal_rect: egui::Rect::NOTHING,
                 status_rect: egui::Rect::NOTHING,

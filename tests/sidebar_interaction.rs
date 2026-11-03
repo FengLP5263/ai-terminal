@@ -14,6 +14,8 @@ struct Harness {
     color: Option<SessionColor>,
     activity: Activity,
     unread: bool,
+    extra: Vec<String>,
+    width: f32,
 }
 impl Harness {
     fn new() -> Self {
@@ -28,6 +30,8 @@ impl Harness {
             color: None,
             activity: Activity::Idle,
             unread: false,
+            extra: Vec::new(),
+            width: 238.0,
         }
     }
     fn frame(&mut self, events: Vec<Event>, collapsed: bool) -> Actions {
@@ -38,7 +42,7 @@ impl Harness {
             time: Some(self.tick as f64 * 0.1),
             ..Default::default()
         };
-        let entries: Vec<_> = [
+        let mut entries: Vec<_> = [
             ("a", "一号", Agent::Codex),
             ("b", "二号", Agent::Claude),
             ("c", "三号", Agent::Shell),
@@ -59,11 +63,24 @@ impl Harness {
             hint: String::new(),
         })
         .collect();
+        entries.extend(self.extra.iter().map(|id| Entry {
+            id,
+            name: id,
+            directory: std::path::Path::new("C:/Projects"),
+            agent: Agent::Shell,
+            color: None,
+            activity: Activity::Idle,
+            unread: false,
+            hint: String::new(),
+        }));
         let mut actions = Actions::default();
         let output = self.ctx.run_ui(input, |ui| {
-            actions = sidebar::show(ui, &entries, Some("a"), collapsed, 238.0, &self.icons);
+            actions = sidebar::show(ui, &entries, Some("a"), collapsed, self.width, &self.icons);
         });
         self.output = Some(output);
+        if !collapsed {
+            self.width = actions.width;
+        }
         actions
     }
     fn row(&self, id: &str) -> Rect {
@@ -87,6 +104,142 @@ impl Harness {
         self.frame(Self::pointer(pos, true), collapsed);
         self.frame(Self::pointer(pos, false), collapsed)
     }
+}
+
+#[test]
+fn sidebar_scrollbar_stays_thin_and_clear_of_rows_during_hover_wheel_and_drag() {
+    fn handle(shape: &egui::Shape, row_right: f32, panel_right: f32) -> Option<Rect> {
+        match shape {
+            egui::Shape::Rect(shape)
+                if shape.rect.left() >= row_right - 0.1
+                    && shape.rect.right() <= panel_right
+                    && shape.rect.width() < 18.0
+                    && shape.rect.height() > 24.0
+                    && shape.fill != egui::Color32::TRANSPARENT =>
+            {
+                Some(shape.rect)
+            }
+            egui::Shape::Vec(shapes) => shapes
+                .iter()
+                .find_map(|shape| handle(shape, row_right, panel_right)),
+            _ => None,
+        }
+    }
+    fn bar(h: &Harness, width: f32) -> Rect {
+        h.output
+            .as_ref()
+            .unwrap()
+            .shapes
+            .iter()
+            .find_map(|shape| handle(&shape.shape, h.row("a").right(), width))
+            .expect("visible scrollbar")
+    }
+    for collapsed in [false, true] {
+        for zoom in [1.0, 1.29] {
+            let mut h = Harness::new();
+            h.ctx.set_zoom_factor(zoom);
+            h.extra = (0..30).map(|i| format!("session-{i}")).collect();
+            let mut width = 0.0;
+            for _ in 0..4 {
+                width = h.frame(vec![], collapsed).width;
+            }
+            let first = h.row("a");
+            let idle = bar(&h, width);
+            assert!(idle.width() <= 3.01, "idle: {idle:?}");
+            assert!(
+                idle.left() > first.right(),
+                "scrollbar must have its own gutter"
+            );
+            assert!(
+                (width - idle.right()).abs() <= 1.6,
+                "bar must sit beside the divider: {idle:?}, divider={width}"
+            );
+            let pointer = idle.center();
+            for _ in 0..6 {
+                h.frame(vec![Event::PointerMoved(pointer)], collapsed);
+            }
+            assert!(
+                bar(&h, width).width() <= 3.01,
+                "hover must not expand the scrollbar"
+            );
+            h.frame(
+                vec![
+                    Event::PointerMoved(first.center()),
+                    Event::MouseWheel {
+                        unit: egui::MouseWheelUnit::Line,
+                        delta: egui::vec2(0.0, -3.0),
+                        modifiers: Modifiers::NONE,
+                        phase: egui::TouchPhase::Move,
+                    },
+                ],
+                collapsed,
+            );
+            for _ in 0..4 {
+                h.frame(vec![], collapsed);
+            }
+            assert!(
+                h.row("a").top() < first.top(),
+                "wheel must scroll: collapsed={collapsed} zoom={zoom} first={first:?} now={:?} pointer={:?}",
+                h.row("a"),
+                h.ctx.input(|i| i.pointer.hover_pos())
+            );
+            let scrolled = h.row("a").top();
+            let thumb = bar(&h, width);
+            assert!(thumb.width() <= 3.01);
+            h.frame(Harness::pointer(thumb.center(), true), collapsed);
+            h.frame(
+                vec![Event::PointerMoved(thumb.center() + egui::vec2(0.0, 70.0))],
+                collapsed,
+            );
+            let action = h.frame(
+                Harness::pointer(thumb.center() + egui::vec2(0.0, 70.0), false),
+                collapsed,
+            );
+            h.frame(vec![], collapsed);
+            assert!(
+                h.row("a").top() < scrolled,
+                "thumb drag: collapsed={collapsed} zoom={zoom} thumb={thumb:?} before={scrolled} now={:?} width={} action={:?}",
+                h.row("a"),
+                action.width,
+                action.select
+            );
+            assert!(action.select.is_none() && action.reorder.is_none());
+            assert!(bar(&h, width).width() <= 3.01);
+            assert_ne!(
+                h.ctx.style_of(egui::Theme::Dark).spacing.scroll.bar_width,
+                3.0,
+                "sidebar style must remain local"
+            );
+        }
+    }
+}
+
+#[test]
+fn sidebar_resize_uses_the_divider_outside_the_scrollbar_and_preserves_limits() {
+    let mut h = Harness::new();
+    h.extra = (0..30).map(|i| format!("session-{i}")).collect();
+    h.frame(vec![], false);
+    let before = h.row("a").width();
+    let grab = egui::pos2(h.width + 2.0, 350.0);
+    h.frame(Harness::pointer(grab, true), false);
+    h.frame(
+        vec![Event::PointerMoved(grab + egui::vec2(60.0, 0.0))],
+        false,
+    );
+    h.frame(Harness::pointer(grab + egui::vec2(60.0, 0.0), false), false);
+    h.frame(vec![], false);
+    assert!(h.width > 290.0 && h.row("a").width() > before + 50.0);
+    let grab = egui::pos2(h.width + 2.0, 350.0);
+    h.frame(Harness::pointer(grab, true), false);
+    h.frame(
+        vec![Event::PointerMoved(grab + egui::vec2(700.0, 0.0))],
+        false,
+    );
+    h.frame(
+        Harness::pointer(grab + egui::vec2(700.0, 0.0), false),
+        false,
+    );
+    assert_eq!(h.width, ai_terminal::model::UiSettings::MAX_SIDEBAR_WIDTH);
 }
 
 #[test]

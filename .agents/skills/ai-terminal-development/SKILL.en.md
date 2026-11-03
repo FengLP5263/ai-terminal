@@ -17,3 +17,5 @@ Load Git Bash system/user login configuration before adding session integration,
 Preserve source layout, the independent helper, font provenance, and session-scoped hooks. Normal exit manages only its own sessions; do not kill existing user CLIs. For fonts, input, or rendering, perform actual screenshot and interaction acceptance; test counts alone do not prove appearance or input compatibility. Follow the [testing skill](../ai-terminal-testing/SKILL.en.md); update architecture, scripts, and vendor `UPSTREAM.md` when affected.
 
 All visible debug windows, floating windows, and example EXEs use the selected B icon in `assets/branding`, not framework defaults or early icons. Check both window icon and EXE resources; the hook helper has no GUI icon.
+
+Pinned native console assets live in assets/windows/conpty. build.rs stages conpty.dll/OpenConsole.exe in Cargo's actual output directories; the two ai-terminal EXEs alone are incomplete. Native frame changes target only owned windows, never system personalization. Bound literal-target checks to standard npm launchers, preserve opaque custom wrappers, and do not run health probes or retry CLIs after nonzero exits.

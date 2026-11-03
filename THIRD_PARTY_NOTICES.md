@@ -22,3 +22,5 @@ See assets/icons/SOURCE.json and assets/icons/LICENSE-lobe-icons. Brand names an
 - egui-winit 0.35.0: local paste-event compatibility patch, MIT OR Apache-2.0. See vendor/egui-winit/UPSTREAM.md and its included license files. The packaged dependency inventory includes this patched crate.
 
 - egui_glow 0.35.0：本地 OpenGL 缓冲区复用补丁，MIT OR Apache-2.0。见 vendor/egui_glow/UPSTREAM.zh.md 及随附许可证；制品依赖清单记录该补丁。
+
+- Microsoft.Windows.Console.ConPTY 1.25.260930003：MIT，微软官方 x64 原生控制台组件。见 [来源与校验记录](assets/windows/conpty/SOURCE.json) 和[原始许可证](assets/windows/conpty/LICENSE.txt)。发行包包含 conpty.dll、OpenConsole.exe 及许可／来源副本；该依赖单独记录在 manifest.json 的 native_console 中。

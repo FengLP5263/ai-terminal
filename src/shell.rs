@@ -364,9 +364,9 @@ pub fn run_agent(agent: Agent, args: Vec<OsString>) -> i32 {
         };
         let binary = std::env::var_os(key)
             .map(PathBuf::from)
-            .filter(|p| p.is_file())
-            .or_else(|| CliSearch::current().excluding(&root).find(agent))
-            .ok_or_else(|| format!("未找到 {}，请先安装对应 Windows CLI。", agent.label()))?;
+            .filter(|p| p.is_file() && crate::discovery::stale_npm_target(p).is_none())
+            .map(Ok)
+            .unwrap_or_else(|| CliSearch::current().excluding(&root).resolve(agent))?;
         // Agent tools and nested agents must not replace the foreground session identity.
         if std::env::var_os("AI_TERMINAL_INVOCATION").is_some_and(|v| !v.is_empty()) {
             return std::process::Command::new(binary)
