@@ -231,10 +231,12 @@ fn main() -> eframe::Result {
     };
     let output = PathBuf::from(
         args.get(2)
-            .expect("terminal_probe codex|claude output-directory"),
+            .expect("terminal_probe codex|shell-codex|claude|claude-manual output-directory"),
     );
     std::fs::create_dir_all(&output).unwrap();
     std::fs::write(output.join("phase.txt"), "launch renderer").unwrap();
+    let verify = output.clone();
+    let manual_mode = args.get(1).is_some_and(|mode| mode == "claude-manual");
     eframe::run_native(
         "ai-terminal TUI check",
         eframe::NativeOptions {
@@ -261,6 +263,8 @@ fn main() -> eframe::Result {
                     "-c".into(),
                     "check_for_update_on_startup=false".into(),
                 ]
+            } else if manual_mode {
+                vec!["--permission-mode".into(), "default".into()]
             } else {
                 vec![]
             };
@@ -324,5 +328,15 @@ fn main() -> eframe::Result {
                 startup_saved: false,
             }))
         }),
-    )
+    )?;
+    let report = std::fs::read(verify.join("result.json")).expect(
+        "TUI capture incomplete: inspect startup-text.txt / trust prompt; no automatic approval",
+    );
+    let report: serde_json::Value = serde_json::from_slice(&report).expect("TUI report");
+    assert_eq!(report["model_request_sent"], false);
+    assert!(
+        verify.join("terminal.png").is_file(),
+        "TUI screenshot missing"
+    );
+    Ok(())
 }

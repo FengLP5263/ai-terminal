@@ -11,6 +11,10 @@ pub const SECONDARY: Color32 = Color32::from_gray(154);
 pub const SELECTED: Color32 = Color32::from_gray(40);
 pub const HOVER: Color32 = Color32::from_gray(28);
 pub const BORDER: Color32 = Color32::from_gray(62);
+pub const WORKING: Color32 = Color32::from_rgb(104, 183, 255);
+pub const COMPLETED: Color32 = Color32::from_rgb(74, 232, 155);
+pub const WAITING: Color32 = Color32::from_rgb(255, 208, 82);
+pub const FAILED: Color32 = Color32::from_rgb(255, 103, 120);
 pub const NEW_TERMINAL_ID: &str = "new-terminal-sidebar";
 #[derive(Clone, Copy)]
 pub enum ActionIcon {
@@ -86,6 +90,17 @@ pub fn icon_at(
     icon: ActionIcon,
     label: &str,
 ) -> Response {
+    action_button(ui, rect, id, icon, label, false)
+}
+
+fn action_button(
+    ui: &mut egui::Ui,
+    rect: Rect,
+    id: egui::Id,
+    icon: ActionIcon,
+    label: &str,
+    rail: bool,
+) -> Response {
     let response = ui.interact(rect, id, Sense::click());
     response.widget_info(|| {
         egui::WidgetInfo::labeled(egui::WidgetType::Button, ui.is_enabled(), label)
@@ -95,9 +110,18 @@ pub fn icon_at(
     } else if response.hovered() {
         Color32::from_gray(35)
     } else {
-        Color32::TRANSPARENT
+        if rail {
+            Color32::from_gray(29)
+        } else {
+            Color32::TRANSPARENT
+        }
     };
-    ui.painter().rect_filled(rect, 6, fill);
+    if rail {
+        ui.painter()
+            .circle_filled(rect.center(), AVATAR / 2.0, fill);
+    } else {
+        ui.painter().rect_filled(rect, 6, fill);
+    }
     if response.has_focus() {
         ui.painter().rect_stroke(
             rect.shrink(0.5),
@@ -106,7 +130,10 @@ pub fn icon_at(
             egui::StrokeKind::Inside,
         );
     }
-    let glyph = Rect::from_center_size(rect.center(), Vec2::splat(ACTION_ICON));
+    let glyph = Rect::from_center_size(
+        rect.center(),
+        Vec2::splat(if rail { AVATAR_ICON } else { ACTION_ICON }),
+    );
     paint_action(
         ui.painter(),
         glyph,
@@ -123,6 +150,12 @@ pub fn icon_at(
 pub fn icon_button(ui: &mut egui::Ui, id: egui::Id, icon: ActionIcon, label: &str) -> Response {
     let (rect, _) = ui.allocate_exact_size(Vec2::splat(CONTROL), Sense::hover());
     icon_at(ui, rect, id, icon, label)
+}
+
+/// The collapsed rail uses the same square tile, disc and glyph sizes as sessions.
+pub fn rail_button(ui: &mut egui::Ui, id: egui::Id, icon: ActionIcon, label: &str) -> Response {
+    let (rect, _) = ui.allocate_exact_size(Vec2::splat(RAIL_ROW), Sense::hover());
+    action_button(ui, rect, id, icon, label, true)
 }
 
 pub fn paint_shell(painter: &egui::Painter, rect: Rect, agent: crate::model::Agent) {
@@ -182,11 +215,11 @@ pub fn session_fill(
         tint(
             color,
             if selected {
-                0.38
+                0.30
             } else if hovered {
-                0.28
+                0.22
             } else {
-                0.18
+                0.15
             },
         )
     } else if selected {
@@ -198,7 +231,7 @@ pub fn session_fill(
     }
 }
 pub fn session_border(color: Option<crate::model::SessionColor>) -> Color32 {
-    color.map(|color| tint(color, 0.65)).unwrap_or(BORDER)
+    color.map(|color| tint(color, 0.85)).unwrap_or(BORDER)
 }
 fn tint(color: crate::model::SessionColor, amount: f32) -> Color32 {
     let rgb = color

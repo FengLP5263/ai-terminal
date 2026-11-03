@@ -1,13 +1,25 @@
 {
-  "description": "Native application captures with synthetic session content and status. No real model requests or private conversations.",
+  "description": "Native Release component captures with fixed synthetic text, example directories and simulated session status; no private data or real model requests.",
+  "version": "0.4.4",
+  "profile": "release",
+  "model_requests": false,
+  "user_profiles": false,
   "files": {
     "workspace.png": {
-      "sha256": "fd52e9e155ac322cd23891533310416945a9b4337ddbeae881290535f1d7a9bb",
-      "source": "Isolated application screenshot with synthetic session data"
+      "sha256": "aeaa77051821918dc05cd2bf03b868f29797fc45487a094eb17ebb5b413a1bcf",
+      "bytes": 129203,
+      "width": 1680,
+      "height": 1020,
+      "source": "examples/readme_capture.rs",
+      "unmodified_native_capture": true
     },
     "floating.png": {
-      "sha256": "8a249ea0295dc27af63007fb1c7a42f92192e4a31327d12c486b176f0ffe6c6d",
-      "source": "Isolated application screenshot with synthetic session data"
+      "sha256": "a9409134af7eb5bda1c6c5e7b3ae1cf13b5c1ded99804af2e1a995a077abbfd1",
+      "bytes": 13114,
+      "width": 732,
+      "height": 72,
+      "source": "examples/island_probe.rs",
+      "unmodified_native_capture": true
     }
   }
 }

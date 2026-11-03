@@ -30,3 +30,5 @@ Since 0.3.6, `agent_id` child events do not drive root state; `agent_type` alone
 Microsoft.Windows.Console.ConPTY is a pinned local runtime dependency with provenance and MIT license in assets/windows/conpty, not a model proxy or related source repository. It runs from files beside the app and follows the existing ConPTY/Job lifecycle.
 
 Literal-target checks for standard npm launchers execute no script, read no CLI authentication/model settings, change no global PATH, and never retry model commands based on arbitrary exit codes. Unknown wrappers retain their original invocation behavior.
+
+User decision on 2026-11-03: prioritize accurate Codex state indicators and defer the shared agents entry. Keep independent mode and session-scoped hooks; do not remove injected arguments, change user configuration, or infer state from output merely to restore for agents. The 0.166.0 startup source still excludes the shared server for incompatible session-level configuration. Restoring the entry must also verify cross-terminal state ownership, conversation switching, and shutdown; see [UI checks](../../docs/ui-rendering.en.md).

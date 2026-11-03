@@ -70,3 +70,14 @@ Shell 头像的原生截图核查（仅 Windows，PowerShell／Git Bash）：`ca
 全屏滚轮／拖选截图（仅 Windows）：`cargo build --offline --locked --release --example scroll_probe`，再用 `rustc --edition=2024 --crate-name mouse_console tests/fixtures/mouse_console.rs -o output/mouse-console.exe` 构建本地样例，运行 `target/release/examples/scroll_probe.exe output/mouse-console.exe output/<unique-selection-probe>`。检查上下翻页、普通左键拖选的高亮及连接说明截图和正常退出；复制行为由 `tests/terminal_interaction.rs` 的真实 ConPTY 回归覆盖。原生探针只向自身窗口输入，不写系统剪贴板、不启动 Agent 或模型。
 
 Windows 兼容性探针：先运行 `cargo build --offline --locked --release --bins --example composer_probe --example titlebar_probe --example discovery_probe`，并用前述 rustc 命令准备 output/mouse-console.exe。分别执行 `target/release/examples/composer_probe.exe output/mouse-console.exe output/<unique-composer-probe>`、`target/release/examples/titlebar_probe.exe output/<unique-titlebar-probe>` 和 `target/release/examples/discovery_probe.exe output/<unique-discovery-probe>`。前两项只使用自身窗口／本地样例，后一项只执行已安装 CLI 的 --version；核对 JSON、PNG 和退出码，Windows 10／11 的结果分开记录。构建会准备固定的原生控制台组件；不能只复制探针 EXE 到另一设备。
+
+浮窗跨屏／DPI 核查（至少两块真实显示器）：cargo build --offline --locked --release --example island_move_probe，然后运行 target/release/examples/island_move_probe.exe output/unique-island-move。探针只移动自身浮窗，在 71%、142%、200% 等缩放下检查原生客户区尺寸并生成逐阶段 PNG／JSON；没有第二屏时明确失败，不操作用户窗口、不启动 Agent 或模型。截图仍需人工查看；原因与 Codex 代理入口边界见 [界面渲染](../docs/ui-rendering.md)。
+真实 Claude 手动模式：在已有可信目录运行 terminal_probe.exe claude-manual output/unique-manual-probe，路径指向已构建的 examples 程序。只为本次 CLI 添加 --permission-mode default，不改变用户偏好、不提交模型请求。探针缺少截图或结果时非零退出；信任提示不能当作成功。
+
+收起侧栏临界布局：cargo build --offline --locked --example workspace_probe，再运行 target/debug/examples/workspace_probe.exe output/unique-sidebar-threshold 900 threshold。使用七个合成会话与独立样例 PTY，在正常大小、缩放和重设窗口尺寸后连续比较多帧会话区域，生成三张 PNG 与 stability_checks 计数；布局抽动会使探针失败。普通 many 模式仍用于长列表滚动条截图，不代替临界布局检查。
+
+preview.3 的 island_move_probe 另检查原生移动开始／结束通知、移动后多帧位置保持与异常客户区尺寸恢复。通知和程序化跨屏分别执行，不模拟系统鼠标模态循环；结果 JSON 的 physical_mouse_drag 为 false，实际鼠标跨屏仍需独立验收。
+
+preview.4 跨屏探针沿用上述命令，同时移动自己的主窗口与浮窗，原生移动状态覆盖 DPI 切换，保存 main-*.png／move-*.png 和 dpi_trace。检查建议／实际矩形误差、递归深度、移动期间尺寸修正延迟和重复跨屏尺寸稳定。physical_mouse_drag 仍为 false；真实鼠标模态拖动另行验收。本地 winit 的构建源码／嵌入资产已计入制品源码身份及依赖许可证清单。
+
+README 公开截图（仅 Windows）：构建 `cargo build --offline --locked --release --example readme_capture --example island_probe`，分别运行 `target/release/examples/readme_capture.exe output/<unique-readme-workspace>` 和 `target/release/examples/island_probe.exe output/<unique-readme-floating>`。前者复用正式侧栏、字体与终端组件，仅输出固定文本、示例目录和合成状态；后者捕获正式浮窗。两者不启动 Agent／模型，不加载用户 profile，只管理自身窗口和 PTY。核对退出码、JSON、PNG 及隐私后，将 workspace.png 和 island-zh.png 原样作为 README 图片，更新 assets/readme/SOURCE.json 的版本、来源、尺寸与 SHA-256。

@@ -4,6 +4,10 @@ Source: https://github.com/kemokempo/egui_term
 Revision: 31bbc7ab8503c9518fcee5717cfa29011e59f451
 License: MIT (LICENSE preserved).
 
+Unreleased: fit complete native emoji clusters inside their cell bounds, including
+narrow text-default pause/play badges. Preserve VS15 text presentation and the
+emulator's original cell coordinates. See the paired UPSTREAM records.
+
 Local changes: viewport-only snapshots; 5000-line scrollback; no background redraw;
 coalesced output wakeups; receiver-disconnect termination; per-child env and Windows
 argument escaping; IME commit support; keyboard focus independent of pointer;

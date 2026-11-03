@@ -45,3 +45,5 @@ Windows 预览包通过 GitHub Releases 分发；尚无自动发布服务、云 
 `src/window_frame.rs` 为应用自己的窗口请求深色 DWM 标题栏，并在原生主题／设置通知处理后恢复该策略；`src/native_console.rs` 在创建会话前检查随包组件。`assets/windows/conpty/` 保存固定版本的微软原生控制台、许可证与来源。Alacritty 使用程序目录的组件，build.rs 为正式程序、测试和示例准备相同版本。
 
 `examples/composer_probe.rs` 覆盖恢复至 151.13608% 与随后 125%、150%、151.13608% 缩放的全屏输入区；`titlebar_probe.rs` 截取自身原生窗口及标题栏；`discovery_probe.rs` 仅调用已安装 CLI 的公开 --version。合成样例、公开版本查询和真实模型回合分别记录。
+
+`vendor/winit` 固定 0.30.13 的 Apache-2.0 本地快照。Windows 原生移动期间采用系统的 DPI 建议矩形，避免上游旧屏幕推回逻辑导致重复 DPI 变化；主窗口与浮窗共用该路径。非拖动路径保持上游实现。来源、归档哈希与范围见该目录 UPSTREAM.zh.md。

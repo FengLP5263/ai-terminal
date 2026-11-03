@@ -40,6 +40,7 @@ pub struct FloatingBar {
     sender: SyncSender<Action>,
     receiver: Receiver<Action>,
     icons: Icons,
+    placement_request: Arc<Mutex<Option<[f32; 2]>>>,
 }
 impl FloatingBar {
     pub fn new(icons: Icons) -> Self {
@@ -49,6 +50,7 @@ impl FloatingBar {
             sender,
             receiver,
             icons,
+            placement_request: Arc::new(Mutex::new(None)),
         }
     }
     pub fn update(&self, snapshot: Snapshot, ctx: &egui::Context) {
@@ -69,12 +71,21 @@ impl FloatingBar {
         let placement = placement(ctx, count, position, false);
         let width = placement.width;
         let zoom = ctx.zoom_factor();
-        let previous_zoom = ctx.data_mut(|data| {
-            let key = egui::Id::new("floating-window-zoom");
-            let previous = data.get_temp::<f32>(key);
-            data.insert_temp(key, zoom);
+        let layout = (count, zoom);
+        let previous = ctx.data_mut(|data| {
+            let key = egui::Id::new("floating-window-layout");
+            let previous = data.get_temp::<(usize, f32)>(key);
+            data.insert_temp(key, layout);
             previous
         });
+        let exists = ctx.input(|i| i.raw.viewports.contains_key(&viewport_id()));
+        // Saved position is an observation, not a command. Only creation and an
+        // intentional layout change can position the native window.
+        if !exists || previous != Some(layout) {
+            *self.placement_request.lock().unwrap() = Some(placement.pixels);
+            ctx.request_repaint_of(viewport_id());
+        }
+        let placement_request = self.placement_request.clone();
         let mut builder = egui::ViewportBuilder::default()
             .with_title("ai-terminal status")
             .with_icon(appearance::window_icon())
@@ -85,13 +96,34 @@ impl FloatingBar {
             .with_taskbar(false)
             .with_active(false)
             .with_always_on_top();
-        if position.is_some() {
+        if !exists {
             builder = builder.with_position([
                 placement.pixels[0] / placement.scale,
                 placement.pixels[1] / placement.scale,
             ]);
         }
         ctx.show_viewport_deferred(viewport_id(), builder, move |ui, _| {
+            let requested = placement_request.lock().unwrap().take();
+            #[cfg(windows)]
+            let observed = crate::floating_native::sync(
+                ui.ctx(),
+                [(count.min(10) as f32 * 48.0 + 8.0).max(96.0), 48.0],
+                ui.ctx().zoom_factor(),
+                requested,
+            );
+            #[cfg(not(windows))]
+            let observed = {
+                if let Some(pos) = requested {
+                    let scale = ui.ctx().pixels_per_point();
+                    ui.ctx()
+                        .send_viewport_cmd(egui::ViewportCommand::OuterPosition(egui::pos2(
+                            pos[0] / scale,
+                            pos[1] / scale,
+                        )));
+                }
+                ui.input(|i| i.viewport().outer_rect)
+                    .map(|r| (r.min * ui.ctx().pixels_per_point()).to_array())
+            };
             let snapshot = snapshot.lock().unwrap().clone();
             let action = body(ui, &snapshot, &icons);
             if let Some(action) = action {
@@ -101,9 +133,7 @@ impl FloatingBar {
             if close {
                 dispatch(&sender, ui.ctx(), Action::Disable);
             }
-            if let Some(rect) = ui.input(|i| i.viewport().outer_rect) {
-                let scale = ui.ctx().pixels_per_point();
-                let pos = [rect.min.x * scale, rect.min.y * scale];
+            if let Some(pos) = observed {
                 let key = egui::Id::new("floating-last-position");
                 let previous = ui.ctx().data_mut(|d| {
                     let old = d.get_temp::<[f32; 2]>(key);
@@ -115,14 +145,6 @@ impl FloatingBar {
                 }
             }
         });
-        // A viewport builder with the same logical size does not emit a resize when
-        // only egui's zoom changes. Reapply it so the native window scales too.
-        if previous_zoom.is_some_and(|old| old != zoom) {
-            ctx.send_viewport_cmd_to(
-                viewport_id(),
-                egui::ViewportCommand::InnerSize(egui::vec2(width, 48.0)),
-            );
-        }
     }
 }
 fn dispatch(sender: &SyncSender<Action>, ctx: &egui::Context, action: Action) {
@@ -132,10 +154,10 @@ fn dispatch(sender: &SyncSender<Action>, ctx: &egui::Context, action: Action) {
 }
 pub fn status_color(activity: Activity) -> Color32 {
     match activity {
-        Activity::Working => Color32::from_rgb(136, 180, 246),
-        Activity::Completed => Color32::from_rgb(88, 191, 141),
-        Activity::Waiting => Color32::from_rgb(235, 184, 82),
-        Activity::Failed => Color32::from_rgb(244, 117, 117),
+        Activity::Working => chrome::WORKING,
+        Activity::Completed => chrome::COMPLETED,
+        Activity::Waiting => chrome::WAITING,
+        Activity::Failed => chrome::FAILED,
         _ => chrome::SECONDARY,
     }
 }

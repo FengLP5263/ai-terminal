@@ -20,3 +20,5 @@ Artifact source identity must also cover the local egui_glow Cargo manifest, Rus
 After the native-console upgrade, new packages use format_version 2 and must include conpty.dll, OpenConsole.exe, Microsoft's original license and provenance, all covered by source identity. Verify pinned assets/windows/conpty hashes before copying; missing companions block delivery and cannot be filled from another preview. Preserve read-only verification of older ZIP formats.
 
 Before building, require a unique, dated, categorized, nonempty current Cargo-version entry in both CHANGELOG.md/CHANGELOG.en.md, with matching dates. Reject missing notes, include both full changelogs in the ZIP, and cover their bytes in source identity. Existing governance, ci, and package entry points perform these checks; Windows/POSIX arguments are unchanged.
+
+Source identity must also cover the local winit patch Cargo manifest, build.rs, Rust sources and embedded assets. Retain its upstream Apache-2.0 license and bilingual UPSTREAM provenance, and collect it in the dependency license inventory through Cargo metadata.

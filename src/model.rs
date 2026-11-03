@@ -62,13 +62,13 @@ impl SessionColor {
     }
     pub fn rgb(self) -> [u8; 3] {
         match self {
-            Self::Blue => [100, 156, 238],
-            Self::Green => [99, 177, 132],
-            Self::Teal => [75, 180, 180],
-            Self::Amber => [212, 174, 80],
-            Self::Orange => [216, 140, 84],
-            Self::Pink => [205, 120, 165],
-            Self::Purple => [163, 127, 218],
+            Self::Blue => [112, 181, 255],
+            Self::Green => [115, 220, 153],
+            Self::Teal => [93, 215, 211],
+            Self::Amber => [246, 211, 112],
+            Self::Orange => [255, 174, 128],
+            Self::Pink => [239, 157, 200],
+            Self::Purple => [189, 163, 255],
         }
     }
 }

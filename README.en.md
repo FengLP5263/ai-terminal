@@ -32,7 +32,7 @@ Enable the floating bar to see session avatars and status above other windows. C
 
 ![AI Terminal floating session bar](assets/readme/floating.png)
 
-> Screenshots show a development build with synthetic session content and simulated status; they contain no real conversations. See the release notes for the features and appearance of a particular release.
+> Screenshots use the real 0.4.4 interface with synthetic sessions, example directories and simulated status. They contain no real usernames, working directories or private conversations. Click an image for its original resolution.
 
 ## Built for multiple sessions
 
@@ -115,7 +115,7 @@ rustup component add rustfmt clippy
 .\scripts\windows\project.ps1 run
 ```
 
-`ci` runs governance, formatting, Clippy, Rust, and Python checks without calling model APIs. Artifact source identity covers the local graphics patch and its shaders. See the [documentation](docs/README.en.md) and [development scripts](scripts/README.en.md) for development, testing, and packaging details.
+`ci` runs governance, formatting, Clippy, Rust, and Python checks without calling model APIs. Artifact source identity covers the local graphics patch, its shaders, and the window-backend patch. See the [documentation](docs/README.en.md) and [development scripts](scripts/README.en.md) for development, testing, and packaging details.
 
 ## Contribute
 
@@ -127,6 +127,6 @@ Issues, ideas, terminal improvements, and documentation contributions are welcom
 
 Project code is available under the [MIT License](LICENSE). Third-party components retain their own licenses; see [third-party notices](THIRD_PARTY_NOTICES.en.md).
 
-## 0.4.3 update
+## 0.4.4 update
 
-Improve Git Bash startup configuration, nested-shell avatars, drag selection, and sidebar scrolling. Fix stale npm entries and Windows 10 dark captions, and bundle a pinned Microsoft native console runtime. See the [bilingual changelog](CHANGELOG.en.md) for additions, improvements, fixes, and upgrade guidance, and the [Windows 10 record](docs/windows10-compatibility.en.md) for verification scope. Each release ZIP includes both changelog files.
+Sharper avatars, more complete emoji, refreshed session colors and brighter status indicators. Fix cross-monitor dragging, DPI transitions, mouse-anchor jumps and sidebar jitter in the main and floating windows; unify collapsed-rail icon sizes and balance expanded-card insets. See the [bilingual changelog](CHANGELOG.en.md) for details and known limits, and the [UI/cross-monitor record](docs/ui-rendering.en.md) for implementation and acceptance scope. Each release ZIP includes both changelog files.

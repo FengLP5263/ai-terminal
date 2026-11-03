@@ -14,6 +14,8 @@ Windows system fonts are read at runtime and not bundled. The project's LICENSE 
 
 ## Agent icons
 
+- winit 0.30.13: local Windows native-drag DPI compatibility patch, Apache-2.0. See the [patch provenance](vendor/winit/UPSTREAM.md) and original LICENSE. The package dependency inventory collects this local dependency and its license.
+
 OpenAI and Claude icons come from [Lobe Icons](https://github.com/lobehub/lobe-icons), MIT. See `assets/icons/SOURCE.json` and `assets/icons/LICENSE-lobe-icons`. Brand names and marks belong to their respective owners.
 
 - egui-winit 0.35.0: local paste-event compatibility patch, MIT OR Apache-2.0. See `vendor/egui-winit/UPSTREAM.md` and its included license files. The packaged dependency inventory includes this patched crate.

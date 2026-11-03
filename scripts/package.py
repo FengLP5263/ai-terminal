@@ -54,6 +54,8 @@ def sha(path):return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 def source_identity(root=ROOT):
     inputs=[root/'build.rs',root/'Cargo.toml',root/'Cargo.lock',root/'vendor/egui_term/Cargo.toml',root/'vendor/egui-winit/Cargo.toml',root/'vendor/egui_glow/Cargo.toml']+list((root/'src').rglob('*.rs'))+list((root/'vendor/egui_term/src').rglob('*.rs'))+list((root/'vendor/egui-winit/src').rglob('*.rs'))+[p for p in (root/'vendor/egui_glow/src').rglob('*') if p.is_file()]+list((root/'assets/fonts').iterdir())+list((root/'assets/icons').iterdir())+list((root/'assets/branding').iterdir())+[p for p in (root/'assets/windows/conpty').rglob('*') if p.is_file()]
     inputs += [root/name for name in CHANGELOGS]
+    inputs += [root/'vendor/winit/Cargo.toml', root/'vendor/winit/build.rs']
+    inputs += [p for p in (root/'vendor/winit/src').rglob('*') if p.is_file()]
     digest=hashlib.sha256()
     for item in sorted(inputs,key=lambda p:p.relative_to(root).as_posix()):
         digest.update(item.relative_to(root).as_posix().encode());digest.update(b'\0');digest.update(item.read_bytes());digest.update(b'\0')
@@ -153,7 +155,7 @@ def build(allow_dirty=False):
     (folder/'README.txt').write_text('ai-terminal '+version+'\n\n请完整解压。ai-terminal.exe、ai-terminal-hook.exe、conpty.dll 和 OpenConsole.exe 必须放在同一目录。双击 ai-terminal.exe 默认进入 PowerShell；左上角＋可新建 PowerShell、CMD 或 Git Bash，在终端中输入 codex 或 claude。\n会话数据在 %LOCALAPPDATA%/ai-terminal；退出只回收本程序拥有的会话进程。\nCodex 欢迎页等待任务通知；任务后仍无通知时，可在 /hooks 审查状态 hook。版本、源码与原生组件身份见 manifest.json；许可证随包携带。\n\nExtract the complete archive. Keep ai-terminal.exe, ai-terminal-hook.exe, conpty.dll and OpenConsole.exe together. Double-click ai-terminal.exe for PowerShell; use + for PowerShell, CMD or Git Bash, then run codex or claude.\nSession data: %LOCALAPPDATA%/ai-terminal. Exit closes only owned sessions. The Codex welcome screen waits for task notifications; review /hooks if notifications remain absent after work begins. See manifest.json and the included licenses for source/runtime identity.\n',encoding='utf-8')
     dependencies(cargo,folder)
     head=command(['git','rev-parse','--verify','HEAD'],check=False)
-    manifest={'format_version':2,'version':version,'platform':'windows-x64','git_commit':head.stdout.strip() if head.returncode==0 else None,'dirty':dirty,'rustc':command(['rustc','-V']).stdout.strip(),'source_sha256':source_identity(),'source_scope':'Cargo manifests/lock, build.rs, production Rust, local egui_glow sources and shaders, font/icon/branding/native-console assets','native_console':native,'build':'cargo build --locked --release','published':False,'files':{}}
+    manifest={'format_version':2,'version':version,'platform':'windows-x64','git_commit':head.stdout.strip() if head.returncode==0 else None,'dirty':dirty,'rustc':command(['rustc','-V']).stdout.strip(),'source_sha256':source_identity(),'source_scope':'Cargo manifests/lock, build.rs, production Rust, local egui_glow sources/shaders and winit build sources/assets, font/icon/branding/native-console assets','native_console':native,'build':'cargo build --locked --release','published':False,'files':{}}
     manifest['source_scope']+=', bilingual changelog'
     for item in sorted(folder.rglob('*')):
         if item.is_file():manifest['files'][item.relative_to(folder).as_posix()]={'bytes':item.stat().st_size,'sha256':sha(item)}

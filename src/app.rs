@@ -2257,7 +2257,7 @@ mod tests {
     }
 
     #[test]
-    fn island_zoom_resizes_and_recenters_while_preserving_vertical_position() {
+    fn island_zoom_refreshes_and_recenters_while_preserving_vertical_position() {
         let root = tempfile::tempdir().unwrap();
         let ctx = egui::Context::default();
         ctx.set_embed_viewports(false);
@@ -2302,17 +2302,15 @@ mod tests {
                 (current[1] - initial[1]).abs() < 0.1,
                 "y position changed at {zoom}"
             );
-            assert!(
-                out.viewport_output
-                    .get(&ai_terminal::floating::viewport_id())
-                    .is_some_and(|v| v.commands.iter().any(|command| matches!(command,
-                    egui::ViewportCommand::InnerSize(size) if (size.y - 48.0).abs() < 0.01))),
-                "zoom {zoom} must resize the native viewport; outputs={:?}",
-                out.viewport_output
-                    .iter()
-                    .map(|(id, viewport)| (*id, &viewport.commands))
-                    .collect::<Vec<_>>()
+            let child = &out.viewport_output[&ai_terminal::floating::viewport_id()];
+            assert_eq!(child.builder.inner_size.unwrap().y, 48.0);
+            assert_eq!(
+                child.repaint_delay,
+                Duration::ZERO,
+                "zoom {zoom} must wake the child to apply its native geometry"
             );
+            // Actual physical resizing is checked by island_zoom_probe on both
+            // native monitors; this headless test cannot execute HWND events.
         }
         app.preferences.floating_position_pixels = Some([1_000_000.0, 80.0]);
         app.floating_session_count = None;

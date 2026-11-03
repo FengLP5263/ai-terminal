@@ -8,6 +8,40 @@ use ai_terminal::{
     status::Activity,
 };
 use egui::{Event, Modifiers, PointerButton, Pos2, Rect};
+
+#[test]
+fn saved_position_observations_do_not_reposition_an_existing_floating_window() {
+    let ctx = egui::Context::default();
+    appearance::setup(&ctx);
+    ctx.set_embed_viewports(false);
+    let bar = floating::FloatingBar::new(Icons::new(&ctx));
+    for position in [[100.0, 80.0], [2700.0, 110.0], [2500.0, 90.0]] {
+        let mut input = egui::RawInput::default();
+        input.viewports.insert(
+            floating::viewport_id(),
+            egui::ViewportInfo {
+                native_pixels_per_point: Some(1.5),
+                outer_rect: Some(Rect::from_min_size(
+                    Pos2::new(position[0] / 1.5, position[1] / 1.5),
+                    egui::vec2(488.0, 48.0),
+                )),
+                ..Default::default()
+            },
+        );
+        let output = ctx.run_ui(input, |_| bar.show(&ctx, Some(position)));
+        let child = &output.viewport_output[&floating::viewport_id()];
+        assert!(
+            child.builder.position.is_none(),
+            "observed position is not a placement command"
+        );
+        assert!(
+            !child
+                .commands
+                .iter()
+                .any(|command| matches!(command, egui::ViewportCommand::OuterPosition(_)))
+        );
+    }
+}
 fn pointer(pos: Pos2, pressed: bool) -> Vec<Event> {
     vec![
         Event::PointerMoved(pos),
@@ -427,7 +461,7 @@ fn many_sessions_stay_still_and_only_drag_scrolls_without_opening_a_session() {
 fn floating_completion_dot_disappears_when_the_session_is_read() {
     fn has_green(shape: &egui::Shape) -> bool {
         match shape {
-            egui::Shape::Circle(circle) => circle.fill == egui::Color32::from_rgb(88, 191, 141),
+            egui::Shape::Circle(circle) => circle.fill == ai_terminal::chrome::COMPLETED,
             egui::Shape::Vec(shapes) => shapes.iter().any(has_green),
             _ => false,
         }

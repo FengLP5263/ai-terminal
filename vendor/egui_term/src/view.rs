@@ -652,7 +652,7 @@ fn glyph_cluster(cells: &[crate::backend::RenderCell], index: usize) -> (String,
             }
         }
     }
-    let presentation = text.contains('\u{fe0f}');
+    let presentation = emoji_presentation(&text);
     let blank_after = cells.get(index + 1).is_some_and(|c| {
         c.point.line == first.point.line
             && c.point.column.0 == first.point.column.0 + 1
@@ -664,6 +664,23 @@ fn glyph_cluster(cells: &[crate::backend::RenderCell], index: usize) -> (String,
         columns.min(2)
     };
     (text, end, visual)
+}
+
+/// Text-default emoji (e.g. Claude's pause/play badges) may occupy a narrow
+/// emulator cell followed by padding. Shape them as an emoji without consuming
+/// or moving the neighbouring terminal cells. VS15 explicitly requests text.
+pub(crate) fn emoji_presentation(text: &str) -> bool {
+    !text.contains('\u{fe0e}')
+        && (text.contains('\u{fe0f}')
+            || text.chars().any(|c| {
+                matches!(c as u32,
+                0x23e9..=0x23fa | 0x25b6 | 0x25c0 |
+                0x2600..=0x2604 | 0x2614..=0x2615 | 0x2648..=0x2653 |
+                0x26a0..=0x26a1 | 0x26bd..=0x26be | 0x26c4..=0x26c5 |
+                0x26f2..=0x26f3 | 0x26fa | 0x26fd | 0x2705 | 0x2728 |
+                0x274c | 0x274e | 0x2753..=0x2755 | 0x2757 | 0x2764 |
+                0x2795..=0x2797 | 0x27b0 | 0x27bf | 0x1f000..=0x1faff)
+            }))
 }
 
 fn process_keyboard_event(

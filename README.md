@@ -32,7 +32,7 @@ AI 任务可能运行很久。打开多个窗口后，来回确认哪个会话�
 
 ![AI Terminal 浮窗示意](assets/readme/floating.png)
 
-> 截图取自开发中的程序，使用合成会话内容和模拟状态，不包含真实对话。发行版的功能与界面请以对应版本说明为准。
+> 截图使用 0.4.4 的真实界面、合成会话内容、示例目录和模拟状态，不包含真实用户名、工作目录或私人对话。点击图片可查看原始分辨率。
 
 ## 为多会话而设计
 
@@ -115,7 +115,7 @@ rustup component add rustfmt clippy
 .\scripts\windows\project.ps1 run
 ```
 
-`ci` 包含治理、格式、Clippy、Rust 和 Python 检查，不调用模型 API。发行包的源码摘要覆盖本地图形补丁与着色器。开发、测试和打包的详细说明见[文档目录](docs/README.md)及[开发脚本](scripts/README.md)。
+`ci` 包含治理、格式、Clippy、Rust 和 Python 检查，不调用模型 API。发行包的源码摘要覆盖本地图形补丁、着色器及窗口后端补丁。开发、测试和打包的详细说明见[文档目录](docs/README.md)及[开发脚本](scripts/README.md)。
 
 ## 一起完善
 
@@ -127,6 +127,6 @@ rustup component add rustfmt clippy
 
 项目代码使用 [MIT License](LICENSE)。第三方组件保留各自的许可证，详见[第三方声明](THIRD_PARTY_NOTICES.md)。
 
-## 0.4.3 更新
+## 0.4.4 更新
 
-改善 Git Bash 启动配置、嵌套 Shell 头像、鼠标拖选和侧栏滚动；修复失效 npm 启动入口与 Windows 10 深色标题栏，并随包提供固定版本的微软原生控制台组件。完整的新增、改进、修复及升级说明见[中英文更新日志](CHANGELOG.md)，验证范围见 [Windows 10 记录](docs/windows10-compatibility.md)。每次发行的 ZIP 均附带两份更新日志。
+头像更清晰，表情显示更完整，会话颜色和状态标识更明亮。修复主窗口及浮窗的双屏拖动、DPI 切换、鼠标锚点跳动与侧栏抖动；收起栏图标大小统一，展开栏保留对称留白。完整更新和已知限制见[中英文更新日志](CHANGELOG.md)，实现及验收范围见[界面与跨屏记录](docs/ui-rendering.md)。每次发行的 ZIP 均附带两份更新日志。
