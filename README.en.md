@@ -26,13 +26,13 @@ It is a native Windows terminal workspace. It does not bundle a model service or
 
 ## A look inside
 
-![AI Terminal workspace with several sessions in the sidebar and a terminal on the right](assets/readme/workspace.png)
+![AI Terminal workspace with several sessions in the sidebar and a terminal on the right](assets/readme/workspace.en.png)
 
 Enable the floating bar to see session avatars and status above other windows. Click an avatar to return to that session:
 
-![AI Terminal floating session bar](assets/readme/floating.png)
+![AI Terminal floating session bar](assets/readme/floating.en.png)
 
-> Screenshots use the real 0.4.4 interface with synthetic sessions, example directories and simulated status. They contain no real usernames, working directories or private conversations. Click an image for its original resolution.
+> Screenshots use the real 0.4.8-preview.1 interface with synthetic sessions, example directories and simulated status. They contain no real usernames, working directories or private conversations. Click an image for its original resolution.
 
 ## Built for multiple sessions
 
@@ -53,11 +53,17 @@ Enable the floating bar to see session avatars and status above other windows. C
 | <img src="assets/readme/agent-codex.png" width="32" height="32" alt="Codex CLI"> | [Codex CLI](https://github.com/openai/codex) | `codex` | Supported | Native lifecycle; compatibility hooks for older versions |
 | <img src="assets/readme/agent-claude.png" width="32" height="32" alt="Claude Code"> | [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview) | `claude` | Supported | Session-scoped hooks |
 | <img src="assets/readme/agent-qoder-cn.png" width="32" height="32" alt="Qoder CN CLI"> | [Qoder CN CLI](https://docs.qoder.cn/en/cli/installation) | `qodercn` / `qoderclicn` | Supported | Session-scoped hooks |
-| <img src="assets/readme/agent-kimi.png" width="32" height="32" alt="Kimi Code CLI"> | [Kimi Code CLI](https://www.kimi.com/code/docs/) | `kimi` | Supported | Not integrated in this release; awaiting task events |
-| <img src="assets/readme/agent-zcode.png" width="32" height="32" alt="ZCode"> | [ZCode](https://zcode.z.ai/) | `zcode` | Supported | Not integrated in this release; awaiting task events |
-| <img src="assets/readme/agent-trae.png" width="32" height="32" alt="TRAE CLI"> | [TRAE CLI](https://docs.trae.cn/cli_about-trae-code-cli-2) | `traecli` | Supported | Not integrated in this release; awaiting task events |
+| <img src="assets/readme/agent-kimi.png" width="32" height="32" alt="Kimi Code CLI"> | [Kimi Code CLI](https://www.kimi.com/code/docs/) | `kimi` | Supported | Native lifecycle (Kimi Code 2.5.0) |
+| <img src="assets/readme/agent-zcode.png" width="32" height="32" alt="ZCode"> | [ZCode](https://zcode.z.ai/) | `zcode` | Supported | Session hooks: start / tools / completion; configuration limits below |
+| <img src="assets/readme/agent-trae.png" width="32" height="32" alt="TRAE CLI"> | [TRAE CLI](https://docs.trae.cn/cli_about-trae-code-cli-2) | `traecli` | Supported | Session-scoped hooks; review trust in the CLI |
 
-Avatar recognition and task status are separate capabilities. For CLIs without integrated task events, output silence or process existence never implies working or completion; check progress in the CLI. Other programs can still run in the real terminal.
+Status comes only from explicit lifecycle events, hooks and process exits. Without an event, the manager keeps “Awaiting task events” and never infers completion from terminal text or silence. The new integrations are available in the 0.4.8 preview, pending real model-turn acceptance; stable 0.4.7 still recognizes only identity and launch/exit for these three CLIs.
+
+- Kimi: the managed `kimi` entry enables OSC 7501 for this process, covering work, permission/question/login waits, completion and failure. Child-agent records and message bodies are discarded. Explicit `PI_PROGRAM_STATUS=0` keeps it disabled.
+- TRAE: invocation-scoped `-c` options provide lifecycle hooks without editing user/project files. Review trust in `/hooks`. Later explicit overrides remain CLI-owned; local hooks are not guaranteed with remote servers.
+- ZCode: applies only to community zcode-app-cli 3.17.2-44 / runtime 0.17.1. Start, tools, question tools and completion are supported. Its current hook interface lacks reliable approval-wait, task-failure and interruption events, so these states may not update immediately. `ZCODE_CLI_SETTINGS_FILE` selects a basic settings snapshot for this process. Only credential-free basic options are allowed; existing hooks, nonempty custom lists, MCP/plugin definitions, unknown settings or an explicit environment override preserve the original configuration and skip integration. Provider/credential files are never opened. Settings changed in the snapshot last only for this invocation; status connection help explains the custom-configuration boundary.
+
+Restart existing CLI processes to apply these integrations. Review login, workspace trust and hook trust within each Agent.
 
 ZCode was tested with the community distribution [zcode-app-cli](https://github.com/kingsword09/zcode-cli) 3.17.2-44 (runtime 0.17.1), not as acceptance of Z.ai's official standalone CLI. The manager forwards the installed public `zcode` entry and neither bundles nor installs Agents automatically. Icons reuse the production painter on a dark surface for legibility on light and dark README pages; see [third-party notices](THIRD_PARTY_NOTICES.en.md).
 

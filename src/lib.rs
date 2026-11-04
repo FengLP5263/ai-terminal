@@ -19,3 +19,5 @@ pub mod floating;
 mod floating_native;
 pub mod i18n;
 pub mod settings;
+
+pub mod integration;

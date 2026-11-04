@@ -73,7 +73,7 @@ fn pending_status_explains_the_right_agent_and_copies_only_the_view_command() {
 }
 
 #[test]
-fn identity_only_agents_explain_the_hook_boundary_without_a_copy_action() {
+fn additional_agents_explain_transport_and_configuration_boundaries() {
     for agent in [Agent::Kimi, Agent::ZCode, Agent::Trae] {
         let ctx = egui::Context::default();
         appearance::setup(&ctx);
@@ -109,15 +109,19 @@ fn identity_only_agents_explain_the_hook_boundary_without_a_copy_action() {
         }
         let output = frame(vec![]);
         assert!(text_rect(&output, &format!("已识别 {}", agent.label())).is_some());
+        let guidance = match agent {
+            Agent::Kimi => "Kimi Code 2.5.0",
+            Agent::Trae => "TRAE 通过本次启动",
+            _ => "社区 zcode-app-cli",
+        };
         assert!(
-            text_rect(&output, "此版本仅识别该 CLI 的头像与启动／退出").is_some(),
+            text_rect(&output, guidance).is_some(),
             "{} guidance missing",
             agent.label()
         );
-        assert!(
-            text_rect(&output, "复制 /hooks").is_none(),
-            "{} must not offer a hook review command",
-            agent.label()
+        assert_eq!(
+            text_rect(&output, "复制 /hooks").is_some(),
+            agent == Agent::Trae
         );
     }
 }

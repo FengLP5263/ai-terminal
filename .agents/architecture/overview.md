@@ -47,3 +47,5 @@ Windows 预览包通过 GitHub Releases 分发；尚无自动发布服务、云 
 `examples/composer_probe.rs` 覆盖恢复至 151.13608% 与随后 125%、150%、151.13608% 缩放的全屏输入区；`titlebar_probe.rs` 截取自身原生窗口及标题栏；`discovery_probe.rs` 仅调用已安装 CLI 的公开 --version。合成样例、公开版本查询和真实模型回合分别记录。
 
 `vendor/winit` 固定 0.30.13 的 Apache-2.0 本地快照。Windows 原生移动期间采用系统的 DPI 建议矩形，避免上游旧屏幕推回逻辑导致重复 DPI 变化；主窗口与浮窗共用该路径。非拖动路径保持上游实现。来源、归档哈希与范围见该目录 UPSTREAM.zh.md。
+
+0.4.8 预览新增 src/integration.rs：只准备本次 CLI 的生命周期环境和无凭据基础设置快照。原生通知保留 Codex／Kimi app 身份，TRAE／社区 ZCode 继续使用独立轻量 helper 与认证桥，不引入代理服务或终端正文扫描。

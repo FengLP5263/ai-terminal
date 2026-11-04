@@ -1,24 +1,28 @@
 {
   "description": "Native Release captures with fixed synthetic content and production avatar badges; per-file versions identify newer captures. No private data or real model requests.",
-  "version": "0.4.4",
+  "version": "0.4.8-preview.1",
   "profile": "release",
   "model_requests": false,
   "user_profiles": false,
   "files": {
     "workspace.png": {
-      "sha256": "aeaa77051821918dc05cd2bf03b868f29797fc45487a094eb17ebb5b413a1bcf",
-      "bytes": 129203,
+      "sha256": "46075b8cd2a04e0e39df5281974ea4a5b092cc98d0d4b28a4698c5941d1becd0",
+      "bytes": 135261,
       "width": 1680,
       "height": 1020,
       "source": "examples/readme_capture.rs",
+      "version": "0.4.8-preview.1",
+      "language": "zh-CN",
       "unmodified_native_capture": true
     },
     "floating.png": {
-      "sha256": "a9409134af7eb5bda1c6c5e7b3ae1cf13b5c1ded99804af2e1a995a077abbfd1",
-      "bytes": 13114,
+      "sha256": "e19bfc4ee4e1a9e337f4d3b212944430c702979fd7ad38e1f439316317ec0ea3",
+      "bytes": 15796,
       "width": 732,
       "height": 72,
       "source": "examples/island_probe.rs",
+      "version": "0.4.8-preview.1",
+      "language": "zh-CN",
       "unmodified_native_capture": true
     },
     "agent-codex.png": {
@@ -80,6 +84,26 @@
       "version": "0.4.7",
       "unmodified_native_capture": true,
       "original_asset_provenance": "assets/icons/SOURCE.json"
+    },
+    "workspace.en.png": {
+      "sha256": "c811abda1810ea3a9ccd8a2340567dd9567e0b0dbcdd58c4af47f53fe8fe3276",
+      "bytes": 146744,
+      "width": 1680,
+      "height": 1020,
+      "source": "examples/readme_capture.rs en",
+      "version": "0.4.8-preview.1",
+      "language": "en",
+      "unmodified_native_capture": true
+    },
+    "floating.en.png": {
+      "sha256": "fbbb6cce3c4dbe14ec99983835d8ed6fec9d8266a5350f0ff0af5eb1fb688781",
+      "bytes": 15799,
+      "width": 732,
+      "height": 72,
+      "source": "examples/island_probe.rs",
+      "version": "0.4.8-preview.1",
+      "language": "en",
+      "unmodified_native_capture": true
     }
   }
 }

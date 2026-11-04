@@ -75,3 +75,35 @@ fn child_metadata_is_ignored_but_a_named_root_agent_still_reports() {
         }
     }
 }
+
+#[test]
+fn community_hook_turn_alias_is_kept_and_explicit_child_ids_are_filtered() {
+    let bridge = Bridge::start(Arc::new(|| {})).unwrap();
+    for parent in [None, Some("parent")] {
+        let mut child = Command::new(env!("CARGO_BIN_EXE_ai-terminal-hook"))
+            .env("AI_TERMINAL_ENDPOINT", &bridge.endpoint)
+            .env("AI_TERMINAL_TOKEN", &bridge.token)
+            .env("AI_TERMINAL_SESSION", "local")
+            .env("AI_TERMINAL_GENERATION", "launch")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .spawn()
+            .unwrap();
+        child.stdin.take().unwrap().write_all(serde_json::json!({"hook_event_name":"UserPromptSubmit","session_id":"root","turnId":"turn-1","agentId":parent,"prompt":"PRIVATE_FIXTURE"}).to_string().as_bytes()).unwrap();
+        assert!(child.wait_with_output().unwrap().status.success());
+        if parent.is_some() {
+            assert!(bridge.receiver.try_recv().is_err());
+        } else {
+            let e = bridge
+                .receiver
+                .recv_timeout(Duration::from_secs(3))
+                .unwrap();
+            assert_eq!(e.turn_id.as_deref(), Some("turn-1"));
+            assert!(
+                !serde_json::to_string(&e)
+                    .unwrap()
+                    .contains("PRIVATE_FIXTURE")
+            );
+        }
+    }
+}

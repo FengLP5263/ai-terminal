@@ -166,8 +166,16 @@ Shell 启动后即可观察严格匹配的 Codex 原生状态协议；收到带 
 
 发布前，用户另已实测确认 Codex 旧会话恢复无问题并授权提交发布。该验收独立于开发侧启动截图和合成事件；不据此扩大长期负载或其他平台的验证范围。
 
-## 未发布：补充 CLI 身份与首次快捷方式
+## 0.4.7：补充 CLI 身份与首次快捷方式
 
 受管 Shell 的入口目录新增 `kimi.exe`、`zcode.exe`、`traecli.exe`，对应 `AI_TERMINAL_REAL_KIMI`／`AI_TERMINAL_REAL_ZCODE`／`AI_TERMINAL_REAL_TRAE`。Shim 只转发真实程序并按调用 ID 报告 ShellAgentStarted／ShellAgentEnded，不注入参数、不复制或修改用户配置；任务状态保持“等待任务通知”，原因与各自 hook 限制在状态下拉中说明。
 
 默认数据目录首次启动时，在应用主线程之外尝试创建桌面快捷方式：通过 `IShellLinkW`／`IPersistFile` 指向当前 `ai-terminal.exe`，使用 Windows Desktop 已知文件夹（支持 OneDrive 等重定向），不携带参数或凭据。`UiSettings.desktop_shortcut` 在尝试前记录，失败不重试、不阻塞启动；指定非默认目录的 `--data-dir`、隔离 smoke／性能测量、工作区读取失败时不尝试，用户删除后不自动重建。创建失败只写入 stderr，不改动桌面以外的位置。
+
+## 0.4.8 预览：新增 CLI 的明确任务通知
+
+Kimi 受管入口仅对子进程设置 `PI_PROGRAM_STATUS=1`，显式已有值优先；观察 `app=kimi-code` 的 OSC 7501 根记录。与 Codex 共用 32 项、按 app 去重及调用代次隔离的队列；可选 title／msg 当场丢弃，带 id 的子记录不参与根状态。匿名 clear 仅清理已连接状态，不建立身份、判断退出或完成。状态仍在后台 logic 消费；Kimi 与 Codex 原生状态均拒绝迟到 hook 覆盖。
+
+TRAE 以本次 `-c hooks.<event>=…` 接入开始、工具、Notification、Stop、Interrupt 与退出；稳定命令通过进程环境引用轻量 helper，用户在 `/hooks` 自行审查，后续显式参数由 CLI 决定。TRAE 未导出的任务失败不靠终端文本猜测，远端服务不保证可执行本机 hook。
+
+社区 zcode-app-cli 的公开 `ZCODE_CLI_SETTINGS_FILE` 替换整份基础设置，不能当作追加配置。仅当没有显式该变量、原设置不大于 64 KiB 且通过无凭据基础选项检查时，在调用自己的 runtime 目录生成快照并注入 type=process 的六种 hook。已有 hook、自定义列表／命令、MCP／插件定义、未知字符串或敏感字段拒绝快照，原样启动 CLI 并保留等待通知。不会读取 provider／凭据文件、复制自定义 hook 或修改用户／项目文件。快照内的设置修改仅本次调用有效；ZCode 当前未导出可靠授权等待、失败与中断，不补猜测。

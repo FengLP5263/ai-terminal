@@ -121,7 +121,7 @@ impl eframe::App for Probe {
         if !self.badges {
             ui.label(format!(
                 "Native: {} · {:?}",
-                self.status.codex_native, self.status.activity
+                self.status.native_lifecycle, self.status.activity
             ));
         }
         let view = TerminalView::new(ui, &mut self.terminal)

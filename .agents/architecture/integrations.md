@@ -7,9 +7,9 @@
 | Codex CLI | 当前／持久 PATH 与用户安装目录 | CLI 自有认证、信任和 hook schema；管理器只注入本次参数 | 升级后重新验证配置解析、/hooks 审查及实际生命周期 |
 | Claude Code | 当前／持久 PATH 与用户安装目录 | CLI 自有认证、模型、插件和权限；--settings 仅会话级 | 模型请求必须显式授权；CLI 可自行保存它自己的运行状态 |
 | Qoder CN CLI | 公开 qodercn／qoderclicn 入口，支持原生与 npm 安装 | CLI 自有登录、模型、目录信任；--settings 仅会话级，显式设置优先 | 合成状态与真实启动分开验证；不自动确认信任或发起模型请求 |
-| Kimi Code CLI | 公开 `kimi` 入口 | CLI 自有模型、登录与配置；本版未接入任务通知 | 仅身份／启停识别，不改用户或项目配置 |
+| Kimi Code CLI | 公开 `kimi` 入口 | CLI 自有模型、登录与配置；0.4.8 预览接入通知 | 0.4.7 仅身份识别；0.4.8 预览边界见下文 |
 | ZCode CLI | 公开 `zcode` 入口；本次实测社区 zcode-app-cli | 配置与认证归对应发行版及 CLI 管理 | 同上，区分官方与社区版验收结果 |
-| TRAE CLI | 公开 `traecli` 入口 | CLI 自有模型、登录与配置；本版未接入任务通知 | 仅身份／启停识别，不改用户或项目配置 |
+| TRAE CLI | 公开 `traecli` 入口 | CLI 自有模型、登录与配置；0.4.8 预览接入通知 | 0.4.7 仅身份识别；0.4.8 预览边界见下文 |
 | PowerShell | Windows 系统组件 | 普通交互 shell，无 AI 工作状态推断 | 管理器负责本会话进程树，不修改用户 profile |
 | Git Bash | 可选的 Git for Windows 安装 | 加载系统／用户启动配置后追加本会话目录通知与入口，不修改用户文件 | 无 Git Bash 时明确提示，允许改用可用的 PowerShell／CMD；WSL 和其他 Bash 不代替 Git Bash |
 | 用户工作目录 | 用户主目录、最近目录或终端 cd 后的目录 | 被打开的项目仍归用户和其项目规范管理 | 选择目录不授权管理器／开发者修改其中代码 |
@@ -69,3 +69,9 @@ Microsoft.Windows.Console.ConPTY 是固定版本的本地运行依赖，来源�
 本次核查的安装版本为 Kimi Code 2.5.0、TRAE CLI 0.213.1 public，以及社区 zcode-app-cli 3.17.2-44（运行时 0.17.1）。后者是独立社区终端前端，不是 Z.ai 官方独立 CLI 发行包，不能以它的启动结果代表其他 ZCode 版本兼容。产品图标来源与已安装 CLI 的发行来源分别记录；图标逐文件身份见 assets/icons/SOURCE.json。
 
 shell_switch_probe 的 `kimi`、`zcode`、`traecli` 模式在全新管理器工作区中启动实际入口、截取启动画面，再聚焦终端空白区，只向自建 CLI 发送 Esc／Ctrl+C 并检查返回 Shell 的截图。不提交模型提示，不接受目录／hook 信任。真实启动、合成生命周期与付费模型回合保持为三类证据。
+
+## 0.4.8 预览接入
+
+Kimi Code 2.5.0 使用自身 pi-tui 的 OSC 7501 `app=kimi-code`；仅受管入口开启本次进程的 `PI_PROGRAM_STATUS`，显式关闭优先。TRAE CLI 0.213.1 使用自身 `-c` TOML hook 覆盖与 CLI 信任审查，实际事件和原生启动分别验证。ZCode 社区版使用其公开的 [Host integration v1](https://github.com/kingsword09/zcode-cli/blob/main/docs/HOST_INTEGRATION.md) 设置路径，不调用 vendor 私有入口；整份设置替换带来的配置保护与事件缺口见运行记录。没有将社区前端冒充官方 ZCode CLI。
+
+三者都不解析屏幕正文、不自动登录或确认信任。真实模型任务仍需用户验收。

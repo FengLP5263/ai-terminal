@@ -35,3 +35,5 @@ Known limits: all physical IME combinations, all image clipboard sources, sustai
 `examples/composer_probe.rs` covers restored 151.13608% zoom followed by 125%, 150% and 151.13608% fullscreen composers. `titlebar_probe.rs` captures only its own native window and caption. `discovery_probe.rs` calls installed CLIs only with public --version. Record synthetic fixtures, public version checks and actual model turns separately.
 
 `vendor/winit` is an Apache-2.0 local snapshot pinned to 0.30.13. During Windows native movement, use the OS-suggested DPI rectangle to avoid repeated DPI transitions caused by upstream nudging toward the old monitor. Main and floating windows share this path; non-drag behavior remains upstream. Provenance, archive hash and scope are in that directory's UPSTREAM.md.
+
+0.4.8 preview adds src/integration.rs for invocation-only lifecycle environment and credential-free basic settings snapshots. Native notifications retain Codex/Kimi app identity. TRAE/community ZCode keep the independent lightweight helper and authenticated bridge, without a proxy service or terminal-body scanning.

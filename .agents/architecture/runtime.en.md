@@ -122,8 +122,16 @@ Local 0.4.6-preview.1 checks passed 166 Rust and 13 Python regressions, governan
 
 Before release, the user also tested recovery of an existing Codex conversation, confirmed that it works correctly and authorized commit/release. This acceptance is separate from developer startup captures and synthetic events; it does not extend verification to long-duration load or other platforms.
 
-## Unreleased: additional CLI identity and first-run shortcut
+## 0.4.7: additional CLI identity and first-run shortcut
 
 Managed shells gain `kimi.exe`, `zcode.exe` and `traecli.exe` entries backed by `AI_TERMINAL_REAL_KIMI`/`AI_TERMINAL_REAL_ZCODE`/`AI_TERMINAL_REAL_TRAE`. The shim only forwards the real program and reports ShellAgentStarted/ShellAgentEnded per invocation; it injects no arguments, copies no user configuration and edits none. Task status remains "Awaiting task events", with each CLI's hook limitation explained in the status menu.
 
 On first launch with the default data directory, the app tries to create a desktop shortcut off the main thread: `IShellLinkW`/`IPersistFile` target the current `ai-terminal.exe` through the Windows Desktop known folder (honoring OneDrive redirection) with no arguments or credentials. `UiSettings.desktop_shortcut` is recorded before the attempt, so failure neither retries nor blocks startup. `--data-dir`, isolated smoke/idle measurements and failed workspace loads skip the attempt, and a user-deleted shortcut is not recreated. Failure is reported only to stderr and touches nothing outside the Desktop.
+
+## 0.4.8 preview: explicit task events for additional CLIs
+
+The managed Kimi entry sets `PI_PROGRAM_STATUS=1` only for its child, respecting explicit existing values, and observes OSC 7501 root records with `app=kimi-code`. It shares Codex's 32-entry, app-aware deduplicated, invocation-epoch queue. Optional title/msg are discarded immediately; records with id cannot affect root status. Anonymous clear only clears an already connected state; it does not establish identity, imply exit or completion. Background logic consumes events; native Kimi/Codex states reject delayed hook overrides.
+
+TRAE uses invocation-only `-c hooks.<event>=…` for start, tools, Notification, Stop, Interrupt and exit. A stable command references the lightweight helper through the process environment. The user reviews trust in `/hooks`; later explicit options remain CLI-owned. Unexported task failures are not inferred from text, and remote servers cannot be assumed to execute local hooks.
+
+Community zcode-app-cli's public `ZCODE_CLI_SETTINGS_FILE` replaces the whole basic settings file; it is not an additive overlay. Only when this variable is unset and the original settings are at most 64 KiB and pass credential-free basic-option validation does the manager create an invocation-owned runtime snapshot with six type=process hooks. Existing hooks, custom lists/commands, MCP/plugin definitions, unknown strings or sensitive fields reject the snapshot, launch the original CLI configuration and keep awaiting events. Provider/credential files are never read; custom hooks are not copied and user/project files are not edited. Snapshot changes last only for this invocation. Missing reliable approval-wait, failure and interruption events are not guessed.

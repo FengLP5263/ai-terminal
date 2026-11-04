@@ -32,7 +32,7 @@ AI 任务可能运行很久。打开多个窗口后，来回确认哪个会话�
 
 ![AI Terminal 浮窗示意](assets/readme/floating.png)
 
-> 截图使用 0.4.4 的真实界面、合成会话内容、示例目录和模拟状态，不包含真实用户名、工作目录或私人对话。点击图片可查看原始分辨率。
+> 截图使用 0.4.8-preview.1 的真实界面、合成会话内容、示例目录和模拟状态，不包含真实用户名、工作目录或私人对话。点击图片可查看原始分辨率。
 
 ## 为多会话而设计
 
@@ -53,11 +53,17 @@ AI 任务可能运行很久。打开多个窗口后，来回确认哪个会话�
 | <img src="assets/readme/agent-codex.png" width="32" height="32" alt="Codex CLI"> | [Codex CLI](https://github.com/openai/codex) | `codex` | 支持 | 原生生命周期；旧版兼容 hook |
 | <img src="assets/readme/agent-claude.png" width="32" height="32" alt="Claude Code"> | [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview) | `claude` | 支持 | 会话级 hook |
 | <img src="assets/readme/agent-qoder-cn.png" width="32" height="32" alt="Qoder CN CLI"> | [Qoder CN CLI](https://docs.qoder.cn/en/cli/installation) | `qodercn` / `qoderclicn` | 支持 | 会话级 hook |
-| <img src="assets/readme/agent-kimi.png" width="32" height="32" alt="Kimi Code CLI"> | [Kimi Code CLI](https://www.kimi.com/code/docs/) | `kimi` | 支持 | 本版未接入；等待任务通知 |
-| <img src="assets/readme/agent-zcode.png" width="32" height="32" alt="ZCode"> | [ZCode](https://zcode.z.ai/) | `zcode` | 支持 | 本版未接入；等待任务通知 |
-| <img src="assets/readme/agent-trae.png" width="32" height="32" alt="TRAE CLI"> | [TRAE CLI](https://docs.trae.cn/cli_about-trae-code-cli-2) | `traecli` | 支持 | 本版未接入；等待任务通知 |
+| <img src="assets/readme/agent-kimi.png" width="32" height="32" alt="Kimi Code CLI"> | [Kimi Code CLI](https://www.kimi.com/code/docs/) | `kimi` | 支持 | 原生生命周期（Kimi Code 2.5.0） |
+| <img src="assets/readme/agent-zcode.png" width="32" height="32" alt="ZCode"> | [ZCode](https://zcode.z.ai/) | `zcode` | 支持 | 会话级 hook：开始／工具／完成；有配置边界，见下文 |
+| <img src="assets/readme/agent-trae.png" width="32" height="32" alt="TRAE CLI"> | [TRAE CLI](https://docs.trae.cn/cli_about-trae-code-cli-2) | `traecli` | 支持 | 会话级 hook；需在 CLI 内审查信任 |
 
-头像识别与任务状态是两项不同能力。未接入任务通知的 CLI 不会被输出静默或进程存在判定为正在工作或已完成；请在 CLI 内查看任务进度。其他程序也能在真实终端中运行。
+状态只来自明确生命周期、hook 与进程退出；未收到事件时保持“等待任务通知”，不根据终端文字或静默猜测完成。新增集成在 0.4.8 预览版提供，真实模型回合等待用户验收；稳定版 0.4.7 的三款新增 CLI 仍仅识别头像与启停。
+
+- Kimi：受管 `kimi` 入口为本次进程启用原生 OSC 7501，区分工作、授权／问题／登录等待、完成与失败；忽略子 Agent 记录和消息正文。显式 `PI_PROGRAM_STATUS=0` 保持关闭。
+- TRAE：本次 `-c` 参数提供生命周期 hook，不改用户／项目配置；启动后在 `/hooks` 中审查信任。显式后续配置仍由 CLI 解释，远端服务不承诺本机 hook 可用。
+- ZCode：仅针对社区 zcode-app-cli 3.17.2-44／运行时 0.17.1。支持开始、工具、问题工具与完成；当前 hook 接口缺少可靠的授权等待、任务失败及中断事件，不能保证这些状态实时同步。通过 `ZCODE_CLI_SETTINGS_FILE` 选择本次进程的基础设置快照，仅允许无凭据的基础选项；已有 hook、非空自定义列表、MCP／插件定义、未知设置或显式该环境变量时保留原配置并跳过接入。不会打开 provider／凭据文件。快照内的设置修改仅对本次调用有效；原配置有自定义内容时，状态连接说明会提示该边界。
+
+已有 CLI 需退出后重新启动，才能应用本次会话集成。登录、目录与 hook 信任由你在 Agent 内确认。
 
 ZCode 本次实测的是社区发行 [zcode-app-cli](https://github.com/kingsword09/zcode-cli) 3.17.2-44（运行时 0.17.1），不作为 Z.ai 官方独立 CLI 验收。管理器转发已安装的公开 `zcode` 入口，不捆绑或自动安装任何 Agent。图标复用正式界面组件，以深色底衬保证在 README 的浅色／深色页面中均可辨识；品牌来源见[第三方说明](THIRD_PARTY_NOTICES.md)。
 

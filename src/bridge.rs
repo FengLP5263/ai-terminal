@@ -145,7 +145,10 @@ pub fn report_hook() {
                 .and_then(|v| v.as_str())
                 .map(|s| s.chars().take(200).collect::<String>())
         };
-        if field("agent_id").is_some_and(|id| !id.is_empty()) {
+        if ["agent_id", "agentId"]
+            .iter()
+            .any(|key| field(key).is_some_and(|id| !id.is_empty()))
+        {
             return Ok(());
         }
         let event = HookEvent {
@@ -158,7 +161,7 @@ pub fn report_hook() {
             generation,
             name: field("hook_event_name").unwrap_or_default(),
             session_id: field("session_id").unwrap_or_default(),
-            turn_id: field("turn_id"),
+            turn_id: field("turn_id").or_else(|| field("turnId")),
             tool_name: field("tool_name"),
             tool_use_id: field("tool_use_id"),
             notification_type: field("notification_type"),

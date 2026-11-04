@@ -120,3 +120,31 @@ fn observed_conpty_preserves_regular_output_while_notifications_are_enabled() {
         "enabling notification observation must not interrupt PTY output"
     );
 }
+
+#[test]
+fn kimi_root_events_survive_hidden_conpty_without_child_or_text_leakage() {
+    use egui_term::{CODEX_PROGRAM_EVENT, CodexProgramStatus as S, ProgramApp};
+    let (tx, rx) = mpsc::channel();
+    let terminal = TerminalBackend::new(736, egui::Context::default(), tx, BackendSettings {
+        shell:"powershell.exe".into(), args:vec!["-NoProfile".into(),"-Command".into(),
+        "Start-Sleep -Milliseconds 750; $e=[char]27; [Console]::Write($e.ToString()+']7501;state=working:app=kimi-code:msg=cHJpdmF0ZQ=='+[char]7+$e+']7501;state=error:app=kimi-code:id=child'+[char]7+$e+']7501;state=blocked:app=kimi-code:kind=auth'+[char]7+$e+']7501;state=done:app=kimi-code'+[char]7); Start-Sleep -Seconds 1".into()], ..Default::default()
+    }).unwrap();
+    terminal.set_visible(false);
+    terminal.set_codex_notifications(true);
+    let end = Instant::now() + Duration::from_secs(8);
+    let mut states = Vec::new();
+    while Instant::now() < end
+        && states.last().map(|e: &egui_term::ProgramEvent| e.state) != Some(S::Done)
+    {
+        if let Ok((736, PtyEvent::Title(notice))) = rx.recv_timeout(Duration::from_millis(100))
+            && notice.starts_with(CODEX_PROGRAM_EVENT)
+        {
+            states.extend(terminal.take_program_events(&notice));
+        }
+    }
+    assert!(states.iter().all(|e| e.app == Some(ProgramApp::Kimi)));
+    assert_eq!(
+        states.iter().map(|e| e.state).collect::<Vec<_>>(),
+        [S::Working, S::Auth, S::Done]
+    );
+}

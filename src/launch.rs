@@ -98,6 +98,11 @@ pub fn build(
     );
     // Avoid inheriting a parent Claude invocation's nested-session marker.
     environment.insert("CLAUDECODE".into(), String::new());
+    environment.extend(crate::integration::environment(
+        spec.agent,
+        &runtime.join(&spec.id).join(&generation),
+        helper,
+    ));
     arguments.extend(agent_arguments(spec, runtime, helper)?);
     let (executable, arguments) = pty_command(&binary, arguments, helper)?;
     Ok(Launch {
@@ -162,12 +167,27 @@ pub fn agent_arguments(
                 arguments.extend(["resume".into(), id.clone()]);
             }
         }
-        // These CLIs publish hooks only through user-level configuration, so the
-        // manager recognizes and launches them without injecting status hooks.
-        Agent::Kimi | Agent::ZCode | Agent::Trae => {}
+        Agent::Trae => {
+            arguments.extend(
+                trae_hook_overrides()
+                    .into_iter()
+                    .flat_map(|s| ["-c".into(), s]),
+            );
+            if let Some(id) = &spec.agent_session_id {
+                arguments.extend(["resume".into(), id.clone()]);
+            }
+        }
+        Agent::Kimi | Agent::ZCode => {}
         Agent::Shell | Agent::Cmd | Agent::Bash => {}
     }
     Ok(arguments)
+}
+
+/// TRAE supports invocation-scoped TOML hook overrides.
+/// The stable command uses the inherited helper path; trust remains CLI-owned.
+pub fn trae_hook_overrides() -> Vec<String> {
+    let command = serde_json::to_string("& $env:AI_TERMINAL_HELPER --hook").unwrap();
+    ["SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "PostToolUseFailure", "Notification", "Stop", "Interrupt", "SessionEnd"].into_iter().map(|event| format!("hooks.{event}=[{{hooks=[{{type=\"command\",command={command},commandWindows={command},timeout=2}}]}}]")).collect()
 }
 
 /// Explicit compatibility mode for older CLIs. Never silently retry a CLI.

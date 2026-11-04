@@ -93,3 +93,5 @@ Qoder CN 启动／合成状态截图（仅 Windows，PowerShell／Git Bash）：
 package 另将图标来源清单和可获得的原始许可复制到 ZIP 的 agent-icons/，并附带双语 THIRD_PARTY_NOTICES；品牌资产按来源分别声明，不统一套用 Lobe MIT。Windows／POSIX 的统一入口和参数不变。
 
 0.4.7 新增已安装 CLI 的原生启动核查：先构建 `cargo build --offline --locked --release --bins --example shell_switch_probe`，再分别执行 `target/release/examples/shell_switch_probe.exe output/<unique-cli-probe> kimi`（末项也可为 `zcode`、`traecli`）。仅输入启动命令，聚焦终端空白区后发送 Esc／Ctrl+C，不提交提示或接受信任；人工检查三张截图中的头像、等待任务通知及返回 Shell，记录实际发行版。README 头像由 `cargo build --offline --locked --release --example agent_icons_capture` 和 `target/release/examples/agent_icons_capture.exe output/<unique-agent-icons>` 生成；无 PTY、Agent 或模型，复用正式头像组件及 B 程序图标。核查六枚 PNG 后原样复制到 assets/readme 并更新 SOURCE.json。均仅支持 Windows 原生运行，没有新增 project 动作或参数。
+
+0.4.8 预览 README 截图：Release 构建 `readme_capture` 后分别运行 `target/release/examples/readme_capture.exe output/readme-zh` 和 `target/release/examples/readme_capture.exe output/readme-en en`，每次使用全新目录；英文模式同时切换控件、名称及终端合成文本。`island_probe` 一次生成六种 Agent 的中英文浮窗；检查退出码、result.json 和四张实际 PNG 后原样复制到 assets/readme 并更新 SOURCE.json。不是模型验收。
