@@ -45,12 +45,18 @@ pub struct Status {
     pub session_id: Option<String>,
     pub turn_id: Option<String>,
     pub last_event: Option<String>,
+    pub codex_native: bool,
     waiting_tool: Option<String>,
 }
 
 impl Status {
     /// Returns false for a different agent's events or a late event from an old turn.
     pub fn apply(&mut self, event: &HookEvent, viewing: bool) -> bool {
+        // Once the foreground TUI reports native lifecycle, delayed legacy
+        // hooks must not overwrite a newer state or another selected chat.
+        if self.codex_native {
+            return false;
+        }
         if event.session_id.is_empty() {
             return false;
         }
@@ -157,6 +163,9 @@ impl Status {
 
     /// The managed Codex TUI emitted a user-facing attention notification.
     pub fn codex_attention(&mut self, question: bool) {
+        if self.codex_native {
+            return;
+        }
         // A late approval notice must not revive an already ended turn. A plan
         // question can legitimately be shown after the normal Stop hook.
         if !question
@@ -176,11 +185,71 @@ impl Status {
     pub fn acknowledge(&mut self) {
         self.unread = false;
     }
+
+    pub fn codex_program(&mut self, state: egui_term::CodexProgramStatus, viewing: bool) {
+        use egui_term::CodexProgramStatus as Native;
+        if state == Native::Clear && !self.codex_native {
+            return;
+        }
+        self.codex_native = true;
+        self.last_event = Some("CodexOSC7501".into());
+        self.waiting_tool = None;
+        self.turn_id = None;
+        self.activity = match state {
+            Native::Idle | Native::Clear => Activity::Idle,
+            Native::Working => Activity::Working,
+            Native::Permission | Native::Question | Native::Auth => Activity::Waiting,
+            Native::Done => Activity::Completed,
+            Native::Error => Activity::Failed,
+        };
+        if matches!(state, Native::Done | Native::Error) {
+            self.unread = !viewing;
+        } else if state != Native::Clear {
+            self.unread = false;
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn native_codex_lifecycle_preserves_unread_and_ignores_late_hooks() {
+        use egui_term::CodexProgramStatus as Native;
+        let mut status = Status::default();
+        status.codex_program(Native::Idle, false);
+        assert_eq!(status.activity, Activity::Idle);
+        status.codex_program(Native::Working, false);
+        status.codex_program(Native::Permission, false);
+        assert_eq!(status.activity, Activity::Waiting);
+        status.codex_program(Native::Working, false);
+        assert_eq!(status.activity, Activity::Working);
+        status.codex_program(Native::Done, false);
+        assert_eq!(status.activity, Activity::Completed);
+        assert!(status.unread);
+        assert!(!status.apply(&event("PreToolUse", "old-turn"), false));
+        status.codex_attention(true);
+        assert_eq!(status.activity, Activity::Completed);
+        status.acknowledge();
+        assert!(!status.unread);
+        status.codex_program(Native::Error, true);
+        assert_eq!(status.activity, Activity::Failed);
+        assert!(!status.unread);
+    }
+    #[test]
+    fn native_codex_clear_is_not_completion_or_a_connection_handshake() {
+        use egui_term::CodexProgramStatus as Native;
+        let mut status = Status::default();
+        status.codex_program(Native::Clear, false);
+        assert!(!status.codex_native);
+        assert_eq!(status.activity, Activity::Unknown);
+        status.codex_program(Native::Working, false);
+        status.codex_program(Native::Clear, false);
+        assert_eq!(status.activity, Activity::Idle);
+        assert!(!status.unread);
+        status.codex_program(Native::Auth, false);
+        assert_eq!(status.activity, Activity::Waiting);
+    }
     fn event(name: &str, turn: &str) -> HookEvent {
         HookEvent {
             invocation: None,
@@ -415,6 +484,12 @@ mod failure_tests {
         event.name = "SessionEnd".into();
         state.apply(&event, false);
         assert_eq!(state.activity, Activity::Failed);
+        state.acknowledge();
+        assert_eq!(state.activity, Activity::Failed);
+        assert!(
+            !state.unread,
+            "reading a failure clears only its unread flag"
+        );
         for code in [0, 130, 143, -1073741510] {
             assert!(!failed_exit(code));
         }

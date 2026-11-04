@@ -458,50 +458,61 @@ fn many_sessions_stay_still_and_only_drag_scrolls_without_opening_a_session() {
 }
 
 #[test]
-fn floating_completion_dot_disappears_when_the_session_is_read() {
-    fn has_green(shape: &egui::Shape) -> bool {
+fn floating_result_dot_disappears_when_the_session_is_read() {
+    fn has_dot(shape: &egui::Shape, color: egui::Color32) -> bool {
         match shape {
-            egui::Shape::Circle(circle) => circle.fill == ai_terminal::chrome::COMPLETED,
-            egui::Shape::Vec(shapes) => shapes.iter().any(has_green),
+            egui::Shape::Circle(circle) => circle.fill == color,
+            egui::Shape::Vec(shapes) => shapes.iter().any(|shape| has_dot(shape, color)),
             _ => false,
         }
     }
-    let ctx = egui::Context::default();
-    appearance::setup(&ctx);
-    let icons = Icons::new(&ctx);
-    let mut snapshot = Snapshot {
-        items: vec![Item {
-            id: "one".into(),
-            name: "Session".into(),
-            agent: Agent::Codex,
-            color: None,
-            activity: Activity::Completed,
-            unread: true,
-        }],
-        active: None,
-        locale: Locale::En,
-    };
-    let frame = |snapshot: &Snapshot| {
-        ctx.run_ui(
-            egui::RawInput {
-                screen_rect: Some(Rect::from_min_size(Pos2::ZERO, egui::vec2(300.0, 48.0))),
-                ..Default::default()
-            },
-            |ui| {
-                floating::body(ui, snapshot, &icons);
-            },
-        )
-    };
-    let output = frame(&snapshot);
-    assert!(
-        output.shapes.iter().any(|shape| has_green(&shape.shape)),
-        "unread completion must be visible"
-    );
-    snapshot.items[0].unread = false;
-    let output = frame(&snapshot);
-    assert!(
-        !output.shapes.iter().any(|shape| has_green(&shape.shape)),
-        "read completion must not retain a green dot"
-    );
-    assert_eq!(snapshot.items[0].activity, Activity::Completed);
+    for (activity, color) in [
+        (Activity::Completed, ai_terminal::chrome::COMPLETED),
+        (Activity::Failed, ai_terminal::chrome::FAILED),
+    ] {
+        let ctx = egui::Context::default();
+        appearance::setup(&ctx);
+        let icons = Icons::new(&ctx);
+        let mut snapshot = Snapshot {
+            items: vec![Item {
+                id: "one".into(),
+                name: "Session".into(),
+                agent: Agent::Codex,
+                color: None,
+                activity,
+                unread: true,
+            }],
+            active: None,
+            locale: Locale::En,
+        };
+        let frame = |snapshot: &Snapshot| {
+            ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(Rect::from_min_size(Pos2::ZERO, egui::vec2(300.0, 48.0))),
+                    ..Default::default()
+                },
+                |ui| {
+                    floating::body(ui, snapshot, &icons);
+                },
+            )
+        };
+        let output = frame(&snapshot);
+        assert!(
+            output
+                .shapes
+                .iter()
+                .any(|shape| has_dot(&shape.shape, color)),
+            "unread {activity:?} must be visible"
+        );
+        snapshot.items[0].unread = false;
+        let output = frame(&snapshot);
+        assert!(
+            !output
+                .shapes
+                .iter()
+                .any(|shape| has_dot(&shape.shape, color)),
+            "read {activity:?} must not retain an unread dot"
+        );
+        assert_eq!(snapshot.items[0].activity, activity);
+    }
 }

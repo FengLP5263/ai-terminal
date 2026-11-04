@@ -460,6 +460,7 @@ impl App {
             })();
         match result {
             Ok((backend, job, generation)) => {
+                backend.set_codex_notifications(session.spec.agent == Agent::Codex);
                 session.backend = Some(backend);
                 session.job = Some(job);
                 session.generation = generation;
@@ -477,6 +478,8 @@ impl App {
             }
             Err(mut error) => {
                 session.status.activity = Activity::Failed;
+                session.status.unread = !(ctx.input(|i| i.viewport().focused.unwrap_or(false))
+                    && self.active.as_deref() == Some(&session.spec.id));
                 if session.spec.agent == Agent::Bash
                     && self.helper.as_ref().is_ok_and(|helper| helper.is_file())
                 {
@@ -739,6 +742,17 @@ impl App {
                 continue;
             };
             match event {
+                PtyEvent::Title(title) if title.starts_with(egui_term::CODEX_PROGRAM_EVENT) => {
+                    if session.display_agent() == Agent::Codex {
+                        let viewing = focused && self.active.as_deref() == Some(&session.spec.id);
+                        if let Some(backend) = &session.backend {
+                            for state in backend.take_codex_program_statuses(&title) {
+                                session.status.codex_program(state, viewing);
+                                session.last_event = Some(Instant::now());
+                            }
+                        }
+                    }
+                }
                 PtyEvent::Title(title) if title.starts_with(egui_term::CODEX_ATTENTION_EVENT) => {
                     if session.detected_agent == Some(Agent::Codex)
                         && let Some(question) = session
@@ -781,6 +795,8 @@ impl App {
                     session.shells.clear();
                     session.agent_ended();
                     session.status.activity = if session.error.is_some() {
+                        session.status.unread =
+                            !(focused && self.active.as_deref() == Some(&session.spec.id));
                         Activity::Failed
                     } else {
                         Activity::Exited
@@ -1134,8 +1150,8 @@ impl App {
                 .show(ctx, |ui| {
                     ui.label(tr(
                         ctx,
-                        "运行中的会话将结束，下次可以恢复对话历史。",
-                        "Running sessions will stop. You can resume conversations next time.",
+                        "终端会话将关闭，下次可以恢复对话历史。Codex 共享后台中的任务可能继续运行。",
+                        "Terminal sessions will close. You can resume conversations next time. Tasks in the shared Codex server may keep running.",
                     ));
                     ui.horizontal(|ui| {
                         exit = ui.button(tr(ctx, "退出", "Quit")).clicked();
@@ -1428,6 +1444,112 @@ fn renderer_info(cc: &eframe::CreationContext<'_>) -> serde_json::Value {
 #[cfg(all(test, windows))]
 mod tests {
     use super::*;
+    #[test]
+    fn startup_and_process_failures_mark_only_unviewed_sessions_unread() {
+        use std::os::windows::process::ExitStatusExt;
+        for viewing in [false, true] {
+            let root = tempfile::tempdir().unwrap();
+            let ctx = egui::Context::default();
+            let creation = eframe::CreationContext::_new_kittest(ctx.clone());
+            let mut app = App::new(&creation, root.path().into(), false, false);
+            app.startup_pending = false;
+            app.helper = Err("synthetic missing helper".into());
+            app.sessions = vec![Session::new(SessionSpec {
+                id: "failure".into(),
+                name: "failure".into(),
+                directory: root.path().into(),
+                agent: Agent::Shell,
+                agent_session_id: None,
+                color: None,
+            })];
+            app.active = Some(if viewing { "failure" } else { "other" }.into());
+            let mut input = egui::RawInput::default();
+            input
+                .viewports
+                .get_mut(&egui::ViewportId::ROOT)
+                .unwrap()
+                .focused = Some(true);
+            ctx.begin_pass(input);
+            app.start_session(0, &ctx);
+            assert_eq!(app.sessions[0].status.activity, Activity::Failed);
+            assert_eq!(app.sessions[0].status.unread, !viewing);
+            app.sessions[0].status.acknowledge();
+            let id = app.sessions[0].terminal_id;
+            app.pty_sender
+                .send((
+                    id,
+                    PtyEvent::ChildExit(std::process::ExitStatus::from_raw(7)),
+                ))
+                .unwrap();
+            app.pty_sender.send((id, PtyEvent::Exit)).unwrap();
+            app.receive_events(&ctx);
+            assert_eq!(app.sessions[0].status.activity, Activity::Failed);
+            assert_eq!(app.sessions[0].status.unread, !viewing);
+            app.sessions[0].status.acknowledge();
+            assert_eq!(app.sessions[0].status.activity, Activity::Failed);
+            assert!(!app.sessions[0].status.unread);
+            let _ = ctx.end_pass();
+        }
+    }
+    #[test]
+    fn native_codex_events_update_only_their_hidden_session_without_drawing() {
+        let root = tempfile::tempdir().unwrap();
+        let ctx = egui::Context::default();
+        let creation = eframe::CreationContext::_new_kittest(ctx.clone());
+        let mut app = App::new(&creation, root.path().into(), false, false);
+        app.startup_pending = false;
+        app.can_draw = false;
+        let mut session = Session::new(SessionSpec {
+            id: "native-hidden".into(),
+            name: "native".into(),
+            directory: root.path().into(),
+            agent: Agent::Shell,
+            agent_session_id: None,
+            color: None,
+        });
+        session.terminal_id = 981;
+        let backend = TerminalBackend::new(981, ctx.clone(), app.pty_sender.clone(), egui_term::BackendSettings {
+            shell: "powershell.exe".into(),
+            args: vec!["-NoLogo".into(), "-NoProfile".into(), "-NonInteractive".into(), "-Command".into(),
+                "Start-Sleep -Milliseconds 500; $e=[char]27; [Console]::Write($e.ToString()+']7501;state=working:app=codex'+[char]7+$e+']7501;state=done:app=codex'+[char]7); Start-Sleep -Seconds 15".into()],
+            ..Default::default()
+        }).unwrap();
+        backend.set_visible(false);
+        backend.set_codex_notifications(true);
+        let pid = backend.pty_id();
+        session.job = Some(crate::platform::ProcessJob::attach(pid).unwrap());
+        session.backend = Some(backend);
+        session.detected_agent = Some(Agent::Codex);
+        app.sessions.push(session);
+        app.sessions.push(Session::new(SessionSpec {
+            id: "other".into(),
+            name: "other".into(),
+            directory: root.path().into(),
+            agent: Agent::Shell,
+            agent_session_id: None,
+            color: None,
+        }));
+        app.active = Some("other".into());
+        let deadline = Instant::now() + Duration::from_secs(8);
+        while app.sessions[0].status.activity != Activity::Completed {
+            assert!(
+                Instant::now() < deadline,
+                "background logic did not consume native lifecycle"
+            );
+            app.receive_events(&ctx);
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert!(app.sessions[0].status.codex_native);
+        assert!(app.sessions[0].status.unread);
+        assert_eq!(app.sessions[1].status.activity, Activity::Unknown);
+        app.floating_action(
+            ai_terminal::floating::Action::Activate("native-hidden".into()),
+            &ctx,
+        );
+        assert!(!app.sessions[0].status.unread);
+        assert_eq!(app.sessions[0].status.activity, Activity::Completed);
+        assert_eq!(app.sessions[0].backend.as_ref().unwrap().pty_id(), pid);
+    }
     #[test]
     fn confirmed_shutdown_closes_only_owned_terminals_and_saves_workspace() {
         struct ChildGuard(std::process::Child);

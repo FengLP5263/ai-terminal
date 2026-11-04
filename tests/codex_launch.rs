@@ -37,7 +37,7 @@ fn installed_codex_accepts_scoped_hook_toml_without_auth_or_trust_changes() {
 }
 
 #[test]
-fn codex_keeps_native_tui_and_uses_an_owned_engine_for_scoped_state() {
+fn codex_keeps_native_tui_and_shared_agents_without_incompatible_overrides() {
     let root = tempfile::tempdir().unwrap();
     let spec = ai_terminal::model::SessionSpec {
         id: "codex".into(),
@@ -53,11 +53,7 @@ fn codex_keeps_native_tui_and_uses_an_owned_engine_for_scoped_state() {
         std::path::Path::new(env!("CARGO_BIN_EXE_ai-terminal-hook")),
     )
     .unwrap();
-    assert!(args.iter().any(|arg| arg == "--no-daemon"));
-    assert!(args.iter().any(|arg| arg.contains("tui.notifications")));
-    assert!(
-        args.iter()
-            .any(|arg| arg.contains("tui.notification_method='osc9'"))
-    );
+    assert!(!args.iter().any(|arg| arg == "--no-daemon"));
+    assert!(!args.iter().any(|arg| arg == "-c" || arg.contains("hooks.")));
     assert!(!args.iter().any(|arg| arg == "--no-alt-screen"));
 }
