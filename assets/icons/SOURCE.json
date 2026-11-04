@@ -14,6 +14,13 @@
       "source": "https://raw.githubusercontent.com/lobehub/lobe-icons/master/packages/static-png/dark/claude-color.png",
       "sha256": "97b53fb85b3bf401ffeb8ee7c5ebad734ce9f6edc3038f242021c53bcc18e23d",
       "bytes": 9337
+    },
+    {
+      "name": "qoder.png",
+      "source": "https://raw.githubusercontent.com/lobehub/lobe-icons/master/packages/static-png/dark/qoder.png",
+      "retrieved": "2026-11-04",
+      "sha256": "45b204899b289f37f019331ab44ee24bca06de769c07f131859f9557480eb2f9",
+      "bytes": 5354
     }
   ]
 }

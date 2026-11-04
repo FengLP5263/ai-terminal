@@ -78,7 +78,7 @@ impl Session {
     fn agent_ended(&mut self) {
         self.detected_agent = None;
         if let Some(backend) = &self.backend {
-            backend.set_codex_notifications(false);
+            backend.set_codex_notifications(self.spec.agent.is_shell());
         }
         self.invocation = None;
         self.agent_process.take();
@@ -91,6 +91,21 @@ impl Session {
             Activity::Idle
         };
         self.status.unread = unread;
+    }
+    fn codex_program(&mut self, state: egui_term::CodexProgramStatus, viewing: bool) {
+        // app=codex is an explicit identity notification even when an absolute
+        // launcher or alias bypassed the session shim. Clear has no app identity.
+        if (!self.display_agent().is_shell() && self.display_agent() != Agent::Codex)
+            || (state == egui_term::CodexProgramStatus::Clear && !self.status.codex_native)
+        {
+            return;
+        }
+        if self.detected_agent.is_none() && self.spec.agent.is_shell() {
+            self.detected_agent = Some(Agent::Codex);
+            self.status = Status::default();
+        }
+        self.status.codex_program(state, viewing);
+        self.last_event = Some(Instant::now());
     }
     fn event(&mut self, event: &HookEvent, viewing: bool) -> bool {
         if self.spec.agent.is_shell() {
@@ -166,6 +181,7 @@ impl Session {
                 let agent = match event.source.as_deref() {
                     Some("codex") => Agent::Codex,
                     Some("claude") => Agent::Claude,
+                    Some("qodercn") => Agent::QoderCn,
                     _ => return false,
                 };
                 let Some(invocation) = event.invocation.clone() else {
@@ -180,13 +196,19 @@ impl Session {
                 if process.exited() {
                     return false;
                 }
+                let native_connected = agent == Agent::Codex
+                    && self.detected_agent == Some(Agent::Codex)
+                    && self.invocation.is_none()
+                    && self.status.codex_native;
                 self.detected_agent = Some(agent);
                 if let Some(backend) = &self.backend {
                     backend.set_codex_notifications(agent == Agent::Codex);
                 }
                 self.invocation = Some(invocation);
                 self.agent_process = Some(process);
-                self.status = Status::default();
+                if !native_connected {
+                    self.status = Status::default();
+                }
                 return true;
             }
             if self.invocation.is_none() || self.invocation != event.invocation {
@@ -460,7 +482,9 @@ impl App {
             })();
         match result {
             Ok((backend, job, generation)) => {
-                backend.set_codex_notifications(session.spec.agent == Agent::Codex);
+                backend.set_codex_notifications(
+                    session.spec.agent.is_shell() || session.spec.agent == Agent::Codex,
+                );
                 session.backend = Some(backend);
                 session.job = Some(job);
                 session.generation = generation;
@@ -743,13 +767,10 @@ impl App {
             };
             match event {
                 PtyEvent::Title(title) if title.starts_with(egui_term::CODEX_PROGRAM_EVENT) => {
-                    if session.display_agent() == Agent::Codex {
-                        let viewing = focused && self.active.as_deref() == Some(&session.spec.id);
-                        if let Some(backend) = &session.backend {
-                            for state in backend.take_codex_program_statuses(&title) {
-                                session.status.codex_program(state, viewing);
-                                session.last_event = Some(Instant::now());
-                            }
+                    let viewing = focused && self.active.as_deref() == Some(&session.spec.id);
+                    if let Some(backend) = &session.backend {
+                        for state in backend.take_codex_program_statuses(&title) {
+                            session.codex_program(state, viewing);
                         }
                     }
                 }
@@ -768,7 +789,9 @@ impl App {
                     if let Some(path) =
                         ai_terminal::shell::directory_from_title(&title, &session.generation)
                     {
-                        if session.agent_process.as_ref().is_some_and(|p| p.exited()) {
+                        if (session.status.codex_native && session.invocation.is_none())
+                            || session.agent_process.as_ref().is_some_and(|p| p.exited())
+                        {
                             session.agent_ended();
                         }
                         if session.spec.directory != path {
@@ -1444,6 +1467,153 @@ fn renderer_info(cc: &eframe::CreationContext<'_>) -> serde_json::Value {
 #[cfg(all(test, windows))]
 mod tests {
     use super::*;
+    fn wait_for_app(app: &mut App, ctx: &egui::Context, mut ready: impl FnMut(&mut App) -> bool) {
+        let deadline = Instant::now() + Duration::from_secs(10);
+        loop {
+            app.receive_events(ctx);
+            if ready(app) {
+                return;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "terminal fixture did not reach its next state"
+            );
+            std::thread::sleep(Duration::from_millis(15));
+        }
+    }
+    #[test]
+    fn absolute_codex_launcher_reports_native_states_without_the_session_shim() {
+        let root = tempfile::tempdir().unwrap();
+        let ctx = egui::Context::default();
+        let creation = eframe::CreationContext::_new_kittest(ctx.clone());
+        let mut app = App::new(&creation, root.path().join("data"), false, false);
+        use_built_helper(&mut app);
+        app.startup_pending = false;
+        app.can_draw = false;
+        app.sessions.push(Session::new(SessionSpec {
+            id: "bypassed".into(),
+            name: "Custom name".into(),
+            directory: root.path().into(),
+            agent: Agent::Shell,
+            agent_session_id: Some("saved-history".into()),
+            color: None,
+        }));
+        app.start_session(0, &ctx);
+        assert!(
+            app.sessions[0].backend.is_some(),
+            "{:?}",
+            app.sessions[0].error
+        );
+        app.sessions[0].backend.as_ref().unwrap().set_visible(false);
+        let pid = app.sessions[0].backend.as_ref().unwrap().pty_id();
+        std::fs::write(
+            root.path().join("lifecycle.ps1"),
+            r#"
+function Send-State($value) { [Console]::Write(([char]27).ToString()+']7501;'+$value+[char]7) }
+function Wait-Step($step) {
+    $deadline=[DateTime]::UtcNow.AddSeconds(15)
+    while (!(Test-Path -LiteralPath (Join-Path $PSScriptRoot ('step'+$step)))) {
+        if ([DateTime]::UtcNow -gt $deadline) { exit 9 }; Start-Sleep -Milliseconds 20
+    }
+}
+[IO.File]::WriteAllText((Join-Path $PSScriptRoot 'args.txt'), ($args -join '|'))
+Send-State 'state=clear'
+[Console]::Write(([char]27).ToString()+']9;Approval requested: fixture'+[char]7)
+[Console]::WriteLine('BYPASS_READY plain state=done:app=codex')
+Wait-Step 0
+Send-State 'state=idle:app=codex'; Wait-Step 1
+Send-State 'state=working:app=codex'; Wait-Step 2
+Send-State 'state=blocked:app=codex:kind=permission'; Wait-Step 3
+Send-State 'state=done:app=codex'; Wait-Step 4
+Send-State 'state=clear'; Wait-Step 5
+"#,
+        )
+        .unwrap();
+        let launcher = root.path().join("codex.cmd");
+        std::fs::write(&launcher, "@echo off\r\n\"%SystemRoot%\\System32\\WindowsPowerShell\\v1.0\\powershell.exe\" -NoLogo -NoProfile -File \"%~dp0lifecycle.ps1\" %*\r\n").unwrap();
+        for _ in 0..2 {
+            let command = format!(
+                "& '{}' --remote unix:// -C '{}' resume fixture-history\r",
+                launcher.display(),
+                root.path().display()
+            );
+            app.sessions[0]
+                .backend
+                .as_mut()
+                .unwrap()
+                .process_command(BackendCommand::Write(command.into_bytes()));
+            wait_for_app(&mut app, &ctx, |_| root.path().join("args.txt").is_file());
+            wait_for_app(&mut app, &ctx, |app| {
+                app.sessions[0]
+                    .backend
+                    .as_mut()
+                    .unwrap()
+                    .plain_text()
+                    .contains("BYPASS_READY")
+            });
+            assert_eq!(app.sessions[0].display_agent(), Agent::Shell);
+            assert!(!app.sessions[0].status.codex_native);
+            let arguments = std::fs::read_to_string(root.path().join("args.txt")).unwrap();
+            assert!(arguments.starts_with("--remote|unix://|-C|"));
+            assert!(arguments.ends_with("|resume|fixture-history"));
+            for (step, activity) in [
+                Activity::Idle,
+                Activity::Working,
+                Activity::Waiting,
+                Activity::Completed,
+                Activity::Idle,
+            ]
+            .into_iter()
+            .enumerate()
+            {
+                std::fs::write(root.path().join(format!("step{step}")), "").unwrap();
+                wait_for_app(&mut app, &ctx, |app| {
+                    app.sessions[0].status.codex_native
+                        && app.sessions[0].status.activity == activity
+                });
+                assert_eq!(app.sessions[0].display_agent(), Agent::Codex);
+                assert!(app.sessions[0].invocation.is_none());
+                if activity == Activity::Completed {
+                    assert!(app.sessions[0].status.unread);
+                }
+            }
+            std::fs::write(root.path().join("step5"), "").unwrap();
+            wait_for_app(&mut app, &ctx, |app| {
+                app.sessions[0].display_agent() == Agent::Shell
+            });
+            assert!(!app.sessions[0].status.codex_native);
+            assert_eq!(app.sessions[0].backend.as_ref().unwrap().pty_id(), pid);
+            assert_eq!(app.sessions[0].spec.name, "Custom name");
+            assert_eq!(
+                app.sessions[0].spec.agent_session_id.as_deref(),
+                Some("saved-history")
+            );
+            for step in 0..6 {
+                std::fs::remove_file(root.path().join(format!("step{step}"))).unwrap();
+            }
+            std::fs::remove_file(root.path().join("args.txt")).unwrap();
+        }
+    }
+    #[test]
+    fn native_codex_identity_does_not_replace_another_managed_agent_or_start_from_clear() {
+        let mut session = Session::new(SessionSpec {
+            id: "identity".into(),
+            name: "identity".into(),
+            directory: PathBuf::new(),
+            agent: Agent::Shell,
+            agent_session_id: None,
+            color: None,
+        });
+        session.codex_program(egui_term::CodexProgramStatus::Clear, false);
+        assert_eq!(session.display_agent(), Agent::Shell);
+        assert!(!session.status.codex_native);
+        for agent in [Agent::Claude, Agent::QoderCn] {
+            session.detected_agent = Some(agent);
+            session.codex_program(egui_term::CodexProgramStatus::Working, false);
+            assert_eq!(session.display_agent(), agent);
+            assert!(!session.status.codex_native);
+        }
+    }
     #[test]
     fn startup_and_process_failures_mark_only_unviewed_sessions_unread() {
         use std::os::windows::process::ExitStatusExt;
@@ -1992,6 +2162,32 @@ mod tests {
             session.spec.name, "my terminal",
             "automatic icons must not overwrite user names"
         );
+        assert!(session.event(&shell_metadata("ShellAgentEnded", "two", "claude"), false));
+        assert!(session.event(
+            &shell_metadata("ShellAgentStarted", "three", "qodercn"),
+            false
+        ));
+        assert_eq!(session.display_agent(), Agent::QoderCn);
+        assert_eq!(session.status.activity, Activity::Unknown);
+        let mut qoder = shell_metadata("UserPromptSubmit", "three", "qodercn");
+        qoder.session_id = "qoder-history".into();
+        assert!(session.event(&qoder, false));
+        assert_eq!(session.status.activity, Activity::Working);
+        qoder.name = "PreToolUse".into();
+        qoder.tool_name = Some("AskUserQuestion".into());
+        assert!(session.event(&qoder, false));
+        assert_eq!(session.status.activity, Activity::Waiting);
+        qoder.name = "Stop".into();
+        assert!(session.event(&qoder, false));
+        assert_eq!(session.status.activity, Activity::Completed);
+        assert!(session.status.unread);
+        session.status.acknowledge();
+        assert!(!session.status.unread);
+        assert!(session.event(
+            &shell_metadata("ShellAgentEnded", "three", "qodercn"),
+            false
+        ));
+        assert_eq!(session.display_agent(), Agent::Cmd);
     }
 
     #[test]

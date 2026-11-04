@@ -158,6 +158,10 @@ fn agent_roundtrip(kind: Agent) {
         "AI_TERMINAL_REAL_CLAUDE".into(),
         fake.to_string_lossy().into_owned(),
     );
+    plan.environment.insert(
+        "AI_TERMINAL_REAL_QODER_CN".into(),
+        fake.to_string_lossy().into_owned(),
+    );
     plan.environment
         .insert("AI_TERMINAL_FIXTURE_INTERACTIVE".into(), "1".into());
     let generation = plan.generation.clone();
@@ -182,7 +186,13 @@ fn agent_roundtrip(kind: Agent) {
         bridge.receiver.try_recv().is_err(),
         "mentioning codex must not be treated as launching it"
     );
-    for agent in ["codex", "claude"] {
+    for (agent, source) in [
+        ("codex", "codex"),
+        ("claude", "claude"),
+        ("qodercn", "qodercn"),
+        ("qoderclicn", "qodercn"),
+        ("qodercn --settings=custom-settings.json", "qodercn"),
+    ] {
         terminal.process_command(BackendCommand::Write(format!("{agent}\r").into_bytes()));
         let began = bridge
             .receiver
@@ -195,7 +205,7 @@ fn agent_roundtrip(kind: Agent) {
                 )
             });
         assert_eq!(began.name, "ShellAgentStarted");
-        assert_eq!(began.source.as_deref(), Some(agent));
+        assert_eq!(began.source.as_deref(), Some(source));
         assert_eq!(began.generation, generation);
         assert!(began.invocation.is_some());
         assert!(began.process_id.is_some());
@@ -212,20 +222,28 @@ fn agent_roundtrip(kind: Agent) {
         assert_eq!(ended.name, "ShellAgentEnded");
         assert_eq!(ended.exit_code, Some(23));
         assert_eq!(ended.invocation, began.invocation);
+        if agent.contains("--settings=") {
+            assert_eq!(
+                std::fs::read_to_string(root.path().join("args.txt")).unwrap(),
+                "[\"--settings=custom-settings.json\"]",
+                "an explicit user configuration must not be replaced or duplicated",
+            );
+            assert!(!root.path().join("custom-settings.json").exists());
+        }
         wait_directory(&rx, &generation, root.path(), &mut terminal);
     }
     terminal.process_command(BackendCommand::Write(b"exit\r".to_vec()));
 }
 #[test]
-fn powershell_recognizes_codex_and_claude_and_returns_to_shell() {
+fn powershell_recognizes_supported_agents_and_returns_to_shell() {
     agent_roundtrip(Agent::Shell);
 }
 #[test]
-fn cmd_recognizes_codex_and_claude_and_returns_to_shell() {
+fn cmd_recognizes_supported_agents_and_returns_to_shell() {
     agent_roundtrip(Agent::Cmd);
 }
 #[test]
-fn bash_recognizes_codex_and_claude_and_returns_to_shell() {
+fn bash_recognizes_supported_agents_and_returns_to_shell() {
     agent_roundtrip(Agent::Bash);
 }
 

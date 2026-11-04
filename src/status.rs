@@ -63,7 +63,10 @@ impl Status {
         // In-process /resume, /clear and /fork switch the foreground conversation.
         // A nested agent's startup must still not steal the parent session.
         let conversation_switch = event.name == "SessionStart"
-            && matches!(event.source.as_deref(), Some("resume" | "clear" | "fork"));
+            && matches!(
+                event.source.as_deref(),
+                Some("resume" | "clear" | "fork" | "new")
+            );
         if let Some(id) = &self.session_id
             && id != &event.session_id
             && !conversation_switch
@@ -411,7 +414,7 @@ mod tests {
     }
     #[test]
     fn resuming_a_conversation_reconnects_status_and_rejects_previous_turns() {
-        for source in ["resume", "clear", "fork"] {
+        for source in ["resume", "clear", "fork", "new"] {
             let mut s = Status::default();
             assert!(s.apply(&event("UserPromptSubmit", "old-turn"), false));
             let mut start = event("SessionStart", "new-turn");

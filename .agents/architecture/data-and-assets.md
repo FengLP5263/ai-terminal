@@ -64,3 +64,5 @@ target/、output/、.runtime/、runtime/、.tools/、参考交接文件、数据
 Agent 头像源图保留 640×640；按实际物理尺寸做面积过滤，每种头像最多共享缓存 12 个尺寸，整数像素对齐，不在每帧缩图。原生表情图块完整适配单元格，VS15 保留文字呈现，不改变终端网格坐标。
 
 新增本地 winit 0.30.13（Apache-2.0）补丁的来源及归档哈希见 vendor/winit/UPSTREAM.zh.md，原始 LICENSE 保留。制品源码身份包含它的 Cargo.toml、build.rs 及 src 下的源码／嵌入资产；依赖清单自动记录本地补丁并收集该 LICENSE。
+
+Qoder CN 使用 Lobe Icons 的 640 像素 Qoder 图标，来源、MIT 许可和 SHA-256 记录在 assets/icons；与其他 Agent 共用按物理尺寸面积过滤的有界缓存。Agent::QoderCn 仅增加身份类型，会话持久化字段、认证边界与终端历史上限不变。
