@@ -1,5 +1,5 @@
 {
-  "description": "Native Release component captures with fixed synthetic text, example directories and simulated session status; no private data or real model requests.",
+  "description": "Native Release captures with fixed synthetic content and production avatar badges; per-file versions identify newer captures. No private data or real model requests.",
   "version": "0.4.4",
   "profile": "release",
   "model_requests": false,
@@ -20,6 +20,66 @@
       "height": 72,
       "source": "examples/island_probe.rs",
       "unmodified_native_capture": true
+    },
+    "agent-codex.png": {
+      "sha256": "7415847c6eb1f717ea4fcf23c993370381ac28fb5a06a63b2992cd5adcb8ba7c",
+      "bytes": 1910,
+      "width": 60,
+      "height": 60,
+      "source": "examples/agent_icons_capture.rs; production sidebar::Icons::paint",
+      "version": "0.4.7",
+      "unmodified_native_capture": true,
+      "original_asset_provenance": "assets/icons/SOURCE.json"
+    },
+    "agent-claude.png": {
+      "sha256": "f749f79904ce144c40cefe1a2790e551d9cb2e627e127736c149ef516af6fe95",
+      "bytes": 1895,
+      "width": 60,
+      "height": 60,
+      "source": "examples/agent_icons_capture.rs; production sidebar::Icons::paint",
+      "version": "0.4.7",
+      "unmodified_native_capture": true,
+      "original_asset_provenance": "assets/icons/SOURCE.json"
+    },
+    "agent-qoder-cn.png": {
+      "sha256": "92bbdbe1d802f856b75b05547124adba0124af62e67cdb961835a0f7c3ebaab3",
+      "bytes": 1124,
+      "width": 60,
+      "height": 60,
+      "source": "examples/agent_icons_capture.rs; production sidebar::Icons::paint",
+      "version": "0.4.7",
+      "unmodified_native_capture": true,
+      "original_asset_provenance": "assets/icons/SOURCE.json"
+    },
+    "agent-kimi.png": {
+      "sha256": "89da06aacc5bf5adaf5a584c2deff2cb769cedc1b60f2d5e664806d0fad7e223",
+      "bytes": 1611,
+      "width": 60,
+      "height": 60,
+      "source": "examples/agent_icons_capture.rs; production sidebar::Icons::paint",
+      "version": "0.4.7",
+      "unmodified_native_capture": true,
+      "original_asset_provenance": "assets/icons/SOURCE.json"
+    },
+    "agent-zcode.png": {
+      "sha256": "b3f2c105376953ec9cba324519381d3fe1bc6d87005ba02181b5370d4a8eb49c",
+      "bytes": 1167,
+      "width": 60,
+      "height": 60,
+      "source": "examples/agent_icons_capture.rs; production sidebar::Icons::paint",
+      "version": "0.4.7",
+      "unmodified_native_capture": true,
+      "original_asset_provenance": "assets/icons/SOURCE.json"
+    },
+    "agent-trae.png": {
+      "sha256": "ea42416d8473e490339c64ba7284963d6175a44aab8cef07cb7e770cac14e19c",
+      "bytes": 874,
+      "width": 60,
+      "height": 60,
+      "source": "examples/agent_icons_capture.rs; production sidebar::Icons::paint",
+      "version": "0.4.7",
+      "unmodified_native_capture": true,
+      "original_asset_provenance": "assets/icons/SOURCE.json"
     }
   }
 }

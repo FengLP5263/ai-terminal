@@ -16,7 +16,12 @@ Windows system fonts are read at runtime and not bundled. The project's LICENSE 
 
 - winit 0.30.13: local Windows native-drag DPI compatibility patch, Apache-2.0. See the [patch provenance](vendor/winit/UPSTREAM.md) and original LICENSE. The package dependency inventory collects this local dependency and its license.
 
-OpenAI, Claude and Qoder icons come from [Lobe Icons](https://github.com/lobehub/lobe-icons), MIT. See `assets/icons/SOURCE.json` and `assets/icons/LICENSE-lobe-icons`. Brand names and marks belong to their respective owners.
+- OpenAI/Claude/Qoder icons come from [Lobe Icons](https://github.com/lobehub/lobe-icons), MIT; the original text is `assets/icons/LICENSE-lobe-icons`.
+- The Kimi Code icon is the PNG used by the official [MoonshotAI/kimi-code](https://github.com/MoonshotAI/kimi-code) documentation, pinned to a commit with original bytes retained. The repository declares MIT; its text is `assets/icons/LICENSE-kimi-code`.
+- The ZCode icon is the application PNG shown in the official [zai-org/ZCode](https://github.com/zai-org/ZCode) README, pinned to a commit with original bytes retained. The repository declares Apache-2.0; its text is `assets/icons/LICENSE-zcode`.
+- The TRAE icon is the PNG referenced by the [official CLI documentation site](https://docs.trae.cn/cli_about-trae-code-cli-2), with only outer padding cropped and the result reduced offline. That official source states no standalone open-source license for the brand asset; the Lobe Icons MIT declaration does not apply.
+
+Brand icons identify integrations only. Names and marks belong to their respective owners; repository licenses do not grant trademark rights. `assets/icons/SOURCE.json` records per-file URLs, pinned revisions, dimensions, transforms and SHA-256. Packages include the same provenance and the available original license texts above in `agent-icons/`.
 
 - egui-winit 0.35.0: local paste-event compatibility patch, MIT OR Apache-2.0. See `vendor/egui-winit/UPSTREAM.md` and its included license files. The packaged dependency inventory includes this patched crate.
 

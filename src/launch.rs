@@ -162,6 +162,9 @@ pub fn agent_arguments(
                 arguments.extend(["resume".into(), id.clone()]);
             }
         }
+        // These CLIs publish hooks only through user-level configuration, so the
+        // manager recognizes and launches them without injecting status hooks.
+        Agent::Kimi | Agent::ZCode | Agent::Trae => {}
         Agent::Shell | Agent::Cmd | Agent::Bash => {}
     }
     Ok(arguments)

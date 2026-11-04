@@ -9,6 +9,9 @@ pub enum Agent {
     Codex,
     Claude,
     QoderCn,
+    Kimi,
+    ZCode,
+    Trae,
     #[default]
     Shell,
     Cmd,
@@ -23,6 +26,9 @@ impl Agent {
             Self::Codex => "Codex",
             Self::Claude => "Claude Code",
             Self::QoderCn => "Qoder CN",
+            Self::Kimi => "Kimi Code",
+            Self::ZCode => "ZCode",
+            Self::Trae => "TRAE",
             Self::Shell => "PowerShell",
             Self::Cmd => "CMD",
             Self::Bash => "Git Bash",
@@ -97,6 +103,7 @@ pub struct UiSettings {
     pub floating_enabled: bool,
     pub floating_position: Option<[f32; 2]>,
     pub floating_position_pixels: Option<[f32; 2]>,
+    pub desktop_shortcut: bool,
 }
 impl Default for UiSettings {
     fn default() -> Self {
@@ -109,6 +116,7 @@ impl Default for UiSettings {
             floating_enabled: false,
             floating_position: None,
             floating_position_pixels: None,
+            desktop_shortcut: false,
         }
     }
 }

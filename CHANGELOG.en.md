@@ -4,9 +4,31 @@
 
 Record user-visible additions, improvements, fixes, and compatibility changes for each release; omit categories that do not apply. Review both languages together, use the same version entry in GitHub Releases, and ship both files in the ZIP. Historical summaries follow existing GitHub release notes and UTC publication dates; development versions without a separate release do not receive invented release dates.
 
-## [Unreleased]
+## [0.4.7] - 2026-11-04
 
-No confirmed changes for a subsequent version yet.
+### Added
+
+- Recognize Kimi Code (`kimi`), ZCode (`zcode`) and TRAE CLI (`traecli`) public entries in managed shells, showing their avatars and restoring the current shell on exit. Discovery keeps the exe/cmd/bat order and stale standard-npm-launcher checks.
+- On first launch with the default data directory, create `ai-terminal.lnk` on the Desktop targeting the current program. The app attempts once and startup continues if creation fails; `--data-dir` with a non-default directory, isolated smoke runs, or a failed workspace load never create it, and a user-deleted shortcut is not recreated.
+
+### Changed
+
+- Use verified official Kimi Code, ZCode and TRAE product icons, with pinned provenance and per-file license declarations. Packages include icon provenance, available original licenses and bilingual third-party notices.
+
+### Fixed
+
+- Release retired atlas pages even when later frames only hit the glyph cache, while preserving texture lifetimes for shapes recorded in the same frame.
+- The native glyph atlas no longer keys cached tiles by foreground/background color. Animated TUI gradients, blinking and per-frame recoloring reuse the same glyphs instead of rapidly filling the atlas and rebuilding it wholesale; a full page now retires only the oldest page and keeps its texture handle until a later frame, reducing terminal garbling and flicker.
+
+### Compatibility and boundaries
+
+- Kimi Code, ZCode and TRAE CLI provide identity and launch/exit recognition only in this release; session-scoped task events are not integrated. The manager does not copy or edit user/project hook configuration or infer task status from output/process existence. ZCode was tested with the community zcode-app-cli 3.17.2-44 (runtime 0.17.1), not as acceptance of Z.ai's official standalone CLI.
+
+### Verification and upgrade notes
+
+- Passed 181 Rust and 14 Python regressions, governance, formatting, Clippy, the optimized build and six-session native smoke. Native captures verified actual startup, avatars and return to PowerShell for Kimi Code 2.5.0, community zcode-app-cli 3.17.2-44 / runtime 0.17.1, and TRAE CLI 0.213.1 public. Kimi was cancelled at directory trust and TRAE at login; no trust approval or model prompt was submitted.
+- The bilingual README now lists six Agents, matching production-rendered icons, launch commands and task-status boundaries. Extract the whole new ZIP; it includes icon provenance, available original licenses and bilingual third-party notices.
+- Actual first-run Desktop creation, real model tasks, Windows 10 and sustained workload remain outside this release's new checks. Startup captures and offline fixtures do not establish those acceptance results.
 
 ## [0.4.6] - 2026-11-04
 

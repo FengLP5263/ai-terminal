@@ -17,7 +17,7 @@ description: 验证 ai-terminal 的离线 Rust 回归、治理脚本、Windows �
 POSIX 配对入口见 scripts/README.md，macOS/Linux 只验证支持的静态治理／ZIP 校验。
 测试保留现有模块内和 tests/ 布局。常规 test 包括 Rust workspace 与 Python 包校验测试，不调用模型 API。
 Codex 配置测试在 CLI 未安装时可能跳过；Windows 的实际安装／真回合必须另行记录。
-smoke 使用三个真实 PowerShell PTY 和合成生命周期，隔离 output/ 唯一目录，验证 JSON、PNG、退出和自身 PTY 回收。
+smoke 使用六个真实 PowerShell PTY 和合成生命周期（覆盖六个 Agent 头像），隔离 output/ 唯一目录，验证 JSON、PNG、退出和自身 PTY 回收。
 Git Bash 原生回归使用临时 HOME 和合成启动文件，禁止执行开发者真实启动配置；覆盖登录文件优先级、PS1、别名、补全、标量／数组 PROMPT_COMMAND、目录跟踪和 Agent 入口。发现与回退测试覆盖便携路径、其他 Bash 的拒绝、缺少 Git／PowerShell 以及点击回退后的真实类型和数据保留。Git 未安装时原生 Bash 核查明确记录未运行，不宣称跨设备完全验证。
 嵌套 Shell 核查使用真实 CMD→PowerShell→CMD 和本地 Agent 样例，验证父调用、根控制台归属、逐层退出与原 PTY 保留；PowerShell 测试带 -NoProfile，Git Bash 使用临时 HOME。头像归约测试另覆盖脱离控制台、过期父调用和 Agent 优先级；不得将合成事件当作真实模型回合。
 异常时只停止本次创建的进程。性能记录应区分 manager 与 Agent 子进程、debug/release、GPU、测量窗口和当前版本。
@@ -59,3 +59,5 @@ preview.4 的 island_move_probe 会保持原生移动状态跨越实际 DPI 边�
 Qoder CN：运行 tests/qoder_cn.rs 的发现、配置、恢复和真实 helper 的合成元数据回归；shell_sessions 使用伪 CLI 验证 PowerShell／CMD／Git Bash 的两个入口和显式设置保留。qoder_cn_probe 的 fixture 模式只画合成状态；默认模式只启动已安装 CLI，不发送提示、不确认信任或授权。截图完成与 hook_connected 分开记录，不把登录／信任页面当成已连接，也不冒称真实模型任务通过。
 
 Codex 直接启动回归使用 App 的真实 Shell／ConPTY 和绝对路径伪 codex.cmd，保留 --remote／-C／resume 参数，核对未识别阶段、原生状态、隐藏后台归约、clear 临时交接、返回提示符与重复调用。`shell_switch_probe` 可追加 `codex-direct` 做实际绝对路径／--remote unix:// 启动截图，仅在已信任目录使用，不发送模型提示、不确认信任、不关闭共享后台；截图需人工核对，不等于真实模型回合。
+
+0.4.7 三款新增入口的真实启动用 shell_switch_probe 的 kimi／zcode／traecli 模式，命令见 scripts/README.md；仅向自建窗口输入启动命令，聚焦终端空白区后发送 Esc／Ctrl+C，核查身份和返回 Shell，不输入提示、不接受信任。记录 ZCode 官方或社区发行来源；本机 zcode-app-cli 不等于官方独立 CLI。README 六枚深色底衬头像用 agent_icons_capture 复用正式组件原生生成，不启动 PTY 或 Agent；人工核对后原样复制并记录来源。

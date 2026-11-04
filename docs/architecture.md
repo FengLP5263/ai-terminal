@@ -27,7 +27,7 @@ Hook 返回 `{}`，不批准、拒绝或修改工具调用。通过 Claude 的 `
 
 ## 验证与限制
 
-核心测试覆盖过期回合拒绝、后台完成、未读确认、并行工具等待和桥认证。原生 smoke 使用三个真实 PowerShell ConPTY 和合成生命周期事件，生成 GPU 截图和 JSON；它不是 Claude/Codex 真实任务测试。CLI 升级可能改变 hook schema 或信任处理；实际 Agent 版本和真实事件验证需单独记录。
+核心测试覆盖过期回合拒绝、后台完成、未读确认、并行工具等待和桥认证。原生 smoke 使用六个真实 PowerShell ConPTY 和合成生命周期事件（覆盖六个已识别的 Agent 头像），生成 GPU 截图和 JSON；它不是 Claude/Codex 真实任务测试。CLI 升级可能改变 hook schema 或信任处理；实际 Agent 版本和真实事件验证需单独记录。
 
 没有心跳可以证明静默推理期间 Agent 的语义进度；不使用静默超时伪造完成。后台任务和定时 Agent 工作流需要额外生命周期覆盖。
 

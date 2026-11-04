@@ -35,8 +35,6 @@ struct Key {
     width: u16,
     height: u16,
     baseline: u16,
-    fg: [u8; 4],
-    bg: [u8; 4],
 }
 #[derive(Clone, Copy)]
 struct Tile {
@@ -61,6 +59,8 @@ struct Engine {
     metrics: HashMap<u16, (Size, f32)>,
     tiles: HashMap<Key, Tile>,
     pages: Vec<Page>,
+    retired: Vec<TextureHandle>,
+    frame: u64,
     family: String,
     identity: usize,
     _registration: Option<RegisteredFonts>,
@@ -204,6 +204,8 @@ impl Engine {
                 metrics: HashMap::new(),
                 tiles: HashMap::new(),
                 pages: Vec::new(),
+                retired: Vec::new(),
+                frame: 0,
                 family: font.family.clone(),
                 identity: font.identity(),
                 _registration: registration,
@@ -323,8 +325,8 @@ impl Engine {
             self.target.BeginDraw();
             self.target
                 .PushAxisAlignedClip(&clip, D2D1_ANTIALIAS_MODE_ALIASED);
-            self.target.Clear(Some(&color(key.bg)));
-            self.brush.SetColor(&color(key.fg));
+            self.target.Clear(Some(&color([0; 4])));
+            self.brush.SetColor(&color([255; 4]));
             let mut left = if key.text.chars().any(|c| c as u32 >= 0x2E80) {
                 ((key.width as f32 - natural_width) / 2.0).max(0.0).round()
             } else {
@@ -379,7 +381,27 @@ impl Engine {
             Ok(bgra)
         }
     }
+    fn expire_retired(&mut self, ctx: &Context) {
+        let frame = ctx.cumulative_frame_nr();
+        if frame != self.frame {
+            self.frame = frame;
+            // Shapes from the previous frame have been painted; unused pages
+            // may now release their GPU textures.
+            self.retired.clear();
+        }
+    }
+
+    fn evict(&mut self) {
+        let page = self.pages.remove(0);
+        let retired = page.texture.id();
+        self.tiles.retain(|_, tile| tile.texture != retired);
+        // Keep the handle alive until a later frame: shapes already recorded
+        // in this frame may still sample this texture.
+        self.retired.push(page.texture);
+    }
+
     fn tile(&mut self, ctx: &Context, key: Key) -> windows::core::Result<Tile> {
+        self.expire_retired(ctx);
         if let Some(tile) = self.tiles.get(&key) {
             return Ok(*tile);
         }
@@ -391,9 +413,8 @@ impl Engine {
                 && (page.x + width < ATLAS || page.y + page.row + height + 2 <= ATLAS)
         };
         if !self.pages.last().is_some_and(fits) {
-            if self.pages.len() >= MAX_PAGES {
-                self.pages.clear();
-                self.tiles.clear();
+            while self.pages.len() >= MAX_PAGES {
+                self.evict();
             }
             let texture = ctx.load_texture(
                 format!("native-text-{}", self.pages.len()),
@@ -459,7 +480,6 @@ pub fn shape(
     bold: bool,
     italic: bool,
     fg: Color32,
-    bg: Color32,
 ) -> Option<Shape> {
     let scale = ctx.pixels_per_point();
     let width = (rect.width() * scale).round() as u16;
@@ -476,10 +496,13 @@ pub fn shape(
         width,
         height,
         baseline: (baseline * scale).round() as u16,
-        fg: fg.to_srgba_unmultiplied(),
-        bg: bg.to_srgba_unmultiplied(),
     };
-    cached_shape(ctx, font, key, rect.min)
+    let tint = if key.style & 4 != 0 {
+        Color32::WHITE
+    } else {
+        fg
+    };
+    cached_shape(ctx, font, key, rect.min, tint)
 }
 
 pub fn emoji_shape(
@@ -505,14 +528,19 @@ pub fn emoji_shape(
             width,
             height,
             baseline: 0,
-            fg: [255; 4],
-            bg: [0; 4],
         },
         rect.min,
+        Color32::WHITE,
     )
 }
 
-fn cached_shape(ctx: &Context, font: &NativeFont, key: Key, position: Pos2) -> Option<Shape> {
+fn cached_shape(
+    ctx: &Context,
+    font: &NativeFont,
+    key: Key,
+    position: Pos2,
+    tint: Color32,
+) -> Option<Shape> {
     let scale = ctx.pixels_per_point();
     let width = key.width;
     let height = key.height;
@@ -525,7 +553,7 @@ fn cached_shape(ctx: &Context, font: &NativeFont, key: Key, position: Pos2) -> O
         mesh.add_rect_with_uv(
             Rect::from_min_size(min, egui::vec2(width as f32 / scale, height as f32 / scale)),
             tile.uv,
-            Color32::WHITE,
+            tint,
         );
         Shape::mesh(mesh)
     })
@@ -552,8 +580,6 @@ mod tests {
                     width,
                     height: 30,
                     baseline: 0,
-                    fg: [255; 4],
-                    bg: [0; 4],
                 };
                 let rgba = engine.raster(&key).unwrap();
                 let pixels = rgba.as_chunks::<4>().0;
@@ -584,8 +610,6 @@ mod tests {
             width: 64,
             height: 42,
             baseline: 30,
-            fg: [215, 215, 215, 255],
-            bg: [0, 0, 0, 255],
         };
         let rgba = engine.raster(&base).unwrap();
         assert!(
@@ -612,6 +636,118 @@ mod tests {
         );
     }
     #[test]
+    fn foreground_color_reuses_the_same_glyph_tile() {
+        let ctx = Context::default();
+        let font = native();
+        let rect = Rect::from_min_size(Pos2::ZERO, egui::vec2(10.0, 20.0));
+        let mesh = |fg| match shape(&ctx, &font, 14.0, "A", rect, 15.0, false, false, fg) {
+            Some(Shape::Mesh(mesh)) => mesh,
+            _ => panic!("native glyph shape"),
+        };
+        let red = mesh(Color32::RED);
+        let blue = mesh(Color32::BLUE);
+        assert_eq!(red.texture_id, blue.texture_id);
+        assert_eq!(red.vertices[0].uv, blue.vertices[0].uv);
+        assert_ne!(red.vertices[0].color, blue.vertices[0].color);
+    }
+
+    fn full_atlas(ctx: &Context) -> Engine {
+        let mut engine = Engine::new(&native()).unwrap();
+        for page in 0..MAX_PAGES {
+            engine.pages.push(Page {
+                texture: ctx.load_texture(
+                    format!("full-atlas-{page}"),
+                    egui::ColorImage::filled([ATLAS, ATLAS], Color32::TRANSPARENT),
+                    TextureOptions::NEAREST,
+                ),
+                x: ATLAS,
+                y: ATLAS,
+                row: 0,
+            });
+        }
+        engine
+    }
+
+    fn atlas_glyph() -> Key {
+        Key {
+            text: "A".into(),
+            pixels: 14,
+            style: 0,
+            width: 12,
+            height: 22,
+            baseline: 16,
+        }
+    }
+
+    #[test]
+    fn evicted_texture_survives_shapes_and_cache_hits_in_the_same_frame() {
+        let ctx = Context::default();
+        let mut engine = full_atlas(&ctx);
+        let retired = engine.pages[0].texture.id();
+        let output = ctx.run_ui(egui::RawInput::default(), |ui| {
+            ui.painter().image(
+                retired,
+                Rect::from_min_size(Pos2::ZERO, egui::vec2(12.0, 22.0)),
+                Rect::from_min_max(Pos2::ZERO, egui::pos2(1.0, 1.0)),
+                Color32::WHITE,
+            );
+            let tile = engine.tile(&ctx, atlas_glyph()).unwrap();
+            assert_ne!(tile.texture, retired);
+            assert_eq!(engine.pages.len(), MAX_PAGES);
+            assert_eq!(engine.retired.len(), 1);
+            engine.tile(&ctx, atlas_glyph()).unwrap();
+            assert_eq!(engine.retired.len(), 1);
+        });
+        assert!(!output.textures_delta.free.contains(&retired));
+        assert!(output
+            .shapes
+            .iter()
+            .any(|shape| matches!(&shape.shape, Shape::Mesh(mesh) if mesh.texture_id == retired)));
+    }
+
+    #[test]
+    fn cache_hit_in_the_next_frame_releases_the_evicted_texture() {
+        let ctx = Context::default();
+        let mut engine = full_atlas(&ctx);
+        let retired = engine.pages[0].texture.id();
+        let mut cached = None;
+        let _ = ctx.run_ui(egui::RawInput::default(), |_| {
+            cached = Some(engine.tile(&ctx, atlas_glyph()).unwrap());
+        });
+        assert_eq!(engine.retired.len(), 1);
+        let cached = cached.unwrap();
+        for frame in 0..4 {
+            let output = ctx.run_ui(egui::RawInput::default(), |_| {
+                let tile = engine.tile(&ctx, atlas_glyph()).unwrap();
+                assert_eq!(tile.texture, cached.texture);
+                assert_eq!(tile.uv, cached.uv);
+                assert_eq!(engine.pages.len(), MAX_PAGES);
+                assert!(engine.retired.is_empty());
+            });
+            assert_eq!(output.textures_delta.free.contains(&retired), frame == 0);
+        }
+    }
+    #[test]
+    fn monochrome_glyph_tiles_keep_a_transparent_background() {
+        let mut engine = Engine::new(&native()).unwrap();
+        let rgba = engine
+            .raster(&Key {
+                text: "A".into(),
+                pixels: 28,
+                style: 0,
+                width: 18,
+                height: 34,
+                baseline: 27,
+            })
+            .unwrap();
+        let pixels = rgba.as_chunks::<4>().0;
+        assert!(pixels.iter().filter(|p| p[3] > 0).count() > 5);
+        assert!(
+            pixels.iter().filter(|p| p[3] == 0).count() > pixels.len() / 2,
+            "glyph tile paints an opaque cell background"
+        );
+    }
+    #[test]
     fn ui_emoji_preserves_color_and_transparent_background() {
         let mut engine = Engine::new(&native()).unwrap();
         for text in ["😀", "👋🏽", "👩‍💻", "❤️"] {
@@ -623,8 +759,6 @@ mod tests {
                     width: 42,
                     height: 38,
                     baseline: 0,
-                    fg: [255; 4],
-                    bg: [0; 4],
                 })
                 .unwrap();
             let pixels = rgba.as_chunks::<4>().0;

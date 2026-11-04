@@ -1,26 +1,107 @@
 {
-  "repository": "https://github.com/lobehub/lobe-icons",
-  "license": "MIT",
-  "retrieved": "2026-10-30",
   "files": [
     {
       "name": "openai.png",
       "source": "https://raw.githubusercontent.com/lobehub/lobe-icons/master/packages/static-png/dark/openai.png",
       "sha256": "375016542ebe78b63c7f36b8f6aee3058f2b706d861e5153fd74f9c27f63b8b7",
-      "bytes": 11297
+      "bytes": 11297,
+      "repository": "https://github.com/lobehub/lobe-icons",
+      "license": "MIT",
+      "license_file": "LICENSE-lobe-icons",
+      "retrieved": "2026-10-30",
+      "dimensions": [
+        640,
+        640
+      ]
     },
     {
       "name": "claude-color.png",
       "source": "https://raw.githubusercontent.com/lobehub/lobe-icons/master/packages/static-png/dark/claude-color.png",
       "sha256": "97b53fb85b3bf401ffeb8ee7c5ebad734ce9f6edc3038f242021c53bcc18e23d",
-      "bytes": 9337
+      "bytes": 9337,
+      "repository": "https://github.com/lobehub/lobe-icons",
+      "license": "MIT",
+      "license_file": "LICENSE-lobe-icons",
+      "retrieved": "2026-10-30",
+      "dimensions": [
+        640,
+        640
+      ]
     },
     {
       "name": "qoder.png",
       "source": "https://raw.githubusercontent.com/lobehub/lobe-icons/master/packages/static-png/dark/qoder.png",
       "retrieved": "2026-11-04",
       "sha256": "45b204899b289f37f019331ab44ee24bca06de769c07f131859f9557480eb2f9",
-      "bytes": 5354
+      "bytes": 5354,
+      "repository": "https://github.com/lobehub/lobe-icons",
+      "license": "MIT",
+      "license_file": "LICENSE-lobe-icons",
+      "dimensions": [
+        640,
+        640
+      ]
+    },
+    {
+      "name": "kimi-color.png",
+      "source": "https://raw.githubusercontent.com/MoonshotAI/kimi-code/f8e15c7a9be44fe4e0361a4ce57eaf690e05476a/docs/.vitepress/theme/Kimi.png",
+      "retrieved": "2026-11-04",
+      "sha256": "c367897f22e26c917200dc6bd5e5cb1456d24bf5f6cf8dcb1524f9d34e336b6d",
+      "bytes": 82192,
+      "repository": "https://github.com/MoonshotAI/kimi-code",
+      "revision": "f8e15c7a9be44fe4e0361a4ce57eaf690e05476a",
+      "license": "MIT",
+      "license_file": "LICENSE-kimi-code",
+      "transform": "None; original official PNG bytes retained.",
+      "verified_on": "2026-11-04",
+      "verification_page": "https://moonshotai.github.io/kimi-code/",
+      "note": "Official product icon used for integration identification. The upstream repository license does not grant trademark rights.",
+      "dimensions": [
+        316,
+        316
+      ]
+    },
+    {
+      "name": "zcode-color.png",
+      "source": "https://raw.githubusercontent.com/zai-org/ZCode/a9fe401eede6e6e5e01be9048679c206fe6f02d9/public/logo/icons/1024x1024.png",
+      "retrieved": "2026-11-04",
+      "sha256": "ae8cc4ca59180441ce3ba60a572ee9a5ee802f9ab9e7de1177ae5e0027c36a7a",
+      "bytes": 263521,
+      "note": "Official product icon used for integration identification. The upstream repository license does not grant trademark rights.",
+      "repository": "https://github.com/zai-org/ZCode",
+      "revision": "a9fe401eede6e6e5e01be9048679c206fe6f02d9",
+      "license": "Apache-2.0",
+      "license_file": "LICENSE-zcode",
+      "transform": "None; original official PNG bytes retained.",
+      "verified_on": "2026-11-04",
+      "verification_page": "https://github.com/zai-org/ZCode/blob/a9fe401eede6e6e5e01be9048679c206fe6f02d9/README.md",
+      "dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "name": "trae-color.png",
+      "source": "https://p9-arcosite.byteimg.com/tos-cn-i-goo7wpa0wc/f5cd1485db3b4f328599afe28a1b54d9~tplv-goo7wpa0wc-topic.png",
+      "retrieved": "2026-11-04",
+      "sha256": "c938ffcd81aa5b91feda1829c94ef5f2a6cab3503e4aa0bb1ab49a99f298f191",
+      "bytes": 85570,
+      "license": "Brand asset; no standalone license stated by the official source.",
+      "verification_page": "https://docs.trae.cn/cli_about-trae-code-cli-2",
+      "verified_on": "2026-11-04",
+      "source_sha256": "9bd320f7e23594183d7552751f558a5ba57aab267fa9404c2750263507496006",
+      "source_bytes": 110746,
+      "source_dimensions": [
+        2400,
+        2400
+      ],
+      "transform": "Crop original PNG to (400,400)-(2000,2000), then resize to 640x640 with Pillow LANCZOS. Only outer empty padding is removed; logo geometry and colors are retained.",
+      "note": "Official TRAE documentation site icon, used only for integration identification. TRAE owns the brand marks; this file is not a Lobe Icons/MIT asset.",
+      "dimensions": [
+        640,
+        640
+      ]
     }
-  ]
+  ],
+  "scope": "Per-file provenance and license declarations; product names and marks remain with their respective owners."
 }

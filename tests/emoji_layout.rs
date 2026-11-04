@@ -122,22 +122,11 @@ fn native_caret_stays_above_glyphs_and_block_cursor_uses_its_real_background() {
                 "native glyph tile erased the insertion caret"
             );
         } else {
-            let cursor_pixels = output
-                .textures_delta
-                .set
-                .iter()
-                .map(|(_, delta)| match &delta.image {
-                    egui::ImageData::Color(image) => image
-                        .pixels
-                        .iter()
-                        .filter(|p| p.r() == 215 && p.g() == 215 && p.b() == 215 && p.a() == 255)
-                        .count(),
-                })
-                .sum::<usize>();
-            assert!(
-                cursor_pixels > 60,
-                "opaque glyph background erased the block cursor"
-            );
+            let cursor = egui::Color32::from_rgb(215, 215, 215);
+            let painted = output.shapes.iter().any(|shape| {
+                matches!(&shape.shape, egui::Shape::Rect(rect) if rect.fill == cursor && rect.rect.width() > 5.0)
+            });
+            assert!(painted, "opaque glyph background erased the block cursor");
         }
     }
 }
