@@ -8,6 +8,30 @@ Record user-visible additions, improvements, fixes, and compatibility changes fo
 
 No confirmed changes for a subsequent version yet.
 
+## [0.4.6] - 2026-11-04
+
+### Added
+
+- Support Qoder CN CLI's `qodercn`/`qoderclicn` entries, avatar, lifecycle hooks, conversation recovery, drag selection and image paste. Resolve native/npm installs and preserve explicit user `--settings`, global configuration and directory trust.
+
+### Fixed
+
+- Codex launched through an absolute path, alias or `--remote … resume …` can establish its avatar and update state from explicit native notifications. Restore shell identity at its prompt and support repeated invocations. Hidden sessions still consume notifications in background logic, without inferring state from content or changing resume arguments or saved conversation IDs.
+
+### Upgrade notes and verification boundaries
+
+- Use the updated manager binary for already open windows; the CLI still owns login, trust and models. Record Qoder's offline synthetic lifecycle, real startup and user preview acceptance separately. This release does not automatically accept trust or send paid model requests.
+- Passed 168 Rust and 13 Python regressions, governance, formatting, Clippy, Release smoke, real Codex 0.166.0 absolute-path remote startup and seven synthetic Qoder state captures. A fake CLI in a real ConPTY covers resume arguments and repeated invocation. Startup captures are not real model-task acceptance; long-duration load and Windows 10 retesting were not run.
+
+## [0.4.6-preview.1] - 2026-11-04
+
+Local feature preview; not a published release.
+
+### Added
+
+- Support Qoder CN CLI's `qodercn`/`qoderclicn` entries, avatar and explicit lifecycle status. Exit restores the current shell; keep native terminal interaction, drag selection and image paste.
+- Inject metadata-only hooks with session-scoped `--settings`, preserving explicit user settings, global/project configuration and directory trust. Resolve native executables and npm launchers and preserve resume arguments.
+
 ## [0.4.5] - 2026-11-04
 
 ### Changed

@@ -85,7 +85,7 @@ def check():
 def main():
     argparse.ArgumentParser(description=__doc__,formatter_class=argparse.RawDescriptionHelpFormatter).parse_args()
     paths,errors,bilingual_pairs=check()
-    report={'ok':not errors,'candidate_files':len(paths),'font_identities_checked':5,'icon_identities_checked':2,'branding_identities_checked':3,'native_console_identities_checked':3,'bilingual_document_pairs_checked':len(bilingual_pairs),'errors':errors}
+    report={'ok':not errors,'candidate_files':len(paths),'font_identities_checked':5,'icon_identities_checked':len(json.loads((ROOT/'assets/icons/SOURCE.json').read_text(encoding='utf-8'))['files']),'branding_identities_checked':3,'native_console_identities_checked':3,'bilingual_document_pairs_checked':len(bilingual_pairs),'errors':errors}
     print(json.dumps(report,ensure_ascii=False,indent=2))
     return 1 if errors else 0
 

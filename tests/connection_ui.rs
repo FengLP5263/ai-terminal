@@ -14,7 +14,7 @@ fn text_rect(output: &egui::FullOutput, wanted: &str) -> Option<Rect> {
 }
 #[test]
 fn pending_status_explains_the_right_agent_and_copies_only_the_view_command() {
-    for agent in [Agent::Codex, Agent::Claude] {
+    for agent in [Agent::Codex, Agent::Claude, Agent::QoderCn] {
         let ctx = egui::Context::default();
         appearance::setup(&ctx);
         let status = Status::default();

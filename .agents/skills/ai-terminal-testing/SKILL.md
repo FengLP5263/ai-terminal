@@ -55,3 +55,7 @@ preview.4 的 island_move_probe 会保持原生移动状态跨越实际 DPI 边�
 原生 Codex 状态／agents 验收使用 agents_status_probe，命令见 scripts/README.md。codex 模式只发送左箭头和 Esc，核对真实入口、总览、返回及原生 idle 通知；不发送提示词、不接受 hook／项目信任、不停止共享后台。badges 模式只用合成文本截图核对 100%／146%／200% 下相邻模式图标。队列、旧代次、隐藏 ConPTY、未读及旧 hook 覆盖另由离线回归验证；启动／导航截图不能冒充真实模型回合。
 
 会话拖动与失败未读核查使用 `sidebar_drag_probe`（命令见 scripts/README.md）。只用合成元数据和自身 egui 输入，截图展开／收起的未读、已读、拖动及松手状态，不启动 PTY、Agent 或模型，不注入系统输入。`sidebar_interaction` 覆盖非中心抓取点、固定行槽让位、多档缩放、向上／向下排序、Esc／列表外取消、边缘滚动及取消后空闲；`settings_floating` 同时验证失败红点与完成绿点在查看后清除。App 的启动／退出失败回归与真实模型任务分别记录。
+
+Qoder CN：运行 tests/qoder_cn.rs 的发现、配置、恢复和真实 helper 的合成元数据回归；shell_sessions 使用伪 CLI 验证 PowerShell／CMD／Git Bash 的两个入口和显式设置保留。qoder_cn_probe 的 fixture 模式只画合成状态；默认模式只启动已安装 CLI，不发送提示、不确认信任或授权。截图完成与 hook_connected 分开记录，不把登录／信任页面当成已连接，也不冒称真实模型任务通过。
+
+Codex 直接启动回归使用 App 的真实 Shell／ConPTY 和绝对路径伪 codex.cmd，保留 --remote／-C／resume 参数，核对未识别阶段、原生状态、隐藏后台归约、clear 临时交接、返回提示符与重复调用。`shell_switch_probe` 可追加 `codex-direct` 做实际绝对路径／--remote unix:// 启动截图，仅在已信任目录使用，不发送模型提示、不确认信任、不关闭共享后台；截图需人工核对，不等于真实模型回合。

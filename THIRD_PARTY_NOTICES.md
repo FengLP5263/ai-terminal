@@ -18,7 +18,7 @@ Windows 系统字体只在运行时读取，不随包复制。项目 LICENSE 适
 
 - winit 0.30.13：本地 Windows 拖动 DPI 兼容补丁，Apache-2.0。见 [补丁来源](vendor/winit/UPSTREAM.zh.md) 和原始 LICENSE；制品依赖清单收集该本地依赖及许可证。
 
-OpenAI and Claude icons are from [Lobe Icons](https://github.com/lobehub/lobe-icons), MIT.
+OpenAI, Claude and Qoder icons are from [Lobe Icons](https://github.com/lobehub/lobe-icons), MIT.
 See assets/icons/SOURCE.json and assets/icons/LICENSE-lobe-icons. Brand names and marks belong to their respective owners.
 
 - egui-winit 0.35.0: local paste-event compatibility patch, MIT OR Apache-2.0. See vendor/egui-winit/UPSTREAM.md and its included license files. The packaged dependency inventory includes this patched crate.
