@@ -35,11 +35,18 @@ class BilingualChecks(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
             (root / 'scripts').mkdir()
-            (root / 'README.md').write_text('[English](README.en.md)', encoding='utf-8')
-            (root / 'README.en.md').write_text('[中文](README.md)', encoding='utf-8')
+            chinese = '[English](README.en.md)\n同一内容\n'
+            english = '[中文](README.md)\nSame content\n'
+            (root / 'README.md').write_bytes(chinese.encode('utf-8'))
+            (root / 'README.en.md').write_bytes(english.encode('utf-8'))
             pairs = {('README.md', 'README.en.md')}
             manifest = root / 'scripts/bilingual-manifest.json'
             manifest.write_text(json.dumps(module.digests(pairs, root)), encoding='utf-8')
+            self.assertEqual([], module.verify_snapshots(pairs, root))
+            # A Windows checkout/editor may change newlines or add a UTF-8 BOM.
+            # Those representation changes must not erase the recorded review.
+            (root / 'README.md').write_bytes(chinese.replace('\n', '\r\n').encode('utf-8-sig'))
+            (root / 'README.en.md').write_bytes(english.replace('\n', '\r\n').encode('utf-8'))
             self.assertEqual([], module.verify_snapshots(pairs, root))
             (root / 'README.md').write_text('changed [English](README.en.md)', encoding='utf-8')
             self.assertTrue(any('README.md' in e for e in module.verify_snapshots(pairs, root)))

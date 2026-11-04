@@ -19,6 +19,7 @@ No confirmed changes for a subsequent version yet.
 
 - Treat failure red dots and completion green dots as unread badges: viewing clears them from the sidebar and floating rail while retaining the failed/completed state. Record unread state for startup failures and abnormal process exits too.
 - Give adjacent narrow Claude mode badges equal visual widths, fixing mismatched double-triangle sizes. Preserve isolated badges, combined emoji and VS15 text presentation.
+- Normalize bilingual document digests as UTF-8/LF text, preventing false governance failures after Windows checkout or editor line-ending conversions.
 
 ### Upgrade notes and verification limits
 
