@@ -129,6 +129,14 @@ def dependencies(cargo,folder):
         inventory.append({'name':package['name'],'version':package['version'],'license_expression':package.get('license'),'repository':package.get('repository'),'license_files':copied,'license_text_available':bool(found)})
     (folder/'dependencies.json').write_text(json.dumps({'scope':'Cargo locked Windows-target metadata, not a binary-completeness claim','packages':inventory,'license_text_missing':[p['name']+'@'+p['version'] for p in inventory if not p['license_text_available']]},ensure_ascii=False,indent=2),encoding='utf-8')
 
+def icon_notices(folder,root=ROOT):
+    source=root/'assets/icons'
+    destination=folder/'agent-icons'
+    destination.mkdir()
+    shutil.copy2(source/'SOURCE.json',destination/'SOURCE.json')
+    for license_file in sorted(source.glob('LICENSE-*')):
+        shutil.copy2(license_file,destination/license_file.name)
+
 def build(allow_dirty=False):
     if os.name!='nt':raise ValueError('native Windows packaging is unsupported on this OS; use Windows project.ps1, or verify an existing ZIP here')
     host=command(['rustc','-Vv']).stdout
@@ -151,8 +159,10 @@ def build(allow_dirty=False):
     for name in ['ai-terminal.exe','ai-terminal-hook.exe']:shutil.copy2(target/name,folder/name)
     for name in CHANGELOGS:shutil.copy2(ROOT/name,folder/name)
     native=native_console_assets(folder)
+    icon_notices(folder)
     for source,destination in [('LICENSE','LICENSE.txt'),('vendor/egui_term/LICENSE','egui-term-LICENSE.txt'),('assets/fonts/LICENSE.md','Hack-LICENSE.txt'),('assets/icons/LICENSE-lobe-icons','Lobe-Icons-LICENSE.txt'),('THIRD_PARTY_NOTICES.md','THIRD_PARTY_NOTICES.md')]:shutil.copy2(ROOT/source,folder/destination)
-    (folder/'README.txt').write_text('ai-terminal '+version+'\n\n请完整解压。ai-terminal.exe、ai-terminal-hook.exe、conpty.dll 和 OpenConsole.exe 必须放在同一目录。双击 ai-terminal.exe 默认进入 PowerShell；左上角＋可新建 PowerShell、CMD 或 Git Bash，在终端中输入 codex、claude 或 qodercn。\n会话数据在 %LOCALAPPDATA%/ai-terminal；退出只回收本程序拥有的会话进程。\nCodex 默认使用原生状态与共享 agents 总览；旧版没有原生通知时，可显式运行 codex --no-daemon 并在 /hooks 审查兼容 hook。共享后台任务由 Codex 自身管理。版本、源码与原生组件身份见 manifest.json；许可证随包携带。\n\nExtract the complete archive. Keep ai-terminal.exe, ai-terminal-hook.exe, conpty.dll and OpenConsole.exe together. Double-click ai-terminal.exe for PowerShell; use + for PowerShell, CMD or Git Bash, then run codex, claude or qodercn.\nSession data: %LOCALAPPDATA%/ai-terminal. Exit closes only owned sessions. Codex uses native lifecycle and the shared agents overview by default. Older CLIs without native events can run codex --no-daemon and review compatibility hooks in /hooks. Codex owns shared background tasks. See manifest.json and the included licenses for source/runtime identity.\n',encoding='utf-8')
+    shutil.copy2(ROOT/'THIRD_PARTY_NOTICES.en.md',folder/'THIRD_PARTY_NOTICES.en.md')
+    (folder/'README.txt').write_text('ai-terminal '+version+'\n\n请完整解压。ai-terminal.exe、ai-terminal-hook.exe、conpty.dll 和 OpenConsole.exe 必须放在同一目录。双击 ai-terminal.exe 默认进入 PowerShell；左上角＋可新建 PowerShell、CMD 或 Git Bash，在终端中输入 codex、claude、qodercn、kimi、zcode 或 traecli。\n会话数据在 %LOCALAPPDATA%/ai-terminal；退出只回收本程序拥有的会话进程。\nCodex 默认使用原生状态与共享 agents 总览；旧版没有原生通知时，可显式运行 codex --no-daemon 并在 /hooks 审查兼容 hook。共享后台任务由 Codex 自身管理。Kimi Code、ZCode、TRAE CLI 本版仅识别头像和启动／退出，任务进度在 CLI 内查看。版本、源码与原生组件身份见 manifest.json；许可证随包携带。\n\nExtract the complete archive. Keep ai-terminal.exe, ai-terminal-hook.exe, conpty.dll and OpenConsole.exe together. Double-click ai-terminal.exe for PowerShell; use + for PowerShell, CMD or Git Bash, then run codex, claude, qodercn, kimi, zcode or traecli.\nSession data: %LOCALAPPDATA%/ai-terminal. Exit closes only owned sessions. Codex uses native lifecycle and the shared agents overview by default. Older CLIs without native events can run codex --no-daemon and review compatibility hooks in /hooks. Codex owns shared background tasks. Kimi Code, ZCode and TRAE CLI provide avatar and launch/exit recognition only in this release; check task progress in the CLI. See manifest.json and the included licenses for source/runtime identity.\n',encoding='utf-8')
     dependencies(cargo,folder)
     head=command(['git','rev-parse','--verify','HEAD'],check=False)
     manifest={'format_version':2,'version':version,'platform':'windows-x64','git_commit':head.stdout.strip() if head.returncode==0 else None,'dirty':dirty,'rustc':command(['rustc','-V']).stdout.strip(),'source_sha256':source_identity(),'source_scope':'Cargo manifests/lock, build.rs, production Rust, local egui_glow sources/shaders and winit build sources/assets, font/icon/branding/native-console assets','native_console':native,'build':'cargo build --locked --release','published':False,'files':{}}

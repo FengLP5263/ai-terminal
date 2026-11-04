@@ -33,3 +33,5 @@ package 会调用 Cargo release 构建，生成独立版本目录和 ZIP，记�
 打包前校验 CHANGELOG.md／CHANGELOG.en.md 含 Cargo 当前版本唯一、同日期、分类且非空的条目；缺失时拒绝构建。ZIP 附带完整双语更新日志，其字节也计入源码身份。更新日志校验可通过既有 governance、ci、package 入口执行，Windows／POSIX 的入口参数不变。
 
 本地 winit 补丁的 Cargo 清单、build.rs、Rust 源码及嵌入资产也必须计入源码身份；保留上游 Apache-2.0 许可证和双语 UPSTREAM 来源记录，并通过 Cargo metadata 收集进依赖许可证清单。
+
+图标来源和可获得的原始许可保存在 ZIP 的 agent-icons/，双语 THIRD_PARTY_NOTICES 也随包携带。按 SOURCE.json 的逐文件来源核查许可范围，不把独立官方品牌资产套用 Lobe MIT；回读包内清单与许可原文。统一 Windows／POSIX 入口和参数不变。

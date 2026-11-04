@@ -162,6 +162,14 @@ fn agent_roundtrip(kind: Agent) {
         "AI_TERMINAL_REAL_QODER_CN".into(),
         fake.to_string_lossy().into_owned(),
     );
+    for key in [
+        "AI_TERMINAL_REAL_KIMI",
+        "AI_TERMINAL_REAL_ZCODE",
+        "AI_TERMINAL_REAL_TRAE",
+    ] {
+        plan.environment
+            .insert(key.into(), fake.to_string_lossy().into_owned());
+    }
     plan.environment
         .insert("AI_TERMINAL_FIXTURE_INTERACTIVE".into(), "1".into());
     let generation = plan.generation.clone();
@@ -192,6 +200,9 @@ fn agent_roundtrip(kind: Agent) {
         ("qodercn", "qodercn"),
         ("qoderclicn", "qodercn"),
         ("qodercn --settings=custom-settings.json", "qodercn"),
+        ("kimi", "kimi"),
+        ("zcode", "zcode"),
+        ("traecli", "traecli"),
     ] {
         terminal.process_command(BackendCommand::Write(format!("{agent}\r").into_bytes()));
         let began = bridge

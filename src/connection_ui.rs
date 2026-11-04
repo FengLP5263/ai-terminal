@@ -39,15 +39,19 @@ pub fn show(ui: &mut egui::Ui, agent: Agent, status: &Status) -> egui::Response 
                     ui.label(crate::i18n::tr(ui.ctx(),"旧版没有原生通知时，可退出后运行 codex --no-daemon 使用兼容模式，再用 /hooks 审查状态钩子。此模式没有共享 agents 入口。","For older CLIs without native events, exit and run codex --no-daemon for compatibility, then review status hooks in /hooks. This mode has no shared agents entry."));
                 } else if agent == Agent::QoderCn {
                     ui.label(crate::i18n::tr(ui.ctx(),"Qoder CN 通过本次启动的 --settings 接入任务 hook。请在 CLI 中自行确认目录信任，再检查 /hooks；手动传入 --settings 时沿用你的配置。","Qoder CN uses task hooks from session-scoped --settings. Review directory trust in the CLI and check /hooks; explicit --settings preserves your configuration."));
+                } else if matches!(agent, Agent::Kimi | Agent::ZCode | Agent::Trae) {
+                    ui.label(crate::i18n::tr(ui.ctx(),"此版本仅识别该 CLI 的头像与启动／退出，尚未接入会话级任务通知。请在 Agent 内查看任务进度；管理器不会修改用户或项目的 hook 配置。","This release recognizes this CLI's avatar and launch/exit only; session-scoped task events are not integrated. Follow progress in the Agent. The manager does not edit user or project hook configuration."));
                 } else {
                     ui.label(crate::i18n::tr(ui.ctx(),"在当前 Claude 输入 /hooks，检查状态钩子是否加载。手动指定配置文件时，请确认其中包含状态钩子。","Use /hooks in Claude to check the status hooks. Custom settings files must include them."));
                 }
             }
-            if ui.button(crate::i18n::tr(ui.ctx(),"复制 /hooks","Copy /hooks")).clicked() {
-                ui.ctx().copy_text("/hooks".into());
-                ui.close();
+            if matches!(agent, Agent::Codex | Agent::Claude | Agent::QoderCn) {
+                if ui.button(crate::i18n::tr(ui.ctx(),"复制 /hooks","Copy /hooks")).clicked() {
+                    ui.ctx().copy_text("/hooks".into());
+                    ui.close();
+                }
+                ui.small(crate::i18n::tr(ui.ctx(),"仅复制查看命令；信任操作由你在 Agent 内确认。","Copies the view command only. You review trust within the agent."));
             }
-            ui.small(crate::i18n::tr(ui.ctx(),"仅复制查看命令；信任操作由你在 Agent 内确认。","Copies the view command only. You review trust within the agent."));
         });
     });
     control

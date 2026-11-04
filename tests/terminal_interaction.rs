@@ -690,3 +690,68 @@ fn focus_loss_during_composition_does_not_block_input() {
         "focus recovery dropped input or submitted unfinished composition: {text}"
     );
 }
+
+#[test]
+fn cursor_position_queries_receive_exactly_one_report_per_query() {
+    // Interactive CLI agents query the cursor with `ESC[6n` while their stdin is
+    // in raw VT mode. The ConPTY passthrough must forward each query to the
+    // embedded terminal, which must answer exactly once per query so agents
+    // that consume one report per query never see leftovers on their input line.
+    let fixture = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/fixtures/vt_cursor_probe.py"
+    );
+    let (tx, _) = mpsc::channel();
+    let ctx = egui::Context::default();
+    let mut backend = TerminalBackend::new(
+        741,
+        ctx.clone(),
+        tx,
+        BackendSettings {
+            shell: "python.exe".into(),
+            args: vec!["-X".into(), "utf8".into(), fixture.into()],
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    frame(&ctx, &mut backend, vec![], false);
+    let text = wait_text(&mut backend, "GOT:");
+    let hex_line = text
+        .lines()
+        .find(|line| line.contains("GOT:"))
+        .expect("probe did not report captured stdin");
+    let bytes: Vec<u8> = hex_line
+        .trim_start_matches(|c: char| !c.is_ascii_hexdigit())
+        .split(' ')
+        .filter_map(|token| u8::from_str_radix(token, 16).ok())
+        .collect();
+    assert!(!bytes.is_empty(), "no stdin bytes captured: {text}");
+    let reports: Vec<&[u8]> = bytes
+        .split(|byte| *byte == 0x1b)
+        .filter(|chunk| !chunk.is_empty())
+        .collect();
+    assert_eq!(
+        reports.len(),
+        2,
+        "expected one cursor report per query, captured: {bytes:?}"
+    );
+    for report in reports {
+        let report_text = String::from_utf8_lossy(report);
+        let params: Vec<&str> = report_text
+            .strip_prefix('[')
+            .and_then(|rest| rest.strip_suffix('R'))
+            .map(|body| body.split(';').collect())
+            .unwrap_or_default();
+        assert_eq!(
+            params.len(),
+            2,
+            "cursor report is not `ESC[{{row}};{{col}}R`: {bytes:?}"
+        );
+        assert!(
+            params
+                .iter()
+                .all(|param| !param.is_empty() && param.bytes().all(|b| b.is_ascii_digit())),
+            "cursor report has non-numeric coordinates: {bytes:?}"
+        );
+    }
+}

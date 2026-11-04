@@ -1,5 +1,6 @@
 //! Native application screenshots of CMD -> PowerShell -> CMD and per-level exit.
 //! Optional codex-direct mode checks absolute-path remote startup without a prompt.
+//! kimi/zcode/traecli modes capture installed CLI startup and interrupt back to shell.
 //! Input is confined to this isolated window; no model request or trust approval.
 #[path = "../src/app.rs"]
 mod app;
@@ -23,6 +24,11 @@ struct Probe {
     capture_pending: bool,
     input_pending: Option<String>,
     codex_direct: Option<String>,
+    agent: Option<String>,
+    focus_click: u8,
+    escape_pending: bool,
+    interrupts_remaining: u8,
+    last_interrupt: Instant,
     finished: bool,
 }
 
@@ -69,6 +75,41 @@ impl eframe::App for Probe {
                 repeat: false,
                 modifiers: egui::Modifiers::NONE,
             });
+        } else if self.focus_click > 0 {
+            let pos = ctx.content_rect().max - egui::vec2(80.0, 60.0);
+            input.events.push(egui::Event::PointerMoved(pos));
+            input.events.push(egui::Event::PointerButton {
+                pos,
+                button: egui::PointerButton::Primary,
+                pressed: self.focus_click == 2,
+                modifiers: egui::Modifiers::NONE,
+            });
+            self.focus_click -= 1;
+        } else if self.escape_pending {
+            for pressed in [true, false] {
+                input.events.push(egui::Event::Key {
+                    key: egui::Key::Escape,
+                    physical_key: Some(egui::Key::Escape),
+                    pressed,
+                    repeat: false,
+                    modifiers: egui::Modifiers::NONE,
+                });
+            }
+            self.escape_pending = false;
+        } else if self.interrupts_remaining > 0
+            && self.last_interrupt.elapsed() > Duration::from_millis(600)
+        {
+            for pressed in [true, false] {
+                input.events.push(egui::Event::Key {
+                    key: egui::Key::C,
+                    physical_key: Some(egui::Key::C),
+                    pressed,
+                    repeat: false,
+                    modifiers: egui::Modifiers::CTRL,
+                });
+            }
+            self.interrupts_remaining -= 1;
+            self.last_interrupt = Instant::now();
         }
         self.inner.raw_input_hook(ctx, input);
     }
@@ -79,7 +120,7 @@ impl eframe::App for Probe {
         }
         self.inner.ui(ui, frame);
         let ctx = ui.ctx();
-        let delay = if self.codex_direct.is_some() && self.stage == 1 {
+        let delay = if (self.codex_direct.is_some() || self.agent.is_some()) && self.stage == 1 {
             15
         } else {
             5
@@ -95,7 +136,9 @@ impl eframe::App for Probe {
             })
         });
         if let Some(image) = screenshot {
-            let name = if self.codex_direct.is_some() {
+            let name = if self.agent.is_some() {
+                ["root-powershell", "agent-startup", "returned-powershell"][self.stage]
+            } else if self.codex_direct.is_some() {
                 ["root-powershell", "absolute-codex-remote"][self.stage]
             } else {
                 [
@@ -125,13 +168,22 @@ impl eframe::App for Probe {
                 )
                 .unwrap();
             self.stage += 1;
-            if self.stage == if self.codex_direct.is_some() { 2 } else { 5 } {
+            let captures = if self.agent.is_some() {
+                3
+            } else if self.codex_direct.is_some() {
+                2
+            } else {
+                5
+            };
+            if self.stage == captures {
                 std::fs::write(
                     self.output.join("capture.json"),
                     serde_json::to_vec_pretty(&serde_json::json!({
                         "screenshots": self.stage, "visual_review_required": true,
                         "model_request_sent": false, "isolated_sessions": true,
                         "absolute_codex_remote": self.codex_direct.is_some(),
+                        "installed_cli": self.agent,
+                        "exit_input": if self.agent.is_some() { "focus empty terminal, Esc, Ctrl+C" } else { "existing probe sequence" },
                         "trust_approved": false, "shared_server_stopped": false,
                     }))
                     .unwrap(),
@@ -142,11 +194,23 @@ impl eframe::App for Probe {
                 ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                 return;
             }
-            self.input_pending = Some(if let Some(command) = &self.codex_direct {
-                command.clone()
+            if let Some(agent) = &self.agent {
+                if self.stage == 1 {
+                    self.input_pending = Some(agent.clone());
+                } else {
+                    self.focus_click = 2;
+                    self.escape_pending = true;
+                    self.interrupts_remaining = 3;
+                    self.last_interrupt = Instant::now() - Duration::from_secs(1);
+                }
             } else {
-                ["powershell -NoLogo -NoProfile", "cmd /d", "exit", "exit"][self.stage - 1].into()
-            });
+                self.input_pending = Some(if let Some(command) = &self.codex_direct {
+                    command.clone()
+                } else {
+                    ["powershell -NoLogo -NoProfile", "cmd /d", "exit", "exit"][self.stage - 1]
+                        .into()
+                });
+            }
             self.stage_began = Instant::now();
             self.capture_pending = false;
         }
@@ -158,10 +222,23 @@ fn main() -> eframe::Result {
     let output = PathBuf::from(
         std::env::args()
             .nth(1)
-            .expect("shell_switch_probe output-directory [codex-direct]"),
+            .expect("shell_switch_probe output-directory [codex-direct|kimi|zcode|traecli]"),
     );
     let direct = std::env::args().nth(2).is_some_and(|s| s == "codex-direct");
-    let directory = if direct {
+    let agent = std::env::args()
+        .nth(2)
+        .filter(|s| ["kimi", "zcode", "traecli"].contains(&s.as_str()));
+    if let Some(name) = &agent {
+        let identity = match name.as_str() {
+            "kimi" => ai_terminal::model::Agent::Kimi,
+            "zcode" => ai_terminal::model::Agent::ZCode,
+            _ => ai_terminal::model::Agent::Trae,
+        };
+        ai_terminal::discovery::CliSearch::current()
+            .resolve(identity)
+            .expect("Install the selected CLI first");
+    }
+    let directory = if direct || agent.is_some() {
         std::env::current_dir().unwrap()
     } else {
         PathBuf::from(std::env::var_os("SystemRoot").expect("SystemRoot"))
@@ -203,7 +280,7 @@ fn main() -> eframe::Result {
                 id: "shell-switch".into(),
                 name: "Shell switch preview".into(),
                 directory,
-                agent: if direct {
+                agent: if direct || agent.is_some() {
                     ai_terminal::model::Agent::Shell
                 } else {
                     ai_terminal::model::Agent::Cmd
@@ -233,6 +310,11 @@ fn main() -> eframe::Result {
                 capture_pending: false,
                 input_pending: None,
                 codex_direct,
+                agent,
+                focus_click: 0,
+                escape_pending: false,
+                interrupts_remaining: 0,
+                last_interrupt: Instant::now(),
                 finished: false,
             }))
         }),

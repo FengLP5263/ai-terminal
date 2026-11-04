@@ -79,3 +79,7 @@ Managed Codex invocations: a bounded, session-scoped OSC 9 observer forwards onl
 Windows 兼容性验收：为宿主探针公开重导出 Alacritty 的 WindowSize，以核查最终 ConPTY 行列／物理字符尺寸。宿主在程序目录随带固定版微软 conpty.dll／OpenConsole.exe，使用 Alacritty 既有动态加载路径；本补丁不改其 ConPTY 协议实现。
 
 Native Codex lifecycle: observe only recognized OSC 7501 state/app/kind values, preserving byte-for-byte PTY output. A 32-state queue preserves recent transition order, coalesces wakeups and rejects old invocation epochs. No status text, prompts or activity details are retained. Adjacent narrow mode badges share a one-cell visual budget; only an isolated badge can extend into its following blank, preventing unequal triangle raster scales.
+
+Unreleased: native glyph atlas keys exclude foreground/background colors; white alpha masks are tinted by mesh vertex colors. Atlas overflow retires only the oldest page and defers texture release to a later frame instead of clearing the whole atlas.
+
+Unreleased retirement fix: run old-page cleanup before the glyph-cache hit return. Repeated cache hits in later frames now release retired textures; same-frame shapes retain valid handles. Native regressions verify both the texture free delta and same-frame shape references without adding polling or idle repaint.

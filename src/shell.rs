@@ -67,6 +67,9 @@ pub fn build(
             "qoderclicn.exe",
             "AI_TERMINAL_REAL_QODER_CN",
         ),
+        (Agent::Kimi, "kimi.exe", "AI_TERMINAL_REAL_KIMI"),
+        (Agent::ZCode, "zcode.exe", "AI_TERMINAL_REAL_ZCODE"),
+        (Agent::Trae, "traecli.exe", "AI_TERMINAL_REAL_TRAE"),
         (
             Agent::Shell,
             "powershell.exe",
@@ -217,6 +220,12 @@ pub fn shim_agent() -> Option<Agent> {
         || name.eq_ignore_ascii_case(std::ffi::OsStr::new("qoderclicn"))
     {
         Some(Agent::QoderCn)
+    } else if name.eq_ignore_ascii_case(std::ffi::OsStr::new("kimi")) {
+        Some(Agent::Kimi)
+    } else if name.eq_ignore_ascii_case(std::ffi::OsStr::new("zcode")) {
+        Some(Agent::ZCode)
+    } else if name.eq_ignore_ascii_case(std::ffi::OsStr::new("traecli")) {
+        Some(Agent::Trae)
     } else if name.eq_ignore_ascii_case(std::ffi::OsStr::new("powershell")) {
         Some(Agent::Shell)
     } else if name.eq_ignore_ascii_case(std::ffi::OsStr::new("cmd")) {
@@ -263,6 +272,9 @@ fn notice(name: &str, agent: Agent, invocation: &str, exit_code: Option<i32>) {
                 Agent::Codex => "codex",
                 Agent::Claude => "claude",
                 Agent::QoderCn => "qodercn",
+                Agent::Kimi => "kimi",
+                Agent::ZCode => "zcode",
+                Agent::Trae => "traecli",
                 Agent::Shell => "powershell",
                 Agent::Cmd => "cmd",
                 Agent::Bash => "bash",
@@ -372,6 +384,9 @@ pub fn run_agent(agent: Agent, args: Vec<OsString>) -> i32 {
             Agent::Codex => "AI_TERMINAL_REAL_CODEX",
             Agent::Claude => "AI_TERMINAL_REAL_CLAUDE",
             Agent::QoderCn => "AI_TERMINAL_REAL_QODER_CN",
+            Agent::Kimi => "AI_TERMINAL_REAL_KIMI",
+            Agent::ZCode => "AI_TERMINAL_REAL_ZCODE",
+            Agent::Trae => "AI_TERMINAL_REAL_TRAE",
             _ => return Err("不是 Agent 类型".into()),
         };
         let binary = std::env::var_os(key)

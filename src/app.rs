@@ -182,6 +182,9 @@ impl Session {
                     Some("codex") => Agent::Codex,
                     Some("claude") => Agent::Claude,
                     Some("qodercn") => Agent::QoderCn,
+                    Some("kimi") => Agent::Kimi,
+                    Some("zcode") => Agent::ZCode,
+                    Some("traecli") => Agent::Trae,
                     _ => return false,
                 };
                 let Some(invocation) = event.invocation.clone() else {
@@ -319,6 +322,11 @@ impl App {
         idle_benchmark: bool,
     ) -> Self {
         ai_terminal::appearance::setup(&cc.egui_ctx);
+        if smoke {
+            // Keep the capture free of incidental hover overlays from the OS cursor.
+            cc.egui_ctx
+                .all_styles_mut(|style| style.interaction.tooltip_delay = 3600.0);
+        }
         ai_terminal::window_frame::apply_dark(cc);
         cc.egui_ctx
             .send_viewport_cmd(egui::ViewportCommand::SetTheme(egui::SystemTheme::Dark));
@@ -339,7 +347,12 @@ impl App {
                 migrated = true;
             }
         }
-        let preferences = workspace.ui.normalize();
+        let mut preferences = workspace.ui.normalize();
+        let shortcut_attempted = ai_terminal::shortcut::ensure_first_run(
+            &mut preferences,
+            smoke || idle_benchmark || error.is_some(),
+            &directory,
+        );
         ai_terminal::zoom::initialize(&cc.egui_ctx, preferences.ui_scale);
         i18n::apply(&cc.egui_ctx, preferences.language);
         let icons = ai_terminal::sidebar::Icons::new(&cc.egui_ctx);
@@ -382,7 +395,7 @@ impl App {
             directory,
             save_error: error,
             load_failed,
-            dirty: migrated,
+            dirty: migrated || shortcut_attempted,
             rename: None,
             rename_text: String::new(),
             close_session: None,
@@ -1217,9 +1230,16 @@ impl App {
         }
         if !self.smoke_setup {
             self.smoke_setup = true;
-            for (index, name) in ["接口联调 🚀", "桌宠修复 👋🏽", "AI 终端 ❤️"]
-                .into_iter()
-                .enumerate()
+            for (index, name) in [
+                "接口联调 🚀",
+                "桌宠修复 👋🏽",
+                "AI 终端 ❤️",
+                "Kimi Code",
+                "ZCode",
+                "TRAE",
+            ]
+            .into_iter()
+            .enumerate()
             {
                 let spec = SessionSpec {
                     id: uuid::Uuid::new_v4().to_string(),
@@ -1232,6 +1252,9 @@ impl App {
                             model::SessionColor::Blue,
                             model::SessionColor::Pink,
                             model::SessionColor::Purple,
+                            model::SessionColor::Teal,
+                            model::SessionColor::Amber,
+                            model::SessionColor::Green,
                         ][index],
                     ),
                 };
@@ -1279,7 +1302,11 @@ impl App {
                                 notification_type: (name == "Notification")
                                     .then(|| "permission_prompt".into()),
                                 source: if name == "ShellAgentStarted" {
-                                    Some(if index == 1 { "claude" } else { "codex" }.into())
+                                    Some(
+                                        ["codex", "claude", "qodercn", "kimi", "zcode", "traecli"]
+                                            [index]
+                                            .into(),
+                                    )
                                 } else {
                                     None
                                 },
@@ -1325,11 +1352,14 @@ impl App {
         }
         if self.started.elapsed() > Duration::from_secs(7) {
             let sessions:Vec<_>=self.sessions.iter_mut().map(|s|serde_json::json!({"name":s.spec.name,"activity":format!("{:?}",s.status.activity),"unread":s.status.unread,"pty_pid":s.backend.as_ref().map(|b|b.pty_id()),"terminal_text":s.backend.as_mut().map(|b|b.plain_text())})).collect();
-            let pass = self.sessions.len() == 3
+            let pass = self.sessions.len() == 6
                 && self.sessions[0].status.unread
                 && self.sessions[0].status.activity == Activity::Completed
                 && self.sessions[1].status.activity == Activity::Waiting
                 && self.sessions[2].status.activity == Activity::Working
+                && self.sessions[3..]
+                    .iter()
+                    .all(|s| s.status.activity == Activity::Working)
                 && self.sessions.iter().all(|s| s.backend.is_some());
             let report = serde_json::json!({"ok":pass,"fixture_events":true,"gpu":self.gpu_info,"sessions":sessions,"manager_resident_bytes":crate::platform::resident_bytes(),"frames":self.frames,"ui_cpu_micros":self.ui_micros,"elapsed_ms":self.started.elapsed().as_millis()});
             let _ = std::fs::create_dir_all(&self.directory);
@@ -2188,6 +2218,30 @@ Send-State 'state=clear'; Wait-Step 5
             false
         ));
         assert_eq!(session.display_agent(), Agent::Cmd);
+    }
+
+    #[test]
+    fn identity_only_agents_are_recognized_without_invented_status() {
+        let mut session = Session::new(SessionSpec {
+            id: "identity-only".into(),
+            name: "my terminal".into(),
+            directory: PathBuf::new(),
+            agent: Agent::Shell,
+            agent_session_id: None,
+            color: None,
+        });
+        for (source, agent) in [
+            ("kimi", Agent::Kimi),
+            ("zcode", Agent::ZCode),
+            ("traecli", Agent::Trae),
+        ] {
+            assert!(session.event(&shell_metadata("ShellAgentStarted", source, source), false));
+            assert_eq!(session.display_agent(), agent);
+            assert_eq!(session.status.activity, Activity::Unknown);
+            assert!(session.event(&shell_metadata("ShellAgentEnded", source, source), false));
+            assert_eq!(session.display_agent(), Agent::Shell);
+            assert_eq!(session.status.activity, Activity::Idle);
+        }
     }
 
     #[test]

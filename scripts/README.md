@@ -89,3 +89,7 @@ Codex 原生状态／总览与模式图标（仅 Windows）：构建 `cargo buil
 侧栏拖动及失败未读截图（仅 Windows，PowerShell／Git Bash）：`cargo build --offline --locked --release --example sidebar_drag_probe`，再运行 `target/release/examples/sidebar_drag_probe.exe output/<unique-sidebar-drag-probe>`。正式侧栏和浮窗组件、标准 B 图标、固定示例目录；生成展开／收起的未读、已读、拖动卡片和松手排序共八张原生 PNG 及 result.json。只向探针自身 egui 发送合成输入，不启动 PTY、Agent 或模型，不读用户配置、不注入系统鼠标。核对进程退出码、抓取点、卡片让位与红点清除，截图完成不替代视觉检查。
 
 Qoder CN 启动／合成状态截图（仅 Windows，PowerShell／Git Bash）：`cargo build --offline --locked --release --bins --example qoder_cn_probe`；`target/release/examples/qoder_cn_probe.exe output/<unique-qoder-fixture> fixture` 生成七种状态图；省略 fixture 时仅启动已安装的 Qoder CN 并截图，不输入提示或确认信任。默认模式使用当前目录；请在已有可信目录执行。result.json 分别记录 synthetic、hook_connected、事件名称及未发送模型请求，必须核对退出码和实际画面。
+
+package 另将图标来源清单和可获得的原始许可复制到 ZIP 的 agent-icons/，并附带双语 THIRD_PARTY_NOTICES；品牌资产按来源分别声明，不统一套用 Lobe MIT。Windows／POSIX 的统一入口和参数不变。
+
+0.4.7 新增已安装 CLI 的原生启动核查：先构建 `cargo build --offline --locked --release --bins --example shell_switch_probe`，再分别执行 `target/release/examples/shell_switch_probe.exe output/<unique-cli-probe> kimi`（末项也可为 `zcode`、`traecli`）。仅输入启动命令，聚焦终端空白区后发送 Esc／Ctrl+C，不提交提示或接受信任；人工检查三张截图中的头像、等待任务通知及返回 Shell，记录实际发行版。README 头像由 `cargo build --offline --locked --release --example agent_icons_capture` 和 `target/release/examples/agent_icons_capture.exe output/<unique-agent-icons>` 生成；无 PTY、Agent 或模型，复用正式头像组件及 B 程序图标。核查六枚 PNG 后原样复制到 assets/readme 并更新 SOURCE.json。均仅支持 Windows 原生运行，没有新增 project 动作或参数。

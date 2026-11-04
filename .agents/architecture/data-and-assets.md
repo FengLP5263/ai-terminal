@@ -20,7 +20,7 @@ runtime/ 保存会话级 hook 配置；桥 token 只在进程环境和短消息�
 
 - assets/fonts/Hack-*.ttf：官方 v3.003，来源、大小和 SHA-256 在 SOURCE.json，原许可证 LICENSE.md。
 - assets/branding：项目原创 B「会话叠窗」图标，SVG 与用户选定源字节相同，PNG／ICO 为固定导出；SOURCE.json 记录大小和 SHA-256，治理检查逐项核对。
-- assets/icons：Lobe Icons 的 OpenAI／Claude PNG，MIT；SOURCE.json 固定下载 URL、日期、大小和 SHA-256，许可证随包携带。
+- assets/icons：OpenAI／Claude／Qoder 来自 Lobe Icons（MIT）；Kimi Code／ZCode 使用各自官方仓库的产品图标，TRAE 使用官方 CLI 文档站的图标。SOURCE.json 逐文件记录来源、许可声明、原始尺寸、变换、大小与 SHA-256，不跨来源套用许可证。
 - Windows 中文／UI／emoji 字体：读取系统字体（含 Segoe UI Emoji），不复制到 Git 或交付包。
 - vendor/egui_term：MIT，上游固定 revision 和本地补丁记录在 UPSTREAM.md。
 - 其他 Cargo 依赖：见 Cargo.lock 和 THIRD_PARTY_NOTICES.md；打包生成依赖清单并收集本机可获得的许可证。
@@ -61,8 +61,12 @@ target/、output/、.runtime/、runtime/、.tools/、参考交接文件、数据
 
 0.4.3 起根中英文 CHANGELOG 纳入源码摘要并随 ZIP 分发；构建先核对当前版本、同一日期和非空的分类变更。GitHub Release 沿用相同版本条目。旧 ZIP 的只读完整性校验不因缺少新日志文件而失效。
 
-Agent 头像源图保留 640×640；按实际物理尺寸做面积过滤，每种头像最多共享缓存 12 个尺寸，整数像素对齐，不在每帧缩图。原生表情图块完整适配单元格，VS15 保留文字呈现，不改变终端网格坐标。
+Agent 头像保留上游 PNG 原始尺寸，TRAE 仅离线裁去外围留白并缩至 640×640；按实际物理尺寸做面积过滤，每种头像最多共享缓存 12 个尺寸，整数像素对齐，不在每帧缩图。原生表情图块完整适配单元格，VS15 保留文字呈现，不改变终端网格坐标。
 
 新增本地 winit 0.30.13（Apache-2.0）补丁的来源及归档哈希见 vendor/winit/UPSTREAM.zh.md，原始 LICENSE 保留。制品源码身份包含它的 Cargo.toml、build.rs 及 src 下的源码／嵌入资产；依赖清单自动记录本地补丁并收集该 LICENSE。
 
 Qoder CN 使用 Lobe Icons 的 640 像素 Qoder 图标，来源、MIT 许可和 SHA-256 记录在 assets/icons；与其他 Agent 共用按物理尺寸面积过滤的有界缓存。Agent::QoderCn 仅增加身份类型，会话持久化字段、认证边界与终端历史上限不变。
+
+Kimi Code 使用官方仓库文档所用的 316×316 PNG，ZCode 使用官方仓库 README 所用的 1024×1024 PNG，均固定提交并保留原始字节；各仓库 MIT／Apache-2.0 原文分别保存在 LICENSE-kimi-code／LICENSE-zcode，仓库许可不授予商标权。TRAE 来自官方 CLI 文档站的 2400×2400 PNG，仅裁去外围留白并离线缩至 640×640，原始哈希和变换登记在 SOURCE.json；官方来源没有单独标明该品牌资产的开源许可，不能标为 Lobe/MIT。所有品牌图标仅用于识别集成，不新增运行时网络请求。ZIP 的 agent-icons/ 保存来源清单和已有原始许可，另附双语第三方说明。
+
+0.4.7 的 README 支持表使用 assets/readme/agent-*.png：由 examples/agent_icons_capture.rs 原生调用正式头像绘制器，在深色底衬上生成六枚图标，保证浅色／深色文档页面的可读性。PNG 原样复制，逐文件版本、尺寸、SHA-256 与来源保存在 assets/readme/SOURCE.json；不含用户数据或真实模型会话。

@@ -7,6 +7,9 @@
 | Codex CLI | Uses current/persistent PATH and user installation. CLI owns authentication, trust and hook schema; the manager injects only session-scoped options. Recheck parsing, `/hooks`, and lifecycle after upgrades. |
 | Claude Code | Uses current/persistent PATH and user installation. CLI owns authentication, models, plugins and permissions; `--settings` is session-scoped. Model requests require explicit authorization. |
 | Qoder CN CLI | Public qodercn/qoderclicn entries, native/npm installs. CLI owns login, models and directory trust; settings are session-scoped and explicit user settings win. Verify synthetic state separately from real startup, without automatic trust approval or model prompts. |
+| Kimi Code CLI | Public `kimi` entry | CLI owns models, login and configuration; task events not integrated in this release | Identity/launch only; no user/project config changes |
+| ZCode CLI | Public `zcode` entry; tested with community zcode-app-cli | Distribution and CLI own their configuration/authentication | Same; distinguish official and community test results |
+| TRAE CLI | Public `traecli` entry | CLI owns models, login and configuration; task events not integrated in this release | Identity/launch only; no user/project config changes |
 | PowerShell | Ordinary Windows shell. The manager owns its session process tree, not the user's profile; do not infer AI status. |
 | Git Bash | Optional Git for Windows installation. Load system/user startup configuration before adding session-scoped directory notifications and Agent entries; do not edit user files. When absent, explicitly offer available PowerShell/CMD. WSL and other Bash distributions are not substituted. |
 | User working directory | The user and that project's rules own its contents. Opening it does not authorize modifying its code. |
@@ -47,3 +50,11 @@ Session `--settings` points only to a runtime hook file. Exec-form native helper
 Status follows official SessionStart, UserPromptSubmit, tool/interaction notices, Stop, StopFailure and actual process exit, never terminal-output heuristics or process presence. The bridge still drops child Agents, conversation content and authentication data, with invocation/generation isolation. Qoder source=new can switch foreground conversation. Reuse production drag selection and Alt+V image paste.
 
 Sources: [flags](https://docs.qoder.cn/en/cli/cli-reference), [settings merge](https://docs.qoder.cn/en/cli/settings), [hooks](https://docs.qoder.cn/en/cli/hooks-reference), [shortcuts](https://docs.qoder.cn/en/cli/interface). Record installed-version checks, unsubmitted startup captures, synthetic hooks and real model tasks separately.
+
+## Kimi Code / ZCode / TRAE CLI (0.4.7)
+
+Recognize the installed public entries `kimi`, `zcode` and `traecli`. Session shims forward original arguments and report ShellAgentStarted/ShellAgentEnded with invocation IDs for avatar and launch/exit recognition. They do not parse output or infer task progress. This release does not integrate session-scoped task notifications for these three CLIs, and does not copy or edit user/project hook, provider or authentication configuration. Upstream hook capabilities vary by version; lack of manager integration does not mean a CLI has no hooks.
+
+Installed versions checked for this release are Kimi Code 2.5.0, TRAE CLI 0.213.1 public, and the community zcode-app-cli 3.17.2-44 with runtime 0.17.1. The latter is an independent community terminal frontend, not Z.ai's official standalone CLI distribution; its startup check does not establish compatibility of other ZCode builds. Product-icon provenance is independent of the installed CLI distribution and is recorded per file in assets/icons/SOURCE.json.
+
+Native shell_switch_probe modes `kimi`, `zcode`, `traecli` launch the selected installed entry in a fresh manager workspace, capture startup, and focus the empty terminal and cancel only their own CLI with Esc/Ctrl+C before checking the return-to-shell capture. They never submit a model prompt or accept directory/hook trust. Real startup, synthetic lifecycle and paid model rounds remain separate evidence.

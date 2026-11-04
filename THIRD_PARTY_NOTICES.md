@@ -18,8 +18,12 @@ Windows 系统字体只在运行时读取，不随包复制。项目 LICENSE 适
 
 - winit 0.30.13：本地 Windows 拖动 DPI 兼容补丁，Apache-2.0。见 [补丁来源](vendor/winit/UPSTREAM.zh.md) 和原始 LICENSE；制品依赖清单收集该本地依赖及许可证。
 
-OpenAI, Claude and Qoder icons are from [Lobe Icons](https://github.com/lobehub/lobe-icons), MIT.
-See assets/icons/SOURCE.json and assets/icons/LICENSE-lobe-icons. Brand names and marks belong to their respective owners.
+- OpenAI／Claude／Qoder 图标来自 [Lobe Icons](https://github.com/lobehub/lobe-icons)，MIT；原文为 assets/icons/LICENSE-lobe-icons。
+- Kimi Code 图标为 [MoonshotAI/kimi-code](https://github.com/MoonshotAI/kimi-code) 官方文档使用的 PNG，固定提交并保留原始字节；仓库声明 MIT，原文为 assets/icons/LICENSE-kimi-code。
+- ZCode 图标为 [zai-org/ZCode](https://github.com/zai-org/ZCode) 官方 README 使用的应用 PNG，固定提交并保留原始字节；仓库声明 Apache-2.0，原文为 assets/icons/LICENSE-zcode。
+- TRAE 图标来自 [官方 CLI 文档站](https://docs.trae.cn/cli_about-trae-code-cli-2) 所引用的 PNG，仅离线裁去外围留白并缩小；该官方来源未单独声明品牌资产的开源许可，不适用 Lobe Icons 的 MIT 声明。
+
+各品牌图标仅用于识别相应集成，名称与商标归各自所有者；仓库开源许可不授予商标权。逐文件 URL、固定提交、尺寸、处理方式和 SHA-256 见 assets/icons/SOURCE.json；发行包的 agent-icons/ 包含同一来源记录及上述可获得的原始许可证。
 
 - egui-winit 0.35.0: local paste-event compatibility patch, MIT OR Apache-2.0. See vendor/egui-winit/UPSTREAM.md and its included license files. The packaged dependency inventory includes this patched crate.
 
