@@ -22,6 +22,7 @@ No confirmed changes for a subsequent version yet.
 
 - Use the updated manager binary for already open windows; the CLI still owns login, trust and models. Record Qoder's offline synthetic lifecycle, real startup and user preview acceptance separately. This release does not automatically accept trust or send paid model requests.
 - Passed 168 Rust and 13 Python regressions, governance, formatting, Clippy, Release smoke, real Codex 0.166.0 absolute-path remote startup and seven synthetic Qoder state captures. A fake CLI in a real ConPTY covers resume arguments and repeated invocation. Startup captures are not real model-task acceptance; long-duration load and Windows 10 retesting were not run.
+- The user separately confirmed that the Qoder CN preview and recovery of an existing Codex conversation work correctly and authorized release. User acceptance is recorded separately from the developer's synthetic/startup checks above.
 
 ## [0.4.6-preview.1] - 2026-11-04
 
