@@ -62,7 +62,9 @@ def candidate_paths(root=ROOT):
 
 
 def digests(pairs, root=ROOT):
-    return {name: hashlib.sha256((root / name).read_bytes()).hexdigest()
+    # Compare reviewed UTF-8 text, independent of checkout/editor EOL and BOM.
+    # Text I/O normalizes CRLF/CR to LF; genuine content edits still change SHA-256.
+    return {name: hashlib.sha256((root / name).read_text(encoding='utf-8-sig').encode('utf-8')).hexdigest()
             for name in sorted({name for pair in pairs for name in pair})}
 
 
