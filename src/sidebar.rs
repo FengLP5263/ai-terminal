@@ -59,6 +59,9 @@ pub struct Icons {
     codex: Arc<Mutex<IconRaster>>,
     claude: Arc<Mutex<IconRaster>>,
     qoder: Arc<Mutex<IconRaster>>,
+    kimi: Arc<Mutex<IconRaster>>,
+    zcode: Arc<Mutex<IconRaster>>,
+    trae: Arc<Mutex<IconRaster>>,
 }
 struct IconRaster {
     name: &'static str,
@@ -149,6 +152,18 @@ impl Icons {
                 "agent-qoder-cn",
                 include_bytes!("../assets/icons/qoder.png"),
             ),
+            kimi: load(
+                "agent-kimi-code",
+                include_bytes!("../assets/icons/kimi-color.png"),
+            ),
+            zcode: load(
+                "agent-zcode",
+                include_bytes!("../assets/icons/zcode-color.png"),
+            ),
+            trae: load(
+                "agent-trae",
+                include_bytes!("../assets/icons/trae-color.png"),
+            ),
         }
     }
     pub fn paint(&self, painter: &egui::Painter, rect: Rect, agent: Agent) {
@@ -162,10 +177,18 @@ impl Icons {
         painter.circle_filled(rect.center(), rect.width() / 2.0, Color32::from_gray(29));
         let icon = snap_square(rect.center(), chrome::AVATAR_ICON);
         match agent {
-            Agent::Codex | Agent::Claude | Agent::QoderCn => {
+            Agent::Codex
+            | Agent::Claude
+            | Agent::QoderCn
+            | Agent::Kimi
+            | Agent::ZCode
+            | Agent::Trae => {
                 let texture = match agent {
                     Agent::Codex => &self.codex,
                     Agent::QoderCn => &self.qoder,
+                    Agent::Kimi => &self.kimi,
+                    Agent::ZCode => &self.zcode,
+                    Agent::Trae => &self.trae,
                     _ => &self.claude,
                 };
                 painter.image(

@@ -26,6 +26,22 @@ class ArchiveVerification(unittest.TestCase):
             self.assertTrue(packaging.verify_archive(good)['ok'])
             with self.assertRaisesRegex(ValueError,'checksum mismatch'):packaging.verify_archive(bad)
 
+    def test_packaged_icon_sources_resolve_their_original_license_texts(self):
+        with tempfile.TemporaryDirectory() as folder:
+            packaging.icon_notices(Path(folder))
+            bundled=Path(folder)/'agent-icons'
+            source=packaging.ROOT/'assets/icons'
+            self.assertEqual((source/'SOURCE.json').read_bytes(),(bundled/'SOURCE.json').read_bytes())
+            records=json.loads((bundled/'SOURCE.json').read_text(encoding='utf-8'))['files']
+            self.assertEqual(len(records),6)
+            for record in records:
+                license_file=record.get('license_file')
+                if license_file:
+                    self.assertEqual((source/license_file).read_bytes(),(bundled/license_file).read_bytes())
+                else:
+                    self.assertTrue(record['source'].startswith('https://'))
+                    self.assertIn('no standalone license',record['license'])
+
     def test_source_identity_covers_window_backend_build_sources_and_glow_shaders(self):
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder)

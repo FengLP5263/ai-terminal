@@ -48,7 +48,7 @@ Terminal scrollback and live process state are not restored after the program ex
 ## Verification and limits
 
 Core tests exercise stale-turn rejection, background completion, unread acknowledgement,
-parallel-tool waiting and bridge authentication. Native smoke uses three real PowerShell
+parallel-tool waiting and bridge authentication. Native smoke uses six real PowerShell
 ConPTYs with synthetic lifecycle events; it produces a GPU screenshot and JSON evidence.
 It is not a live Claude/Codex task test. CLI upgrades can change hook schemas or trust
 handling; actual agent versions and live-event verification must be recorded separately.

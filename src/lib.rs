@@ -8,6 +8,7 @@ pub mod launch;
 pub mod model;
 pub mod native_console;
 pub mod shell;
+pub mod shortcut;
 pub mod sidebar;
 pub mod status;
 pub mod ui_text;

@@ -19,12 +19,13 @@ fn native_codex_lifecycle_survives_a_hidden_windows_conpty() {
     terminal.set_codex_notifications(true);
     let deadline = Instant::now() + Duration::from_secs(8);
     let mut states = Vec::new();
+    let mut last_notice = None;
     while Instant::now() < deadline && states.last() != Some(&Native::Done) {
         if let Ok((735, PtyEvent::Title(value))) = rx.recv_timeout(Duration::from_millis(100))
             && value.starts_with(CODEX_PROGRAM_EVENT)
         {
             states.extend(terminal.take_codex_program_statuses(&value));
-            assert!(terminal.take_codex_program_statuses(&value).is_empty());
+            last_notice = Some(value);
         }
     }
     assert_eq!(
@@ -36,6 +37,14 @@ fn native_codex_lifecycle_survives_a_hidden_windows_conpty() {
             Native::Working,
             Native::Done
         ]
+    );
+    // A wake identifies the invocation, not an immutable batch. While the producer
+    // is active, another drain can legitimately receive newer states. Done is the
+    // final emitted state, so only now can we assert that nothing is replayed.
+    assert!(
+        terminal
+            .take_codex_program_statuses(last_notice.as_deref().expect("Done notice"))
+            .is_empty()
     );
     terminal.set_codex_notifications(false);
     assert!(

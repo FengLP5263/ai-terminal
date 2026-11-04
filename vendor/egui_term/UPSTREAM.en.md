@@ -56,3 +56,7 @@ Windows compatibility acceptance: publicly re-export Alacritty WindowSize for ho
 Unreleased: fit native emoji clusters into cell bounds instead of clipping their fallback line boxes; narrow pause/play badges may use following padding. VS15 keeps text presentation. Emulator coordinates, selection and bounded atlas ownership remain unchanged.
 
 Native Codex lifecycle: recognized OSC 7501 state/app/kind metadata only, with a bounded 32-state ordered queue, coalesced wakeups and invocation-epoch rejection. PTY bytes remain intact; no prompt/activity text is stored. Adjacent narrow mode badges keep equal visual widths; only isolated badges extend into following padding.
+
+Unreleased: native glyph atlas keys exclude foreground/background colors. Tiles rasterize a white mask and receive color from mesh vertex colors, so animated TUI gradients and per-frame recoloring no longer duplicate glyphs. A full atlas retires only the oldest page and keeps its texture handle until a later frame, preventing shapes recorded this frame from sampling an early-freed texture; the atlas is no longer cleared and rebuilt wholesale.
+
+Unreleased retirement fix: run old-page cleanup before the glyph-cache hit return. Repeated cache hits in later frames now release retired textures; same-frame shapes retain valid handles. Native regressions verify both the texture free delta and same-frame shape references without adding polling or idle repaint.

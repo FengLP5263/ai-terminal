@@ -494,7 +494,6 @@ impl<'a> TerminalView<'a> {
                                 flags.contains(cell::Flags::BOLD),
                                 flags.contains(cell::Flags::ITALIC),
                                 fg,
-                                bg,
                             )
                         });
                         #[cfg(not(windows))]

@@ -6,13 +6,13 @@
 
 **给多个 AI 会话，一个清爽的工作空间。**
 
-在熟悉的终端里使用 Codex、Claude Code 和 Qoder CN CLI，随时查看会话状态，需要时一键返回。
+在熟悉的终端里使用 Codex、Claude Code、Qoder CN、Kimi Code、ZCode 和 TRAE CLI，随时查看会话状态，需要时一键返回。
 
 [![GitHub Release](https://img.shields.io/github/v/release/FengLP5263/ai-terminal?label=release)](https://github.com/FengLP5263/ai-terminal/releases/latest)
 [![Platform](https://img.shields.io/badge/platform-Windows%20x64-0078D4)](#平台支持)
 [![License](https://img.shields.io/badge/license-MIT-5c8a66)](LICENSE)
 
-[下载使用](#快速开始) · [功能介绍](#为多会话而设计) · [更新日志](CHANGELOG.md) · [常见问题](#常见问题) · [参与贡献](CONTRIBUTING.md)
+[下载使用](#快速开始) · [功能介绍](#为多会话而设计) · [支持的 Agent](#支持的-agent) · [更新日志](CHANGELOG.md) · [常见问题](#常见问题) · [参与贡献](CONTRIBUTING.md)
 
 简体中文 | [English](README.en.md)
 
@@ -39,12 +39,27 @@ AI 任务可能运行很久。打开多个窗口后，来回确认哪个会话�
 | 功能 | 你可以做什么 |
 | --- | --- |
 | **真正的终端** | 新建 PowerShell、CMD 或 Git Bash，在里面直接运行已安装的命令行工具。 |
-| **Agent 会话识别** | 启动 Codex、Claude Code 或 Qoder CN CLI 后显示对应头像；其他命令仍可作为普通终端使用。 |
+| **Agent 会话识别** | 启动 Codex、Claude Code、Qoder CN、Kimi Code、ZCode 或 TRAE CLI 后显示对应头像；其他命令仍可作为普通终端使用。 |
 | **任务状态** | 在侧栏和浮窗中查看支持的 Agent 的进行中、需要处理、完成或失败状态。状态来自支持的生命周期通知和进程退出，并非对所有 CLI 的通用推断。 |
 | **置顶浮窗** | 只显示会话头像和状态，一次最多显示 10 个；拖动头像区域可查看其余会话，点击头像回到会话。 |
 | **整理自己的工作区** | 拖动会话排序、重命名、设置颜色、收起侧栏；使用 Ctrl + 滚轮调整整个界面大小。 |
 | **熟悉的终端体验** | 支持中文、ANSI 颜色和系统彩色 emoji；Codex／Claude Code／Qoder CN CLI 可使用剪贴板图片，具体交互由对应 CLI 处理。 |
 | **中英双语** | 自动跟随系统语言，也可在设置中手动选择简体中文或 English。 |
+
+## 支持的 Agent
+
+| 图标 | Agent | Windows 启动命令 | 头像与启动／退出识别 | 自动任务状态 |
+| --- | --- | --- | --- | --- |
+| <img src="assets/readme/agent-codex.png" width="32" height="32" alt="Codex CLI"> | [Codex CLI](https://github.com/openai/codex) | `codex` | 支持 | 原生生命周期；旧版兼容 hook |
+| <img src="assets/readme/agent-claude.png" width="32" height="32" alt="Claude Code"> | [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview) | `claude` | 支持 | 会话级 hook |
+| <img src="assets/readme/agent-qoder-cn.png" width="32" height="32" alt="Qoder CN CLI"> | [Qoder CN CLI](https://docs.qoder.cn/en/cli/installation) | `qodercn` / `qoderclicn` | 支持 | 会话级 hook |
+| <img src="assets/readme/agent-kimi.png" width="32" height="32" alt="Kimi Code CLI"> | [Kimi Code CLI](https://www.kimi.com/code/docs/) | `kimi` | 支持 | 本版未接入；等待任务通知 |
+| <img src="assets/readme/agent-zcode.png" width="32" height="32" alt="ZCode"> | [ZCode](https://zcode.z.ai/) | `zcode` | 支持 | 本版未接入；等待任务通知 |
+| <img src="assets/readme/agent-trae.png" width="32" height="32" alt="TRAE CLI"> | [TRAE CLI](https://docs.trae.cn/cli_about-trae-code-cli-2) | `traecli` | 支持 | 本版未接入；等待任务通知 |
+
+头像识别与任务状态是两项不同能力。未接入任务通知的 CLI 不会被输出静默或进程存在判定为正在工作或已完成；请在 CLI 内查看任务进度。其他程序也能在真实终端中运行。
+
+ZCode 本次实测的是社区发行 [zcode-app-cli](https://github.com/kingsword09/zcode-cli) 3.17.2-44（运行时 0.17.1），不作为 Z.ai 官方独立 CLI 验收。管理器转发已安装的公开 `zcode` 入口，不捆绑或自动安装任何 Agent。图标复用正式界面组件，以深色底衬保证在 README 的浅色／深色页面中均可辨识；品牌来源见[第三方说明](THIRD_PARTY_NOTICES.md)。
 
 ## 平台支持
 
@@ -66,16 +81,16 @@ AI 任务可能运行很久。打开多个窗口后，来回确认哪个会话�
 ```powershell
 cd 'C:\path\to\your-project'
 codex
-# 或运行 claude / qodercn
+# 或运行 claude / qodercn / kimi / zcode / traecli
 ```
 
-请事先自行安装并配置 [Codex CLI](https://github.com/openai/codex)、[Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview) 或 [Qoder CN CLI](https://docs.qoder.cn/cli/installation)。AI Terminal 沿用 CLI 自己的登录、模型、信任和权限设置。
+请事先自行安装并配置 [Codex CLI](https://github.com/openai/codex)、[Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview)、[Qoder CN CLI](https://docs.qoder.cn/cli/installation)、Kimi Code、ZCode 或 TRAE CLI。AI Terminal 沿用 CLI 自己的登录、模型、信任和权限设置。
 
 ### 3. 按自己的方式管理
 
 在左上角齿轮中设置语言和浮窗；悬停会话头像可查看信息，点击即可切换。浮窗可拖动位置，并可在设置中关闭。按住 <kbd>Ctrl</kbd> 滚动鼠标滚轮可缩放整个界面。
 
-在受管终端里交互式启动 `powershell`、`cmd` 或 `bash` 时，头像会跟随当前 Shell；`exit` 逐层恢复。启动 Codex／Claude／Qoder CN 时优先显示 Agent 头像，退出后恢复当前 Shell。单次脚本命令和 Agent 内部的工具命令不会因此改变 Shell 头像。
+在受管终端里交互式启动 `powershell`、`cmd` 或 `bash` 时，头像会跟随当前 Shell；`exit` 逐层恢复。启动 Codex／Claude／Qoder CN／Kimi Code／ZCode／TRAE CLI 时优先显示 Agent 头像，退出后恢复当前 Shell。单次脚本命令和 Agent 内部的工具命令不会因此改变 Shell 头像。
 
 ## 常见问题
 
@@ -89,7 +104,7 @@ codex
 
 ### 为什么 Agent 没有显示状态？
 
-状态依赖 CLI 支持的明确生命周期通知。0.4.5 起默认接收 Codex 原生状态并保留共享 agents 总览，已在 Codex 0.166.0 验证。未提供原生通知的旧 Codex 可显式运行 `codex --no-daemon`，再用 `/hooks` 审查兼容 hook；该模式没有共享入口。0.4.4 及更早版本的 Codex 接入、以及 Claude／Qoder CN 仍使用 hook。没有状态不代表任务已经结束；程序不会替你信任 hook 或修改用户级 CLI 配置。
+状态依赖 CLI 明确的生命周期通知。Codex 默认使用原生状态并保留共享 agents 总览；旧版可显式运行 `codex --no-daemon` 使用兼容 hook。Claude Code 和 Qoder CN 通过会话级 hook 接入。Kimi Code、ZCode 与 TRAE CLI 在本版仅识别头像和启动／退出，尚未接入会话级任务通知，状态保持“等待任务通知”。管理器不替你信任 hook，也不修改用户或项目的 hook 配置。
 
 ### 重启后可以继续之前的对话吗？
 
@@ -97,7 +112,11 @@ codex
 
 ### 怎么查看终端历史和粘贴图片？
 
-普通滚轮用于查看历史；全屏应用接管鼠标滚轮时可用 <kbd>Shift</kbd> + 滚轮查看本地历史。识别到 Codex／Claude Code／Qoder CN CLI 时，可通过 <kbd>Ctrl</kbd> + <kbd>V</kbd> 或 <kbd>Shift</kbd> + <kbd>Insert</kbd> 将剪贴板图片交给 CLI 处理。
+普通滚轮用于查看历史；全屏应用接管鼠标滚轮时可用 <kbd>Shift</kbd> + 滚轮查看本地历史。识别到 Codex／Claude Code／Qoder CN／Kimi Code／ZCode／TRAE CLI 时，可通过 <kbd>Ctrl</kbd> + <kbd>V</kbd> 或 <kbd>Shift</kbd> + <kbd>Insert</kbd> 将剪贴板图片交给 CLI 处理。
+
+### 首次运行会在桌面创建快捷方式吗？
+
+使用默认数据目录首次启动时，程序会尝试在桌面创建 `ai-terminal.lnk`，便于关闭后再次打开；只尝试一次，创建失败不影响启动。使用 `--data-dir` 指定非默认数据目录、隔离 smoke 或工作区读取失败时不会创建，手动删除后也不会自动重建。快捷方式只指向当前 `ai-terminal.exe`，不含命令参数或凭据。
 
 ### 会保存我的对话或 API Key 吗？
 
@@ -127,6 +146,8 @@ rustup component add rustfmt clippy
 
 项目代码使用 [MIT License](LICENSE)。第三方组件保留各自的许可证，详见[第三方声明](THIRD_PARTY_NOTICES.md)。
 
-## 0.4.6 更新
+Agent 品牌图标的来源与许可按文件分别记录，详见[第三方说明](THIRD_PARTY_NOTICES.md)；ZIP 的 agent-icons/ 附带来源清单和可获得的原始许可。
 
-新增 Qoder CN CLI 支持；修复通过绝对路径或远程恢复命令启动 Codex 后头像和状态未接入的问题。Codex 保留共享 agents 总览，状态仍来自明确生命周期通知。完整功能、升级说明和验证范围见[中英文更新日志](CHANGELOG.md)；每次发行的 ZIP 均附带两份日志。
+## 0.4.7 更新
+
+新增 Kimi Code、ZCode 和 TRAE CLI 的头像与启停识别、首次桌面快捷方式；改进彩色动画 TUI 的字形缓存并修复旧图集释放。支持范围和六种 Agent 图标见上方表格。完整功能、升级说明和验证范围见[中英文更新日志](CHANGELOG.md)；每次发行的 ZIP 均附带两份日志。

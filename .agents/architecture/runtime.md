@@ -165,3 +165,9 @@ Shell 启动后即可观察严格匹配的 Codex 原生状态协议；收到带 
 0.4.6：用户已验收 Qoder 预览；最终 168 项 Rust、13 项 Python 回归、治理／格式／Clippy、Release smoke 与原生截图通过。正式 App 已核查真实 Codex 0.166.0 的绝对路径／--remote unix:// 启动、头像、就绪和 agents 入口；恢复参数、等待／完成、clear、返回 Shell 和重复调用另由真实 ConPTY 的伪 CLI 覆盖。没有发送模型提示，不能将两类证据称为真实模型回合通过。
 
 发布前，用户另已实测确认 Codex 旧会话恢复无问题并授权提交发布。该验收独立于开发侧启动截图和合成事件；不据此扩大长期负载或其他平台的验证范围。
+
+## 未发布：补充 CLI 身份与首次快捷方式
+
+受管 Shell 的入口目录新增 `kimi.exe`、`zcode.exe`、`traecli.exe`，对应 `AI_TERMINAL_REAL_KIMI`／`AI_TERMINAL_REAL_ZCODE`／`AI_TERMINAL_REAL_TRAE`。Shim 只转发真实程序并按调用 ID 报告 ShellAgentStarted／ShellAgentEnded，不注入参数、不复制或修改用户配置；任务状态保持“等待任务通知”，原因与各自 hook 限制在状态下拉中说明。
+
+默认数据目录首次启动时，在应用主线程之外尝试创建桌面快捷方式：通过 `IShellLinkW`／`IPersistFile` 指向当前 `ai-terminal.exe`，使用 Windows Desktop 已知文件夹（支持 OneDrive 等重定向），不携带参数或凭据。`UiSettings.desktop_shortcut` 在尝试前记录，失败不重试、不阻塞启动；指定非默认目录的 `--data-dir`、隔离 smoke／性能测量、工作区读取失败时不尝试，用户删除后不自动重建。创建失败只写入 stderr，不改动桌面以外的位置。

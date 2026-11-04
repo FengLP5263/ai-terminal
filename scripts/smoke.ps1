@@ -1,6 +1,6 @@
 ﻿<#
 .SYNOPSIS
-隔离原生 smoke：三个真实 PowerShell 与合成状态。
+隔离原生 smoke：六个真实 PowerShell 与合成状态。
 
 .EXAMPLE
     .\scripts\smoke.ps1 -Release    # 验证已构建优化版

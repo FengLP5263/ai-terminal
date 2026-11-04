@@ -14,7 +14,7 @@
 
 - `assets/fonts/Hack-*.ttf`: official v3.003; `SOURCE.json` records source, size, and SHA-256, with `LICENSE.md`.
 - `assets/branding`: original B “stacked sessions” icon; SVG matches the selected candidate, PNG/ICO are fixed exports with identities in `SOURCE.json`.
-- `assets/icons`: Lobe Icons OpenAI/Claude PNGs, MIT; source URL, date, size and hash in `SOURCE.json`, licenses included.
+- `assets/icons`: OpenAI/Claude/Qoder come from Lobe Icons (MIT); Kimi Code/ZCode use their official repositories' product icons, and TRAE uses its official CLI documentation site icon. `SOURCE.json` records provenance, license declarations, original dimensions, transforms, size and SHA-256 per file; licenses do not apply across sources.
 - Windows Chinese/UI/emoji fonts, including Segoe UI Emoji, are system fonts, not copied into Git or packages.
 - `vendor/egui_term` is MIT with revision and patches in `UPSTREAM.md`. Other Cargo dependencies are in `Cargo.lock` and `THIRD_PARTY_NOTICES.md`; packaging records dependencies and collects available licenses.
 
@@ -42,8 +42,12 @@ New manifests use format_version 2 with native_console identity, both companions
 
 Starting with 0.4.3, both root CHANGELOG files are covered by source identity and shipped in the ZIP. Build checks the current version, matching date, and nonempty categorized changes first. GitHub Releases reuse the same version entry. Read-only integrity verification of older ZIPs still accepts archives without the new changelog files.
 
-Agent source icons remain 640×640. Area-filter them at the physical display size, sharing at most 12 cached sizes per avatar and aligning to integer pixels; no per-frame resampling. Native emoji tiles fit complete clusters inside cells, preserve VS15 text presentation, and keep emulator coordinates unchanged.
+Agent icons retain their upstream PNG dimensions; only TRAE has outer padding cropped and is reduced offline to 640×640. Area-filter them at the physical display size, sharing at most 12 cached sizes per avatar and aligning to integer pixels; no per-frame resampling. Native emoji tiles fit complete clusters inside cells, preserve VS15 text presentation, and keep emulator coordinates unchanged.
 
 Provenance and the registry archive hash for the local winit 0.30.13 patch (Apache-2.0) are in vendor/winit/UPSTREAM.md; the original LICENSE is retained. Package source identity covers its Cargo.toml, build.rs, and sources/embedded assets under src. The dependency inventory records the local patch and collects that LICENSE automatically.
 
 Qoder CN uses the 640-pixel Qoder asset from Lobe Icons, with provenance, MIT license and SHA-256 in assets/icons. It shares the bounded physical-size area-filtered cache. Agent::QoderCn adds an identity only, preserving persisted session fields, authentication boundaries and the terminal history limit.
+
+Kimi Code uses the 316×316 PNG shown by its official documentation, and ZCode uses the 1024×1024 PNG shown in its official repository README. Both are pinned to commits and retain their original bytes. The repositories' MIT/Apache-2.0 texts are preserved as LICENSE-kimi-code/LICENSE-zcode; repository licenses do not grant trademark rights. TRAE comes from the official CLI documentation site's 2400×2400 PNG, with only outer padding cropped before offline reduction to 640×640; SOURCE.json records the original hash and transform. That official source states no standalone open-source license for its brand asset, so Lobe/MIT must not be assigned to it. Brand icons identify integrations only, with no runtime network requests. ZIPs include provenance and available original licenses in agent-icons/, plus bilingual third-party notices.
+
+The 0.4.7 README support table uses assets/readme/agent-*.png. examples/agent_icons_capture.rs natively invokes the production avatar painter on a dark surface for legibility in light/dark documentation. PNGs are copied unchanged; assets/readme/SOURCE.json records per-file versions, dimensions, SHA-256 and provenance. They contain no user data or real model sessions.

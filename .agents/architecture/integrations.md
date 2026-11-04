@@ -7,6 +7,9 @@
 | Codex CLI | 当前／持久 PATH 与用户安装目录 | CLI 自有认证、信任和 hook schema；管理器只注入本次参数 | 升级后重新验证配置解析、/hooks 审查及实际生命周期 |
 | Claude Code | 当前／持久 PATH 与用户安装目录 | CLI 自有认证、模型、插件和权限；--settings 仅会话级 | 模型请求必须显式授权；CLI 可自行保存它自己的运行状态 |
 | Qoder CN CLI | 公开 qodercn／qoderclicn 入口，支持原生与 npm 安装 | CLI 自有登录、模型、目录信任；--settings 仅会话级，显式设置优先 | 合成状态与真实启动分开验证；不自动确认信任或发起模型请求 |
+| Kimi Code CLI | 公开 `kimi` 入口 | CLI 自有模型、登录与配置；本版未接入任务通知 | 仅身份／启停识别，不改用户或项目配置 |
+| ZCode CLI | 公开 `zcode` 入口；本次实测社区 zcode-app-cli | 配置与认证归对应发行版及 CLI 管理 | 同上，区分官方与社区版验收结果 |
+| TRAE CLI | 公开 `traecli` 入口 | CLI 自有模型、登录与配置；本版未接入任务通知 | 仅身份／启停识别，不改用户或项目配置 |
 | PowerShell | Windows 系统组件 | 普通交互 shell，无 AI 工作状态推断 | 管理器负责本会话进程树，不修改用户 profile |
 | Git Bash | 可选的 Git for Windows 安装 | 加载系统／用户启动配置后追加本会话目录通知与入口，不修改用户文件 | 无 Git Bash 时明确提示，允许改用可用的 PowerShell／CMD；WSL 和其他 Bash 不代替 Git Bash |
 | 用户工作目录 | 用户主目录、最近目录或终端 cd 后的目录 | 被打开的项目仍归用户和其项目规范管理 | 选择目录不授权管理器／开发者修改其中代码 |
@@ -58,3 +61,11 @@ Microsoft.Windows.Console.ConPTY 是固定版本的本地运行依赖，来源�
 状态基于官方 SessionStart、UserPromptSubmit、工具／交互通知、Stop、StopFailure 与实际退出；不以输出或进程存在猜状态。桥继续丢弃子 Agent、正文及认证信息，调用／启动代次隔离。Qoder 的 source=new 可切换前台会话。鼠标拖选与 Alt+V 图片粘贴复用正式终端能力。
 
 接口来源：[参数](https://docs.qoder.cn/en/cli/cli-reference)、[配置合并](https://docs.qoder.cn/en/cli/settings)、[Hooks](https://docs.qoder.cn/en/cli/hooks-reference)、[快捷键](https://docs.qoder.cn/en/cli/interface)。实际版本核查、未提交启动截图、合成 hook 与真实模型回合分别记录。
+
+## Kimi Code／ZCode／TRAE CLI（0.4.7）
+
+识别已安装的公开入口 `kimi`、`zcode`、`traecli`。会话 shim 保留原参数，并按调用 ID 报告 ShellAgentStarted／ShellAgentEnded，仅用于头像与启动／退出识别；不解析输出或推断任务进度。本版尚未接入这三个 CLI 的会话级任务通知，也不复制或修改用户／项目 hook、provider 或认证配置。上游 hook 能力可能随版本变化，管理器未接入不代表 CLI 没有 hook。
+
+本次核查的安装版本为 Kimi Code 2.5.0、TRAE CLI 0.213.1 public，以及社区 zcode-app-cli 3.17.2-44（运行时 0.17.1）。后者是独立社区终端前端，不是 Z.ai 官方独立 CLI 发行包，不能以它的启动结果代表其他 ZCode 版本兼容。产品图标来源与已安装 CLI 的发行来源分别记录；图标逐文件身份见 assets/icons/SOURCE.json。
+
+shell_switch_probe 的 `kimi`、`zcode`、`traecli` 模式在全新管理器工作区中启动实际入口、截取启动画面，再聚焦终端空白区，只向自建 CLI 发送 Esc／Ctrl+C 并检查返回 Shell 的截图。不提交模型提示，不接受目录／hook 信任。真实启动、合成生命周期与付费模型回合保持为三类证据。
