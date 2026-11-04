@@ -26,13 +26,17 @@ pub fn show(ui: &mut egui::Ui, agent: Agent, status: &Status) -> egui::Response 
             ui.strong(crate::i18n::tr(ui.ctx(),"会话状态","Session status"));
             let connected=status.last_event.is_some() && status.activity!=Activity::Unknown;
             if connected {
-                ui.label(crate::i18n::tr(ui.ctx(),"已连接 Agent 的任务通知","Connected to agent task events"));
+                ui.label(if status.codex_native {
+                    crate::i18n::tr(ui.ctx(),"已连接 Codex 原生状态通知","Connected to Codex native lifecycle")
+                } else {
+                    crate::i18n::tr(ui.ctx(),"已连接 Agent 的任务通知","Connected to agent task events")
+                });
                 ui.label(crate::i18n::tr(ui.ctx(),"进行中、需要处理与已完成随任务通知更新。","Working, attention, failure and completion follow task events."));
             } else {
                 ui.label(match locale {crate::i18n::Locale::ZhCn=>format!("已识别 {}，尚未收到任务通知。",agent.label()),crate::i18n::Locale::En=>format!("Recognized {}. No task event received yet.",agent.label())});
                 if agent==Agent::Codex {
-                    ui.label(crate::i18n::tr(ui.ctx(),"Codex 通常在首次提交任务时连接通知；欢迎页尚未开始任务属于正常状态。","Codex usually connects when the first task is submitted. Its welcome screen has no task yet."));
-                    ui.label(crate::i18n::tr(ui.ctx(),"如果提交任务后仍无变化，可用 /hooks 检查状态钩子；只有未启用时才需要审查确认。","If task status never changes, use /hooks to check the hooks. Review only disabled definitions."));
+                    ui.label(crate::i18n::tr(ui.ctx(),"Codex 原生状态支持共享 agents 总览，无需额外状态 hook。已在 Codex 0.166.0 验证。","Codex native lifecycle supports the shared agents overview without additional status hooks. Verified with Codex 0.166.0."));
+                    ui.label(crate::i18n::tr(ui.ctx(),"旧版没有原生通知时，可退出后运行 codex --no-daemon 使用兼容模式，再用 /hooks 审查状态钩子。此模式没有共享 agents 入口。","For older CLIs without native events, exit and run codex --no-daemon for compatibility, then review status hooks in /hooks. This mode has no shared agents entry."));
                 } else {
                     ui.label(crate::i18n::tr(ui.ctx(),"在当前 Claude 输入 /hooks，检查状态钩子是否加载。手动指定配置文件时，请确认其中包含状态钩子。","Use /hooks in Claude to check the status hooks. Custom settings files must include them."));
                 }

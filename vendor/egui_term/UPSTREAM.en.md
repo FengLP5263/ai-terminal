@@ -54,3 +54,5 @@ Coding CLI drag selection: the host can enable set_drag_selection to prefer loca
 Windows compatibility acceptance: publicly re-export Alacritty WindowSize for host probes to inspect final ConPTY rows/columns and physical cell dimensions. The host bundles pinned Microsoft conpty.dll/OpenConsole.exe beside its executable, using Alacritty's existing dynamic loading path; this patch does not alter its ConPTY protocol implementation.
 
 Unreleased: fit native emoji clusters into cell bounds instead of clipping their fallback line boxes; narrow pause/play badges may use following padding. VS15 keeps text presentation. Emulator coordinates, selection and bounded atlas ownership remain unchanged.
+
+Native Codex lifecycle: recognized OSC 7501 state/app/kind metadata only, with a bounded 32-state ordered queue, coalesced wakeups and invocation-epoch rejection. PTY bytes remain intact; no prompt/activity text is stored. Adjacent narrow mode badges keep equal visual widths; only isolated badges extend into following padding.

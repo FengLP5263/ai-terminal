@@ -34,3 +34,15 @@ preview.3 追加核查：跨屏探针分别发出原生进入／退出移动通�
 preview.4 原因补充：所用 winit 0.30.13 的原生拖动路径会自行重算建议矩形并向旧显示器推回；[上游问题 4600](https://github.com/rust-windowing/winit/issues/4600) 记录了相同的 DPI 反馈问题。根据 [Microsoft 说明](https://learn.microsoft.com/en-us/windows/win32/hidpi/wm-dpichanged)，本地补丁在原生移动时直接采用系统矩形，主窗口与浮窗同时覆盖；保留非拖动分支。浮窗在移动期间也不再额外改大小。展开侧栏的会话卡片左右留白保持一致。新探针在移动状态下跨 DPI，比较系统建议与实际矩形并记录递归深度；不将其误称为真实系统鼠标拖动。
 
 0.4.4 定版：2026-11-03 用户已确认 preview.4 的本机真实跨屏拖动正常。该批检查包含 150 项 Rust、13 项 Python 回归及 Release smoke；保持移动状态的双屏探针记录 14 次 DPI 事件、最大递归深度 1、建议／实际矩形误差 0、移动期间额外尺寸写入 0。公开 README 截图另用 Release 组件和固定合成内容生成，不代表真实模型回合或 Windows 10 远程实机复测。
+
+## 后续开发：原生状态与相邻模式图标
+
+0.4.4 发布后，用户要求继续恢复 agents 入口。Codex 0.166.0 的 [terminal_program_status.rs](https://github.com/openai/codex/blob/rust-v0.166.0/codex-rs/tui/src/terminal_program_status.rs) 提供 OSC 7501 的明确生命周期。管理器接收当前 PTY 的有限状态枚举，不再默认注入会禁用共享后台的参数；旧版可显式使用 `codex --no-daemon` 和原有 hook。状态队列最多 32 项、按代次隔离并合并唤醒，后台 logic 消费；不依赖输出静默、铃声或文字猜测。原生模式不接管共享服务、不接受 hook 信任；具体恢复 ID 和关闭语义见运行记录。上面的暂缓决定保留为 0.4.4 历史，不代表新开发模式。
+
+Claude 的相邻窄三角图标原本得到不同绘制宽度：前一个因后面是图标只用一格，最后一个因后面是空格被扩展为两格，原生缩放因此不一致。新增回归先在旧代码得到 1／2 的失败结果，修复后相邻标识均用同宽；独立标识、组合 emoji 和 VS15 行为保留。
+
+## 0.4.5 定版核查
+
+2026-11-04 用户已确认本机预览。正式版通过 161 项 Rust、13 项 Python 回归及治理、格式、Clippy；Release 原生侧栏探针完成展开／收起的未读、已读、拖动和松手排序八张截图，临界侧栏与 smoke 均正常退出。真实 Codex 0.166.0 启动及 agents 导航的先前记录与合成状态测试分开保存；本次不追加付费模型回合、长期负载或 Windows 10 远程复测。
+
+公开核查图只用固定合成元数据、示例目录与正式组件：[展开拖动](../assets/verification/0.4.5/expanded-drag.png)、[收起拖动](../assets/verification/0.4.5/collapsed-drag.png)、[未读失败](../assets/verification/0.4.5/expanded-unread.png)、[查看之后](../assets/verification/0.4.5/expanded-read.png)。抓取点、完整卡片、列表让位、拖动时隐藏提示及两处红点清除已人工核对；来源及 SHA-256 见 [SOURCE.json](../assets/verification/0.4.5/SOURCE.json)。这些组件截图不代表真实模型任务或物理输入的全面兼容性验收。

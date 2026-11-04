@@ -392,6 +392,8 @@ pub fn run_agent(agent: Agent, args: Vec<OsString>) -> i32 {
             .any(|arg| arg == "--settings" || arg.to_string_lossy().starts_with("--settings="));
         let injected = if agent == Agent::Claude && explicit_settings {
             Vec::new()
+        } else if agent == Agent::Codex && args.iter().any(|arg| arg == "--no-daemon") {
+            launch::codex_legacy_overrides()
         } else {
             launch::agent_arguments(&spec, &runtime, &helper)?
         };

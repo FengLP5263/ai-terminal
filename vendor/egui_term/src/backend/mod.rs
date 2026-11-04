@@ -1,4 +1,5 @@
 mod notification;
+pub use notification::CodexProgramStatus;
 pub mod settings;
 
 use crate::types::Size;
@@ -29,6 +30,7 @@ use std::sync::{mpsc, Arc};
 pub type TerminalMode = TermMode;
 pub type PtyEvent = Event;
 pub const CODEX_ATTENTION_EVENT: &str = "ai-terminal-codex-attention-v1";
+pub const CODEX_PROGRAM_EVENT: &str = "ai-terminal-codex-program-v1";
 pub type SelectionType = AlacrittySelectionType;
 
 #[derive(Debug, Clone)]
@@ -150,6 +152,7 @@ pub struct TerminalBackend {
     codex_notifications: Arc<AtomicBool>,
     codex_notice_epoch: Arc<AtomicU64>,
     codex_notice_pending: Arc<AtomicU8>,
+    codex_program: Arc<std::sync::Mutex<notification::ProgramQueue>>,
     shutdown: mpsc::Sender<Event>,
 }
 
@@ -208,12 +211,16 @@ impl TerminalBackend {
         let codex_notifications = Arc::new(AtomicBool::new(false));
         let codex_notice_epoch = Arc::new(AtomicU64::new(0));
         let codex_notice_pending = Arc::new(AtomicU8::new(0));
+        let codex_program = Arc::new(std::sync::Mutex::new(notification::ProgramQueue::default()));
         let pty = notification::ObservedPty::new(
             pty,
             id,
-            codex_notifications.clone(),
-            codex_notice_epoch.clone(),
-            codex_notice_pending.clone(),
+            notification::Control {
+                enabled: codex_notifications.clone(),
+                epoch: codex_notice_epoch.clone(),
+                pending: codex_notice_pending.clone(),
+                program: codex_program.clone(),
+            },
             pty_event_proxy_sender.clone(),
             app_context.clone(),
         );
@@ -287,6 +294,7 @@ impl TerminalBackend {
             codex_notifications,
             codex_notice_epoch,
             codex_notice_pending,
+            codex_program,
             shutdown,
         })
     }
@@ -294,9 +302,24 @@ impl TerminalBackend {
     /// Observe Codex's scoped OSC 9 attention notifications; never record their contents.
     pub fn set_codex_notifications(&self, enabled: bool) {
         self.codex_notifications.store(false, Ordering::Release);
-        self.codex_notice_epoch.fetch_add(1, Ordering::AcqRel);
+        let epoch = self.codex_notice_epoch.fetch_add(1, Ordering::AcqRel) + 1;
         self.codex_notice_pending.store(0, Ordering::Release);
+        self.codex_program.lock().unwrap().reset(epoch);
         self.codex_notifications.store(enabled, Ordering::Release);
+    }
+
+    /// Drain a bounded, ordered lifecycle queue for this invocation only.
+    pub fn take_codex_program_statuses(&self, notice: &str) -> Vec<CodexProgramStatus> {
+        let epoch = notice
+            .strip_prefix(CODEX_PROGRAM_EVENT)
+            .and_then(|s| s.strip_prefix(';'))
+            .and_then(|s| s.parse::<u64>().ok());
+        if !self.codex_notifications.load(Ordering::Acquire)
+            || epoch != Some(self.codex_notice_epoch.load(Ordering::Acquire))
+        {
+            return Vec::new();
+        }
+        self.codex_program.lock().unwrap().drain()
     }
 
     /// Accept each notice once, only for the currently running Codex invocation.

@@ -89,11 +89,11 @@ Yes, use PowerShell or CMD directly. Git Bash is optional; selecting it when una
 
 ### Why is there no Agent status?
 
-Status depends on lifecycle notifications supported by the CLI. Codex usually sends its first notification after a task is submitted; if status is still missing, inspect `/hooks` in the CLI. No status does not mean a task has finished. AI Terminal does not trust hooks on your behalf or change user-level CLI configuration.
+Status depends on explicit CLI lifecycle notifications. Since 0.4.5, the app receives native Codex state by default while preserving the shared agents overview, verified with Codex 0.166.0. Older CLIs without native events can explicitly run `codex --no-daemon` and review compatibility hooks in `/hooks`; that mode has no shared entry. Codex integration through 0.4.4, and Claude integration, use hooks. Missing status does not mean completion; the app never trusts hooks or changes user-level CLI configuration on your behalf.
 
 ### Can I continue a conversation after restarting?
 
-The app restores the session list and interface settings, not running processes or terminal screen contents. To continue an AI conversation, use the CLI's own session recovery feature. Exiting the app ends the session processes it manages, so save active work first.
+The app restores the session list and interface settings, not running processes or terminal screen contents. Continue conversations with the CLI's own recovery feature. Exit reaps only owned terminals/helpers; tasks in Codex's shared server may keep running under Codex's control.
 
 ### How do I scroll terminal history or paste an image?
 
@@ -127,6 +127,6 @@ Issues, ideas, terminal improvements, and documentation contributions are welcom
 
 Project code is available under the [MIT License](LICENSE). Third-party components retain their own licenses; see [third-party notices](THIRD_PARTY_NOTICES.en.md).
 
-## 0.4.4 update
+## 0.4.5 update
 
-Sharper avatars, more complete emoji, refreshed session colors and brighter status indicators. Fix cross-monitor dragging, DPI transitions, mouse-anchor jumps and sidebar jitter in the main and floating windows; unify collapsed-rail icon sizes and balance expanded-card insets. See the [bilingual changelog](CHANGELOG.en.md) for details and known limits, and the [UI/cross-monitor record](docs/ui-rendering.en.md) for implementation and acceptance scope. Each release ZIP includes both changelog files.
+Codex keeps explicit lifecycle status alongside the `← for agents` overview. Session cards follow the pointer while the list makes space; viewed failures clear their red badges, and Claude's adjacent mode triangles have equal sizes. See the [bilingual changelog](CHANGELOG.en.md) for changes, upgrade notes and verification scope. Each release ZIP includes both files.

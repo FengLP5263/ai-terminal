@@ -148,14 +148,8 @@ pub fn agent_arguments(
             }
         }
         Agent::Codex => {
-            // Keep this managed terminal's engine, environment and tasks in its own job.
-            arguments.push("--no-daemon".into());
-            for setting in codex_hook_overrides()
-                .into_iter()
-                .chain(codex_notification_overrides())
-            {
-                arguments.extend(["-c".into(), setting]);
-            }
+            // Codex's native OSC 7501 lifecycle works with its shared server.
+            // Invocation-scoped -c hooks would force it back to embedded mode.
             if let Some(id) = &spec.agent_session_id {
                 arguments.extend(["resume".into(), id.clone()]);
             }
@@ -163,6 +157,16 @@ pub fn agent_arguments(
         Agent::Shell | Agent::Cmd | Agent::Bash => {}
     }
     Ok(arguments)
+}
+
+/// Explicit compatibility mode for older CLIs. Never silently retry a CLI.
+/// The caller supplies --no-daemon; preserve its native TUI and hook review.
+pub fn codex_legacy_overrides() -> Vec<String> {
+    codex_hook_overrides()
+        .into_iter()
+        .chain(codex_notification_overrides())
+        .flat_map(|setting| ["-c".into(), setting])
+        .collect()
 }
 
 /// Enable explicit user-attention notifications only within this managed Codex invocation.
