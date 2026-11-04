@@ -525,37 +525,200 @@ fn right_click_palette_sets_and_resets_color_without_selecting_another_tab() {
 }
 
 #[test]
-fn completion_indicator_disappears_after_reading_in_both_sidebar_sizes() {
-    fn green_dot(shape: &egui::Shape) -> bool {
+fn result_indicator_disappears_after_reading_in_both_sidebar_sizes() {
+    fn result_dot(shape: &egui::Shape, color: egui::Color32) -> bool {
         match shape {
-            egui::Shape::Circle(circle) => circle.fill == ai_terminal::chrome::COMPLETED,
-            egui::Shape::Vec(shapes) => shapes.iter().any(green_dot),
+            egui::Shape::Circle(circle) => circle.fill == color,
+            egui::Shape::Vec(shapes) => shapes.iter().any(|shape| result_dot(shape, color)),
             _ => false,
         }
     }
     for collapsed in [false, true] {
+        for (activity, color) in [
+            (Activity::Completed, ai_terminal::chrome::COMPLETED),
+            (Activity::Failed, ai_terminal::chrome::FAILED),
+        ] {
+            let mut h = Harness::new();
+            h.activity = activity;
+            h.unread = true;
+            h.frame(vec![], collapsed);
+            assert!(
+                h.output
+                    .as_ref()
+                    .unwrap()
+                    .shapes
+                    .iter()
+                    .any(|s| result_dot(&s.shape, color))
+            );
+            h.unread = false;
+            h.frame(vec![], collapsed);
+            assert!(
+                !h.output
+                    .as_ref()
+                    .unwrap()
+                    .shapes
+                    .iter()
+                    .any(|s| result_dot(&s.shape, color)),
+                "a viewed {activity:?} must not retain an unread dot"
+            );
+            assert_eq!(h.activity, activity);
+        }
+    }
+}
+
+#[test]
+fn drag_card_follows_grab_point_and_rows_make_space_without_committing_early() {
+    for collapsed in [false, true] {
+        for zoom in [0.71, 1.0, 1.42, 2.0] {
+            let mut h = Harness::new();
+            h.ctx.set_zoom_factor(zoom);
+            for _ in 0..3 {
+                h.frame(vec![], collapsed);
+            }
+            let a = h.row("a");
+            let b = h.row("b");
+            let c = h.row("c");
+            let grab = egui::vec2(12.0, 11.0);
+            let press = a.min + grab;
+            h.frame(Harness::pointer(press, true), collapsed);
+            h.frame(
+                vec![Event::PointerMoved(press + egui::vec2(0.0, 15.0))],
+                collapsed,
+            );
+            let pointer = c.min + grab;
+            let actions = h.frame(vec![Event::PointerMoved(pointer)], collapsed);
+            assert!(
+                egui::DragAndDrop::has_any_payload(&h.ctx),
+                "drag not started"
+            );
+            h.frame(vec![], collapsed);
+            assert!(actions.reorder.is_none());
+            assert!(actions.select.is_none());
+            assert_eq!(
+                h.row("a"),
+                c,
+                "the source leaves a full-size destination gap"
+            );
+            assert_eq!(h.row("b"), a);
+            assert_eq!(h.row("c"), b);
+            let ghost = Rect::from_min_size(pointer - grab, a.size());
+            assert!(
+                h.output.as_ref().unwrap().shapes.iter().any(|shape| {
+                    matches!(&shape.shape, egui::Shape::Rect(card) if card.rect == ghost
+                    && card.fill == ai_terminal::chrome::SELECTED)
+                }),
+                "full card must follow the pointer at its original grab point: {ghost:?}"
+            );
+            // A stationary pointer must not feed the shifted card geometry back into ordering.
+            for _ in 0..8 {
+                h.frame(vec![], collapsed);
+                assert_eq!(h.row("a"), c);
+                assert_eq!(h.row("b"), a);
+            }
+            assert!(!h.output.as_ref().unwrap().shapes.iter().any(|shape| {
+                matches!(&shape.shape, egui::Shape::Text(text) if text.galley.job.text.contains("C:/项目"))
+            }), "a hover tooltip must not cover the card during dragging");
+            let actions = h.frame(Harness::pointer(pointer, false), collapsed);
+            assert_eq!(actions.reorder, Some(("a".into(), "c".into(), true)));
+            assert!(actions.select.is_none() && actions.rename.is_none());
+        }
+    }
+}
+
+#[test]
+fn drag_can_move_up_or_cancel_without_opening_a_session() {
+    for collapsed in [false, true] {
+        for cancel in ["escape", "outside", "none"] {
+            let mut h = Harness::new();
+            h.frame(vec![], collapsed);
+            let a = h.row("a");
+            let c = h.row("c");
+            h.frame(Harness::pointer(c.center(), true), collapsed);
+            h.frame(
+                vec![Event::PointerMoved(c.center() - egui::vec2(0.0, 15.0))],
+                collapsed,
+            );
+            h.frame(vec![Event::PointerMoved(a.center())], collapsed);
+            h.frame(vec![], collapsed);
+            assert_eq!(h.row("c"), a);
+            let pointer = if cancel == "outside" {
+                egui::pos2(600.0, 250.0)
+            } else {
+                a.center()
+            };
+            if cancel == "escape" {
+                h.frame(
+                    vec![Event::Key {
+                        key: egui::Key::Escape,
+                        physical_key: None,
+                        pressed: true,
+                        repeat: false,
+                        modifiers: Modifiers::NONE,
+                    }],
+                    collapsed,
+                );
+            }
+            let actions = h.frame(Harness::pointer(pointer, false), collapsed);
+            assert_eq!(
+                actions.reorder,
+                (cancel == "none").then(|| ("c".into(), "a".into(), false))
+            );
+            assert!(actions.select.is_none() && actions.rename.is_none());
+            h.frame(vec![], collapsed);
+            h.frame(vec![], collapsed);
+            assert_eq!(h.row("a"), a);
+            assert_eq!(h.row("c"), c);
+            assert!(!egui::DragAndDrop::has_any_payload(&h.ctx));
+        }
+    }
+}
+
+#[test]
+fn held_card_scrolls_long_lists_at_the_edge_and_stops_after_cancel() {
+    for collapsed in [false, true] {
         let mut h = Harness::new();
-        h.activity = Activity::Completed;
-        h.unread = true;
-        h.frame(vec![], collapsed);
-        assert!(
-            h.output
-                .as_ref()
-                .unwrap()
-                .shapes
-                .iter()
-                .any(|s| green_dot(&s.shape))
+        h.extra = (0..30).map(|i| format!("extra-{i}")).collect();
+        for _ in 0..4 {
+            h.frame(vec![], collapsed);
+        }
+        let a = h.row("a");
+        h.frame(Harness::pointer(a.center(), true), collapsed);
+        h.frame(
+            vec![Event::PointerMoved(a.center() + egui::vec2(0.0, 15.0))],
+            collapsed,
         );
-        h.unread = false;
-        h.frame(vec![], collapsed);
+        let edge = egui::pos2(a.center().x, h.height - 15.0);
+        h.frame(vec![Event::PointerMoved(edge)], collapsed);
+        let before = h.row("extra-0").top();
+        for _ in 0..24 {
+            h.frame(vec![], collapsed);
+        }
         assert!(
-            !h.output
-                .as_ref()
-                .unwrap()
-                .shapes
-                .iter()
-                .any(|s| green_dot(&s.shape)),
-            "a viewed completion must not retain a green dot"
+            h.row("extra-0").top() < before - 10.0,
+            "held card should scroll the overflowing list"
         );
+        let outside = egui::pos2(600.0, 250.0);
+        assert!(
+            h.frame(Harness::pointer(outside, false), collapsed)
+                .reorder
+                .is_none()
+        );
+        for _ in 0..8 {
+            h.frame(vec![], collapsed);
+        }
+        let settled = h.row("extra-0");
+        for _ in 0..8 {
+            h.frame(vec![], collapsed);
+            assert_eq!(h.row("extra-0"), settled);
+            assert!(
+                h.output
+                    .as_ref()
+                    .unwrap()
+                    .viewport_output
+                    .values()
+                    .all(|v| !v.repaint_delay.is_zero()),
+                "a cancelled drag must not leave an idle repaint loop"
+            );
+        }
     }
 }

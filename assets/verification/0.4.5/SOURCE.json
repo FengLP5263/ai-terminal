@@ -1,0 +1,36 @@
+{
+  "version": "0.4.5",
+  "profile": "release",
+  "description": "Unmodified native production-component captures with fixed synthetic session metadata; no private information.",
+  "source": "examples/sidebar_drag_probe.rs",
+  "model_requests": false,
+  "user_profiles": false,
+  "system_input_injection": false,
+  "files": {
+    "expanded-drag.png": {
+      "sha256": "16841c31c4d7184bc328736a817271ec15be99ebb77db7d29b51082df91f28ea",
+      "bytes": 88023,
+      "width": 1500,
+      "height": 960
+    },
+    "collapsed-drag.png": {
+      "sha256": "4b997b7cdaaa57cd979f146fffed0a4072f332d355f6b0ce3df3395e0bbbeaff",
+      "bytes": 65774,
+      "width": 1500,
+      "height": 960
+    },
+    "expanded-unread.png": {
+      "sha256": "29a49493abe734b8d42adfd66a8be92361e65d10f706a2247d25f2bc83ca029b",
+      "bytes": 88125,
+      "width": 1500,
+      "height": 960
+    },
+    "expanded-read.png": {
+      "sha256": "3e269d96b5a4f353a5778ae9869cac3bf458e8bf6870990a2e43251c7d684db4",
+      "bytes": 87845,
+      "width": 1500,
+      "height": 960
+    }
+  },
+  "source_sha256": "912ad1041529ab8d076571e9f60a8d148e0ef91cc7f8bb9e784cc58bd6abbe21"
+}

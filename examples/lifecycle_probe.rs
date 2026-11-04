@@ -92,9 +92,9 @@ fn main() {
                 format!(
                     "{agent}{}\r",
                     if offline {
-                        " -c check_for_update_on_startup=false -c log_dir=\"$env:AI_TERMINAL_PROBE_LOG_DIR\" -c model_provider='ai_terminal_fixture' -c model_providers.ai_terminal_fixture.name='OfflineFixture' -c model_providers.ai_terminal_fixture.base_url=\"$env:AI_TERMINAL_PROBE_PROVIDER\" -c model_providers.ai_terminal_fixture.wire_api='responses' -c model_providers.ai_terminal_fixture.requires_openai_auth=false -c model_providers.ai_terminal_fixture.supports_websockets=false -c model='gpt-5.4'"
+                        " --no-daemon -c check_for_update_on_startup=false -c log_dir=\"$env:AI_TERMINAL_PROBE_LOG_DIR\" -c model_provider='ai_terminal_fixture' -c model_providers.ai_terminal_fixture.name='OfflineFixture' -c model_providers.ai_terminal_fixture.base_url=\"$env:AI_TERMINAL_PROBE_PROVIDER\" -c model_providers.ai_terminal_fixture.wire_api='responses' -c model_providers.ai_terminal_fixture.requires_openai_auth=false -c model_providers.ai_terminal_fixture.supports_websockets=false -c model='gpt-5.4'"
                     } else if agent == "codex" {
-                        " -c check_for_update_on_startup=false -c log_dir=\"$env:AI_TERMINAL_PROBE_LOG_DIR\""
+                        " --no-daemon -c check_for_update_on_startup=false -c log_dir=\"$env:AI_TERMINAL_PROBE_LOG_DIR\""
                     } else {
                         ""
                     }

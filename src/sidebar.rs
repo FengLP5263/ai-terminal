@@ -36,7 +36,23 @@ pub struct Actions {
 }
 
 #[derive(Clone)]
-struct DragSession(String);
+struct DragSession {
+    id: String,
+    grab: Vec2,
+}
+
+/// Project a temporary list order without moving any live sessions before drop.
+fn drag_slot(slot: usize, source: usize, destination: usize) -> usize {
+    if slot == destination {
+        source
+    } else if source < destination && (source..destination).contains(&slot) {
+        slot + 1
+    } else if source > destination && (destination + 1..=source).contains(&slot) {
+        slot - 1
+    } else {
+        slot
+    }
+}
 
 #[derive(Clone)]
 pub struct Icons {
@@ -166,10 +182,21 @@ impl Icons {
 
 /// Shared status indicator used by the sidebar and floating session rail.
 pub fn paint_status(ui: &egui::Ui, avatar: Rect, activity: Activity, unread: bool, fill: Color32) {
+    paint_status_on(ui, ui.painter(), avatar, activity, unread, fill);
+}
+
+fn paint_status_on(
+    ui: &egui::Ui,
+    painter: &egui::Painter,
+    avatar: Rect,
+    activity: Activity,
+    unread: bool,
+    fill: Color32,
+) {
     let indicator = avatar.right_bottom() - egui::vec2(2.0, 2.0);
     let surface = fill;
     if activity == Activity::Working {
-        ui.painter().circle_filled(indicator, 5.5, surface);
+        painter.circle_filled(indicator, 5.5, surface);
         let time = ui.input(|i| i.time as f32);
         let points = (0..13)
             .map(|i| {
@@ -177,14 +204,14 @@ pub fn paint_status(ui: &egui::Ui, avatar: Rect, activity: Activity, unread: boo
                 indicator + egui::vec2(a.cos(), a.sin()) * 4.0
             })
             .collect();
-        ui.painter().add(egui::Shape::line(
+        painter.add(egui::Shape::line(
             points,
             Stroke::new(1.75, chrome::WORKING),
         ));
         ui.ctx().request_repaint_after(Duration::from_millis(80));
-    } else if matches!(activity, Activity::Waiting | Activity::Failed) || unread {
-        ui.painter().circle_filled(indicator, 5.5, surface);
-        ui.painter().circle_filled(
+    } else if activity == Activity::Waiting || unread {
+        painter.circle_filled(indicator, 5.5, surface);
+        painter.circle_filled(
             indicator,
             3.5,
             if activity == Activity::Failed {
@@ -193,6 +220,91 @@ pub fn paint_status(ui: &egui::Ui, avatar: Rect, activity: Activity, unread: boo
                 chrome::WAITING
             } else {
                 chrome::COMPLETED
+            },
+        );
+    }
+}
+
+#[derive(Clone, Copy)]
+struct CardStyle {
+    selected: bool,
+    hovered: bool,
+    raised: bool,
+}
+
+fn paint_card(
+    ui: &egui::Ui,
+    painter: &egui::Painter,
+    entry: &Entry<'_>,
+    rect: Rect,
+    collapsed: bool,
+    icons: &Icons,
+    style: CardStyle,
+) {
+    let fill = chrome::session_fill(entry.color, style.selected, style.hovered);
+    if style.raised {
+        painter.rect_filled(
+            rect.translate(egui::vec2(0.0, 3.0)).expand(2.0),
+            8,
+            Color32::from_black_alpha(100),
+        );
+    }
+    painter.rect_filled(rect, 6, fill);
+    if style.selected || style.raised {
+        painter.rect_stroke(
+            rect.shrink(0.5),
+            5,
+            Stroke::new(1.0, chrome::session_border(entry.color)),
+            egui::StrokeKind::Inside,
+        );
+    }
+    let avatar = Rect::from_center_size(
+        Pos2::new(
+            if collapsed {
+                rect.center().x
+            } else {
+                rect.left() + 24.0
+            },
+            rect.center().y,
+        ),
+        Vec2::splat(chrome::AVATAR),
+    );
+    icons.paint(painter, avatar, entry.agent);
+    paint_status_on(ui, painter, avatar, entry.activity, entry.unread, fill);
+    if !collapsed {
+        let left = rect.left() + 52.0;
+        let text_rect = Rect::from_min_max(
+            Pos2::new(left, rect.center().y - 18.0),
+            Pos2::new(rect.right() - 40.0, rect.bottom()),
+        );
+        let painter = painter.with_clip_rect(text_rect.intersect(painter.clip_rect()));
+        crate::ui_text::paint(
+            ui,
+            &painter,
+            text_rect.left_top(),
+            entry.name,
+            14.0,
+            if style.selected {
+                Color32::from_gray(245)
+            } else {
+                chrome::TEXT
+            },
+            text_rect.width(),
+        );
+        let project = entry
+            .directory
+            .file_name()
+            .unwrap_or(entry.directory.as_os_str())
+            .to_string_lossy();
+        painter.text(
+            Pos2::new(left, rect.center().y + 4.0),
+            egui::Align2::LEFT_TOP,
+            project,
+            egui::FontId::proportional(12.0),
+            if style.selected {
+                Color32::from_gray(180)
+            } else {
+                chrome::SECONDARY
             },
         );
     }
@@ -299,7 +411,41 @@ pub fn show(
             .id_salt("session-list-scroll")
             .auto_shrink([false, false])
             .show(ui, |ui| {
-                for (index, entry) in entries.iter().enumerate() {
+                let drag = egui::DragAndDrop::payload::<DragSession>(ui.ctx());
+                let pointer = ui.input(|i| i.pointer.interact_pos());
+                let source = drag
+                    .as_ref()
+                    .and_then(|drag| entries.iter().position(|entry| entry.id == drag.id));
+                let row_height = if collapsed {
+                    chrome::RAIL_ROW
+                } else {
+                    chrome::ROW
+                };
+                let pitch =
+                    row_height + ui.spacing().item_spacing.y + if collapsed { 0.0 } else { 4.0 };
+                let list_top = ui.cursor().top();
+                let viewport = ui.clip_rect().intersect(Rect::from_min_max(
+                    Pos2::new(ui.cursor().left(), ui.clip_rect().top()),
+                    Pos2::new(row_right, ui.clip_rect().bottom()),
+                ));
+                // Use fixed slots rather than moving card hitboxes to avoid reorder feedback.
+                let destination = source.map(|source| {
+                    match (drag.as_ref(), pointer.filter(|p| viewport.contains(*p))) {
+                        (Some(drag), Some(pointer)) => {
+                            (((pointer.y - drag.grab.y - list_top) / pitch)
+                                .round()
+                                .max(0.0) as usize)
+                                .min(entries.len().saturating_sub(1))
+                        }
+                        _ => source,
+                    }
+                });
+                for slot in 0..entries.len() {
+                    let index = match (source, destination) {
+                        (Some(source), Some(destination)) => drag_slot(slot, source, destination),
+                        _ => slot,
+                    };
+                    let entry = &entries[index];
                     // A scrollbar can change available width from 51 to 44.
                     // Deriving square row height from it toggles overflow forever
                     // near the fit threshold. Keep the rail tile independent.
@@ -319,112 +465,74 @@ pub fn show(
                     );
                     let selected = active == Some(entry.id);
                     let hovered = ui.rect_contains_pointer(rect);
-                    let fill = chrome::session_fill(entry.color, selected, hovered);
-                    ui.painter().rect_filled(rect, 6, fill);
-                    if selected {
+                    let is_source = source == Some(index);
+                    if is_source {
+                        // The gap takes the same space as a real card; all other rows move aside.
+                        ui.painter()
+                            .rect_filled(rect.shrink(1.0), 6, Color32::from_gray(22));
                         ui.painter().rect_stroke(
-                            rect.shrink(0.5),
+                            rect.shrink(1.0),
                             5,
-                            Stroke::new(1.0, chrome::session_border(entry.color)),
+                            Stroke::new(1.0, chrome::BORDER),
                             egui::StrokeKind::Inside,
                         );
-                    }
-                    let avatar = Rect::from_center_size(
-                        Pos2::new(
-                            if collapsed {
-                                rect.center().x
-                            } else {
-                                rect.left() + 24.0
-                            },
-                            rect.center().y,
-                        ),
-                        Vec2::splat(chrome::AVATAR),
-                    );
-                    icons.paint(ui.painter(), avatar, entry.agent);
-                    paint_status(ui, avatar, entry.activity, entry.unread, fill);
-                    let mut edit = false;
-                    if !collapsed {
-                        let left = rect.left() + 52.0;
-                        let text_rect = Rect::from_min_max(
-                            Pos2::new(left, rect.center().y - 18.0),
-                            Pos2::new(rect.right() - 40.0, rect.bottom()),
-                        );
-                        let painter = ui.painter().with_clip_rect(text_rect);
-                        crate::ui_text::paint(
+                    } else {
+                        paint_card(
                             ui,
-                            &painter,
-                            text_rect.left_top(),
-                            entry.name,
-                            14.0,
-                            if selected {
-                                Color32::from_gray(245)
-                            } else {
-                                chrome::TEXT
-                            },
-                            text_rect.width(),
-                        );
-                        let project = entry
-                            .directory
-                            .file_name()
-                            .unwrap_or(entry.directory.as_os_str())
-                            .to_string_lossy();
-                        painter.text(
-                            Pos2::new(left, rect.center().y + 4.0),
-                            egui::Align2::LEFT_TOP,
-                            project,
-                            egui::FontId::proportional(12.0),
-                            if selected {
-                                Color32::from_gray(180)
-                            } else {
-                                chrome::SECONDARY
+                            ui.painter(),
+                            entry,
+                            rect,
+                            collapsed,
+                            icons,
+                            CardStyle {
+                                selected,
+                                hovered,
+                                raised: false,
                             },
                         );
-                        if hovered || selected {
-                            let edit_rect = Rect::from_center_size(
-                                Pos2::new(rect.right() - 18.0, rect.center().y),
-                                Vec2::splat(chrome::CONTROL),
-                            );
-                            edit = chrome::icon_at(
-                                ui,
-                                edit_rect,
-                                egui::Id::new(("edit-session", entry.id)),
-                                chrome::ActionIcon::Edit,
-                                crate::i18n::tr(ui.ctx(), "编辑会话名称", "Edit session name"),
-                            )
-                            .clicked();
-                        }
+                    }
+                    let mut edit = false;
+                    if !collapsed && drag.is_none() && (hovered || selected) {
+                        let edit_rect = Rect::from_center_size(
+                            Pos2::new(rect.right() - 18.0, rect.center().y),
+                            Vec2::splat(chrome::CONTROL),
+                        );
+                        edit = chrome::icon_at(
+                            ui,
+                            edit_rect,
+                            egui::Id::new(("edit-session", entry.id)),
+                            chrome::ActionIcon::Edit,
+                            crate::i18n::tr(ui.ctx(), "编辑会话名称", "Edit session name"),
+                        )
+                        .clicked();
                     }
                     if edit {
                         actions.rename = Some(entry.id.into());
                     } else if response.clicked() {
                         actions.select = Some(entry.id.into());
                     }
-                    response.dnd_set_drag_payload(DragSession(entry.id.into()));
-                    let after = ui
-                        .input(|i| i.pointer.interact_pos())
-                        .is_some_and(|p| p.y > rect.center().y);
-                    if let Some(payload) = response.dnd_hover_payload::<DragSession>()
-                        && payload.0 != entry.id
-                    {
-                        let y = if after { rect.bottom() } else { rect.top() };
-                        ui.painter().line_segment(
-                            [Pos2::new(rect.left(), y), Pos2::new(rect.right(), y)],
-                            Stroke::new(2.0, Color32::from_rgb(136, 180, 246)),
+                    if response.drag_started_by(egui::PointerButton::Primary) {
+                        let press = ui
+                            .input(|i| i.pointer.press_origin())
+                            .unwrap_or(rect.center());
+                        egui::DragAndDrop::set_payload(
+                            ui.ctx(),
+                            DragSession {
+                                id: entry.id.into(),
+                                grab: press - rect.min,
+                            },
                         );
-                        ui.ctx().set_cursor_icon(egui::CursorIcon::Grabbing);
+                        ui.ctx().request_repaint();
                     }
-                    if let Some(payload) = response.dnd_release_payload::<DragSession>()
-                        && payload.0 != entry.id
-                    {
-                        actions.reorder = Some((payload.0.clone(), entry.id.into(), after));
+                    if drag.is_none() && !response.dragged() {
+                        response.clone().on_hover_text(format!(
+                            "{} · {}\n{}\n{}",
+                            entry.name,
+                            entry.agent.label(),
+                            entry.directory.display(),
+                            entry.hint
+                        ));
                     }
-                    response.clone().on_hover_text(format!(
-                        "{} · {}\n{}\n{}",
-                        entry.name,
-                        entry.agent.label(),
-                        entry.directory.display(),
-                        entry.hint
-                    ));
                     response.context_menu(|ui| {
                         if ui
                             .button(crate::i18n::tr(ui.ctx(), "编辑名称", "Rename"))
@@ -470,7 +578,7 @@ pub fn show(
                             ui.close();
                         }
                     });
-                    if index + 1 < entries.len() {
+                    if slot + 1 < entries.len() {
                         ui.painter().hline(
                             rect.left() + 4.0..=rect.right() - 4.0,
                             rect.bottom() + if collapsed { 2.0 } else { 5.0 },
@@ -479,6 +587,74 @@ pub fn show(
                     }
                     if !collapsed {
                         ui.add_space(4.0);
+                    }
+                }
+                // A non-interactive foreground copy follows the original grab point, even
+                // outside the rail. Only metadata is painted; no terminal data is copied.
+                if let Some(drag) = egui::DragAndDrop::payload::<DragSession>(ui.ctx())
+                    && let Some(entry) = entries.iter().find(|entry| entry.id == drag.id)
+                    && let Some(pointer) = pointer
+                {
+                    ui.ctx().set_cursor_icon(egui::CursorIcon::Grabbing);
+                    if ui.input(|i| i.pointer.button_released(egui::PointerButton::Primary)) {
+                        if viewport.contains(pointer)
+                            && let (Some(source), Some(destination)) = (source, destination)
+                            && source != destination
+                        {
+                            actions.reorder = Some((
+                                drag.id.clone(),
+                                entries[destination].id.into(),
+                                destination > source,
+                            ));
+                        }
+                        egui::DragAndDrop::clear_payload(ui.ctx());
+                    } else {
+                        // Only a held card near the viewport edge scrolls the long list.
+                        // Ordinary hovering and idle frames never start a scroll loop.
+                        if viewport.contains(pointer) {
+                            let edge = 24.0_f32.min(viewport.height() / 4.0);
+                            let direction =
+                                if pointer.y < viewport.top() + edge && list_top < viewport.top() {
+                                    1.0
+                                } else if pointer.y > viewport.bottom() - edge
+                                    && ui.min_rect().bottom() > viewport.bottom()
+                                {
+                                    -1.0
+                                } else {
+                                    0.0
+                                };
+                            if direction != 0.0 {
+                                let distance = ui.input(|i| i.stable_dt.min(0.05)) * 260.0;
+                                ui.scroll_with_delta_animation(
+                                    egui::vec2(0.0, direction * distance),
+                                    egui::style::ScrollAnimation::none(),
+                                );
+                                ui.ctx().request_repaint();
+                            }
+                        }
+                        let size = if collapsed {
+                            Vec2::splat(chrome::RAIL_ROW)
+                        } else {
+                            Vec2::new((row_right - ui.max_rect().left()).max(1.0), chrome::ROW)
+                        };
+                        let rect = Rect::from_min_size(pointer - drag.grab, size);
+                        let painter = ui.ctx().layer_painter(egui::LayerId::new(
+                            egui::Order::Tooltip,
+                            egui::Id::new("session-drag-preview"),
+                        ));
+                        paint_card(
+                            ui,
+                            &painter,
+                            entry,
+                            rect,
+                            collapsed,
+                            icons,
+                            CardStyle {
+                                selected: active == Some(entry.id),
+                                hovered: true,
+                                raised: true,
+                            },
+                        );
                     }
                 }
             });

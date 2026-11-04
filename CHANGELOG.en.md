@@ -8,6 +8,48 @@ Record user-visible additions, improvements, fixes, and compatibility changes fo
 
 No confirmed changes for a subsequent version yet.
 
+## [0.4.5] - 2026-11-04
+
+### Changed
+
+- Preserve Codex's shared server and `← for agents` by default. Explicit native OSC 7501 lifecycle from the current terminal updates status, including hidden sessions. Explicit `codex --no-daemon` retains the legacy hook integration.
+- Show a full session card at the pointer's original grab point while the list makes space. Release commits the order; Escape or release outside cancels. Holding a card at an overflowing list's edge scrolls further. Hide hover tooltips during dragging so they do not cover the card.
+
+### Fixed
+
+- Treat failure red dots and completion green dots as unread badges: viewing clears them from the sidebar and floating rail while retaining the failed/completed state. Record unread state for startup failures and abnormal process exits too.
+- Give adjacent narrow Claude mode badges equal visual widths, fixing mismatched double-triangle sizes. Preserve isolated badges, combined emoji and VS15 text presentation.
+
+### Upgrade notes and verification limits
+
+- Native lifecycle and agents navigation were checked with Codex 0.166.0. Older CLIs without native events can use `codex --no-daemon` and review compatibility hooks in `/hooks`; that mode has no shared agents entry. Existing CLIs must be exited and relaunched to use the new integration; the manager does not restart sessions or alter user configuration automatically.
+- Codex owns shared background tasks. Closing the manager reaps only its terminals and helpers; tasks in the shared server may continue running.
+- Passed 161 Rust and 13 Python regressions, governance, formatting, Clippy, Release smoke and native UI captures; the user accepted the local preview. Synthetic lifecycle, real CLI navigation and actual model tasks are recorded separately. No paid model turns, long-duration load measurements or remote Windows 10 retest were run for this release.
+
+## [0.4.5-preview.2] - 2026-11-04
+
+Local feature preview; not a published release. Includes preview.1's native Codex status and mode-badge fixes.
+
+### Changed
+
+- Show a full session card at the pointer's original grab point during reordering, with a live destination gap. Commit on release; Escape or release outside the list cancels. Holding a card at an overflowing list's edge scrolls further.
+
+### Fixed
+
+- Treat failure red dots and completion green dots as unread badges: viewing clears them from the sidebar and floating rail while retaining the failed status. Record unread state for startup failures and abnormal process exits as well.
+
+## [0.4.5-preview.1] - 2026-11-03
+
+Local feature preview; not a published release.
+
+### Changed
+
+- Preserve Codex's shared server and `← for agents` by default, updating status from explicit OSC 7501 lifecycle in the current terminal. Explicit `codex --no-daemon` retains the legacy hook integration. Codex owns shared background tasks.
+
+### Fixed
+
+- Use equal visual widths for adjacent narrow mode badges, fixing mismatched sizes in Claude's double-triangle indicator; isolated badges can still use following padding for a complete glyph.
+
 ## [0.4.4] - 2026-11-03
 
 ### Improved

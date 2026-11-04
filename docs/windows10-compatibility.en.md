@@ -33,6 +33,8 @@ Native evidence remains in ignored `output/` and an isolated remote temporary di
 
 ## Local 0.4.3 preview
 
+Follow-up status (2026-11-03): the user confirmed #12 no longer occurs in actual 0.4.4 use and explicitly requested closure. [Issue #12](https://github.com/FengLP5263/ai-terminal/issues/12) is closed on that acceptance and can be reopened if it recurs. Retain the historical inability to reproduce the original trigger reliably; closure does not claim a uniquely identified root cause or add a new Windows 10 hardware-test result.
+
 After the user confirmed basic functionality in the Windows 10 preview above, the package manifest and lock file were updated to 0.4.3 and the application was rebuilt and launched locally. Governance, fmt, Clippy, 144 Rust tests, 10 Python tests, and three-session native smoke passed. The local preview archive passed read-back verification; its window title is `ai-terminal 0.4.3` and it remains responsive after the launch command exits.
 
 The preview uses isolated session data and a launcher under `output/previews/0.4.3-<timestamp>/`. The running 0.4.2 instance and its configuration are preserved. That preview's manifest recorded dirty=true and published=false; launching it did not create a tag or remote release. Windows 10 verification used the same fixes before the version-number change. Basic acceptance does not replace targeted reproduction of the original #12 conditions. The user subsequently reported no significant issues in the local 0.4.3 trial and authorized release; formal artifacts must be rebuilt from the clean PR-merged commit.

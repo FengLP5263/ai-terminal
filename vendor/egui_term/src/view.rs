@@ -658,7 +658,31 @@ fn glyph_cluster(cells: &[crate::backend::RenderCell], index: usize) -> (String,
             && c.point.column.0 == first.point.column.0 + 1
             && c.cell.c == ' '
     });
-    let visual = if presentation && first_width == 1 && blank_after {
+    // A trailing badge in a narrow symbol run must use the same width as its
+    // neighbours. Otherwise only that last glyph expands into the padding and
+    // gets a different raster scale (for example Claude's adjacent play icons).
+    let previous_badge = presentation
+        && first_width == 1
+        && blank_after
+        && index
+            .checked_sub(1)
+            .and_then(|i| cells.get(i))
+            .is_some_and(|c| {
+                if c.point.line != first.point.line
+                    || c.point.column.0 + 1 != first.point.column.0
+                    || c.cell
+                        .flags
+                        .intersects(cell::Flags::WIDE_CHAR | cell::Flags::WIDE_CHAR_SPACER)
+                {
+                    return false;
+                }
+                let mut previous = c.cell.c.to_string();
+                if let Some(zero) = c.cell.zerowidth() {
+                    previous.extend(zero);
+                }
+                emoji_presentation(&previous)
+            });
+    let visual = if presentation && first_width == 1 && blank_after && !previous_badge {
         2
     } else {
         columns.min(2)
@@ -1098,6 +1122,41 @@ fn grid_glyph(ch: char, rect: Rect, color: egui::Color32) -> Option<Vec<Shape>> 
 #[cfg(test)]
 mod rendering_tests {
     use super::*;
+    #[test]
+    fn adjacent_narrow_mode_badges_have_equal_visual_cells() {
+        use crate::backend::RenderCell;
+        use alacritty_terminal::index::{Column, Line};
+        for badge in ['\u{23f5}', '\u{25b6}', '\u{23f8}'] {
+            let cells: Vec<_> = [badge, badge, ' ', 'a']
+                .into_iter()
+                .enumerate()
+                .map(|(column, c)| RenderCell {
+                    point: TerminalGridPoint::new(Line(0), Column(column)),
+                    cell: cell::Cell {
+                        c,
+                        ..Default::default()
+                    },
+                })
+                .collect();
+            let first = glyph_cluster(&cells, 0);
+            let second = glyph_cluster(&cells, 1);
+            assert_eq!(
+                first.2, second.2,
+                "adjacent badge {badge} changed size before padding"
+            );
+            assert_eq!(
+                (first.1, second.1),
+                (0, 1),
+                "badges must remain separate cells"
+            );
+            assert_eq!(first.0, second.0);
+            assert_eq!(
+                glyph_cluster(&cells[1..], 0).2,
+                2,
+                "an isolated mode badge may use its following blank"
+            );
+        }
+    }
     #[test]
     fn terminal_rules_and_blocks_fill_their_cells() {
         let rect = Rect::from_min_size(egui::pos2(10.0, 20.0), egui::vec2(9.0, 24.0));

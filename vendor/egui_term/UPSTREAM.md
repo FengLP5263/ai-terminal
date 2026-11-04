@@ -77,3 +77,5 @@ Managed Codex invocations: a bounded, session-scoped OSC 9 observer forwards onl
 编码 CLI 的拖选：宿主可启用 set_drag_selection，在应用鼠标模式下将普通左键拖动用于本地选择；移动阈值为 3 逻辑像素，无拖动单击在释放时转发按下／释放。Shift 可强制本地选择，普通终端程序的 1002／1003 拖动协议保持可用；滚轮独立路由。复制选区不向 PTY 发送 Ctrl+C，无选区保留中断。真实 ConPTY 回归覆盖标准／SGR 鼠标、点击、拖动、复制及中断；原生探针截图不改写系统剪贴板。
 
 Windows 兼容性验收：为宿主探针公开重导出 Alacritty 的 WindowSize，以核查最终 ConPTY 行列／物理字符尺寸。宿主在程序目录随带固定版微软 conpty.dll／OpenConsole.exe，使用 Alacritty 既有动态加载路径；本补丁不改其 ConPTY 协议实现。
+
+Native Codex lifecycle: observe only recognized OSC 7501 state/app/kind values, preserving byte-for-byte PTY output. A 32-state queue preserves recent transition order, coalesces wakeups and rejects old invocation epochs. No status text, prompts or activity details are retained. Adjacent narrow mode badges share a one-cell visual budget; only an isolated badge can extend into its following blank, preventing unequal triangle raster scales.

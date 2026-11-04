@@ -10,7 +10,10 @@ mod view;
 
 pub use alacritty_terminal::event::WindowSize;
 pub use backend::settings::BackendSettings;
-pub use backend::{BackendCommand, PtyEvent, TerminalBackend, TerminalMode, CODEX_ATTENTION_EVENT};
+pub use backend::{
+    BackendCommand, CodexProgramStatus, PtyEvent, TerminalBackend, TerminalMode,
+    CODEX_ATTENTION_EVENT, CODEX_PROGRAM_EVENT,
+};
 pub use bindings::{Binding, BindingAction, InputKind, KeyboardBinding};
 pub use font::{FontSettings, TerminalFont, TextRendererSession};
 pub use theme::{ColorPalette, TerminalTheme};
