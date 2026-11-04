@@ -6,7 +6,7 @@
 
 **A calmer workspace for your AI sessions.**
 
-Use Codex and Claude Code in a familiar terminal, keep an eye on their status, and return to any session in a click.
+Use Codex, Claude Code and Qoder CN CLI in a familiar terminal, keep an eye on their status, and return to any session in a click.
 
 [![GitHub Release](https://img.shields.io/github/v/release/FengLP5263/ai-terminal?label=release)](https://github.com/FengLP5263/ai-terminal/releases/latest)
 [![Platform](https://img.shields.io/badge/platform-Windows%20x64-0078D4)](#platform-support)
@@ -39,11 +39,11 @@ Enable the floating bar to see session avatars and status above other windows. C
 | Feature | What you can do |
 | --- | --- |
 | **A real terminal** | Open PowerShell, CMD, or Git Bash and run your installed command-line tools directly. |
-| **Agent recognition** | Starting Codex or Claude Code displays the corresponding avatar; other commands still work as ordinary terminal sessions. |
+| **Agent recognition** | Starting Codex, Claude Code or Qoder CN CLI displays the corresponding avatar; other commands still work as ordinary terminal sessions. |
 | **Task status** | See working, needs attention, completed, or failed states for supported Agents in the sidebar and floating bar. Status comes from supported lifecycle notifications and process exits; it is not a universal inference for every CLI. |
 | **Always-on-top bar** | Show only session avatars and status, up to 10 at a time. Drag the avatar area to see more, and click an avatar to return to its session. |
 | **Your workspace** | Drag to reorder, rename or color sessions, collapse the sidebar, and scale the entire interface with Ctrl + mouse wheel. |
-| **Familiar terminal behavior** | Use Chinese text, ANSI colors, and system color emoji; pass clipboard images to Codex or Claude Code for the CLI to handle. |
+| **Familiar terminal behavior** | Use Chinese text, ANSI colors, and system color emoji; pass clipboard images to Codex, Claude Code or Qoder CN CLI for the CLI to handle. |
 | **Chinese and English** | Follow the system language or choose Simplified Chinese or English in settings. |
 
 ## Platform support
@@ -66,16 +66,16 @@ Select a Shell with the **+** button at the top left, or press <kbd>Ctrl</kbd> +
 ```powershell
 cd 'C:\path\to\your-project'
 codex
-# or run claude
+# or run claude / qodercn
 ```
 
-Install and configure [Codex CLI](https://github.com/openai/codex) or [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview) separately. AI Terminal respects the CLI's own login, model, trust, and permission settings.
+Install and configure [Codex CLI](https://github.com/openai/codex), [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview) or [Qoder CN CLI](https://docs.qoder.cn/en/cli/installation) separately. AI Terminal respects the CLI's own login, model, trust, and permission settings.
 
 ### 3. Make it yours
 
 Use the gear at the top left to set the language and floating bar. Hover over a session avatar for details and click it to switch sessions. Drag the floating bar to reposition it, and turn it off in settings. Hold <kbd>Ctrl</kbd> and scroll to scale the entire interface.
 
-Interactively launching `powershell`, `cmd` or `bash` through a managed entry updates the avatar to the current shell; `exit` restores each level. Codex/Claude take avatar priority while active, then return to the current shell. One-off scripts and tool commands inside Agents do not change shell identity.
+Interactively launching `powershell`, `cmd` or `bash` through a managed entry updates the avatar to the current shell; `exit` restores each level. Codex/Claude/Qoder CN take avatar priority while active, then return to the current shell. One-off scripts and tool commands inside Agents do not change shell identity.
 
 ## Frequently asked questions
 
@@ -89,7 +89,7 @@ Yes, use PowerShell or CMD directly. Git Bash is optional; selecting it when una
 
 ### Why is there no Agent status?
 
-Status depends on explicit CLI lifecycle notifications. Since 0.4.5, the app receives native Codex state by default while preserving the shared agents overview, verified with Codex 0.166.0. Older CLIs without native events can explicitly run `codex --no-daemon` and review compatibility hooks in `/hooks`; that mode has no shared entry. Codex integration through 0.4.4, and Claude integration, use hooks. Missing status does not mean completion; the app never trusts hooks or changes user-level CLI configuration on your behalf.
+Status depends on explicit CLI lifecycle notifications. Since 0.4.5, the app receives native Codex state by default while preserving the shared agents overview, verified with Codex 0.166.0. Older CLIs without native events can explicitly run `codex --no-daemon` and review compatibility hooks in `/hooks`; that mode has no shared entry. Codex integration through 0.4.4, and Claude/Qoder CN integration, use hooks. Missing status does not mean completion; the app never trusts hooks or changes user-level CLI configuration on your behalf.
 
 ### Can I continue a conversation after restarting?
 
@@ -97,7 +97,7 @@ The app restores the session list and interface settings, not running processes 
 
 ### How do I scroll terminal history or paste an image?
 
-Use the mouse wheel for history. When a full-screen app takes over the wheel, use <kbd>Shift</kbd> + wheel for local history. When Codex or Claude Code is recognized, <kbd>Ctrl</kbd> + <kbd>V</kbd> or <kbd>Shift</kbd> + <kbd>Insert</kbd> passes a clipboard image to the CLI.
+Use the mouse wheel for history. When a full-screen app takes over the wheel, use <kbd>Shift</kbd> + wheel for local history. When Codex, Claude Code or Qoder CN CLI is recognized, <kbd>Ctrl</kbd> + <kbd>V</kbd> or <kbd>Shift</kbd> + <kbd>Insert</kbd> passes a clipboard image to the CLI.
 
 ### Are conversations or API keys saved?
 
@@ -127,6 +127,6 @@ Issues, ideas, terminal improvements, and documentation contributions are welcom
 
 Project code is available under the [MIT License](LICENSE). Third-party components retain their own licenses; see [third-party notices](THIRD_PARTY_NOTICES.en.md).
 
-## 0.4.5 update
+## 0.4.6 update
 
-Codex keeps explicit lifecycle status alongside the `← for agents` overview. Session cards follow the pointer while the list makes space; viewed failures clear their red badges, and Claude's adjacent mode triangles have equal sizes. See the [bilingual changelog](CHANGELOG.en.md) for changes, upgrade notes and verification scope. Each release ZIP includes both files.
+Add Qoder CN CLI support and fix missing avatar/state integration when Codex starts through an absolute path or remote resume command. Codex keeps its shared agents overview, with state still driven by explicit lifecycle notifications. See the [bilingual changelog](CHANGELOG.en.md) for changes, upgrade notes and verification scope. Each release ZIP includes both files.

@@ -1,5 +1,6 @@
 //! Native application screenshots of CMD -> PowerShell -> CMD and per-level exit.
-//! Only synthetic input into this isolated window; no Agent, model or user profile.
+//! Optional codex-direct mode checks absolute-path remote startup without a prompt.
+//! Input is confined to this isolated window; no model request or trust approval.
 #[path = "../src/app.rs"]
 mod app;
 #[path = "../src/platform.rs"]
@@ -20,7 +21,8 @@ struct Probe {
     stage: usize,
     stage_began: Instant,
     capture_pending: bool,
-    input_pending: Option<&'static str>,
+    input_pending: Option<String>,
+    codex_direct: Option<String>,
     finished: bool,
 }
 
@@ -52,7 +54,7 @@ impl eframe::App for Probe {
             .or_default()
             .focused = Some(true);
         if let Some(command) = self.input_pending.take() {
-            input.events.push(egui::Event::Text(command.into()));
+            input.events.push(egui::Event::Text(command));
             input.events.push(egui::Event::Key {
                 key: egui::Key::Enter,
                 physical_key: Some(egui::Key::Enter),
@@ -77,7 +79,12 @@ impl eframe::App for Probe {
         }
         self.inner.ui(ui, frame);
         let ctx = ui.ctx();
-        if self.stage_began.elapsed() > Duration::from_secs(5) && !self.capture_pending {
+        let delay = if self.codex_direct.is_some() && self.stage == 1 {
+            15
+        } else {
+            5
+        };
+        if self.stage_began.elapsed() > Duration::from_secs(delay) && !self.capture_pending {
             self.capture_pending = true;
             ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::default()));
         }
@@ -88,13 +95,17 @@ impl eframe::App for Probe {
             })
         });
         if let Some(image) = screenshot {
-            let name = [
-                "root-cmd",
-                "powershell",
-                "nested-cmd",
-                "return-powershell",
-                "return-root-cmd",
-            ][self.stage];
+            let name = if self.codex_direct.is_some() {
+                ["root-powershell", "absolute-codex-remote"][self.stage]
+            } else {
+                [
+                    "root-cmd",
+                    "powershell",
+                    "nested-cmd",
+                    "return-powershell",
+                    "return-root-cmd",
+                ][self.stage]
+            };
             let mut encoder = png::Encoder::new(
                 std::fs::File::create(self.output.join(format!("{name}.png"))).unwrap(),
                 image.width() as u32,
@@ -114,15 +125,28 @@ impl eframe::App for Probe {
                 )
                 .unwrap();
             self.stage += 1;
-            if self.stage == 5 {
-                std::fs::write(self.output.join("capture.json"), r#"{"screenshots":5,"visual_review_required":true,"model_request_sent":false,"isolated_sessions":true}"#).unwrap();
+            if self.stage == if self.codex_direct.is_some() { 2 } else { 5 } {
+                std::fs::write(
+                    self.output.join("capture.json"),
+                    serde_json::to_vec_pretty(&serde_json::json!({
+                        "screenshots": self.stage, "visual_review_required": true,
+                        "model_request_sent": false, "isolated_sessions": true,
+                        "absolute_codex_remote": self.codex_direct.is_some(),
+                        "trust_approved": false, "shared_server_stopped": false,
+                    }))
+                    .unwrap(),
+                )
+                .unwrap();
                 self.finished = true;
                 // Bypass confirmation only for our completed probe, with normal on_exit/drop.
                 ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                 return;
             }
-            self.input_pending =
-                Some(["powershell -NoLogo -NoProfile", "cmd /d", "exit", "exit"][self.stage - 1]);
+            self.input_pending = Some(if let Some(command) = &self.codex_direct {
+                command.clone()
+            } else {
+                ["powershell -NoLogo -NoProfile", "cmd /d", "exit", "exit"][self.stage - 1].into()
+            });
             self.stage_began = Instant::now();
             self.capture_pending = false;
         }
@@ -134,8 +158,24 @@ fn main() -> eframe::Result {
     let output = PathBuf::from(
         std::env::args()
             .nth(1)
-            .expect("shell_switch_probe output-directory"),
+            .expect("shell_switch_probe output-directory [codex-direct]"),
     );
+    let direct = std::env::args().nth(2).is_some_and(|s| s == "codex-direct");
+    let directory = if direct {
+        std::env::current_dir().unwrap()
+    } else {
+        PathBuf::from(std::env::var_os("SystemRoot").expect("SystemRoot"))
+    };
+    let codex_direct = direct.then(|| {
+        let cli = ai_terminal::discovery::CliSearch::current()
+            .find(ai_terminal::model::Agent::Codex)
+            .expect("Install Codex first");
+        format!(
+            "& '{}' --remote unix:// -C '{}'",
+            cli.to_string_lossy().replace('\'', "''"),
+            directory.to_string_lossy().replace('\'', "''")
+        )
+    });
     let data = output.join("data");
     std::fs::create_dir_all(&data).unwrap();
     assert!(
@@ -162,8 +202,12 @@ fn main() -> eframe::Result {
             sessions: vec![ai_terminal::model::SessionSpec {
                 id: "shell-switch".into(),
                 name: "Shell switch preview".into(),
-                directory: PathBuf::from(std::env::var_os("SystemRoot").expect("SystemRoot")),
-                agent: ai_terminal::model::Agent::Cmd,
+                directory,
+                agent: if direct {
+                    ai_terminal::model::Agent::Shell
+                } else {
+                    ai_terminal::model::Agent::Cmd
+                },
                 agent_session_id: None,
                 color: None,
             }],
@@ -188,6 +232,7 @@ fn main() -> eframe::Result {
                 stage_began: Instant::now(),
                 capture_pending: false,
                 input_pending: None,
+                codex_direct,
                 finished: false,
             }))
         }),

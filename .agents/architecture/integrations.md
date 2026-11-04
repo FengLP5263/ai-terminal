@@ -6,6 +6,7 @@
 | --- | --- | --- | --- |
 | Codex CLI | 当前／持久 PATH 与用户安装目录 | CLI 自有认证、信任和 hook schema；管理器只注入本次参数 | 升级后重新验证配置解析、/hooks 审查及实际生命周期 |
 | Claude Code | 当前／持久 PATH 与用户安装目录 | CLI 自有认证、模型、插件和权限；--settings 仅会话级 | 模型请求必须显式授权；CLI 可自行保存它自己的运行状态 |
+| Qoder CN CLI | 公开 qodercn／qoderclicn 入口，支持原生与 npm 安装 | CLI 自有登录、模型、目录信任；--settings 仅会话级，显式设置优先 | 合成状态与真实启动分开验证；不自动确认信任或发起模型请求 |
 | PowerShell | Windows 系统组件 | 普通交互 shell，无 AI 工作状态推断 | 管理器负责本会话进程树，不修改用户 profile |
 | Git Bash | 可选的 Git for Windows 安装 | 加载系统／用户启动配置后追加本会话目录通知与入口，不修改用户文件 | 无 Git Bash 时明确提示，允许改用可用的 PowerShell／CMD；WSL 和其他 Bash 不代替 Git Bash |
 | 用户工作目录 | 用户主目录、最近目录或终端 cd 后的目录 | 被打开的项目仍归用户和其项目规范管理 | 选择目录不授权管理器／开发者修改其中代码 |
@@ -45,3 +46,15 @@ Microsoft.Windows.Console.ConPTY 是固定版本的本地运行依赖，来源�
 2026-11-03 用户取舍：Codex 优先保留准确的状态提示，暂不启用共享 agents 入口。保持独立模式和会话级 hook；不要仅为恢复 for agents 删除注入参数、改用户配置或退回输出猜测。0.166.0 启动源码仍对不兼容的会话级配置排除共享后台。后续恢复入口必须同时验证跨终端状态归属、切换对话与关闭回收；记录见 [界面核查](../../docs/ui-rendering.md)。
 
 后续开发采用 Codex 的 OSC 7501 明确生命周期，解除默认会话级配置与共享后台冲突。2026-11-03 的暂缓决定作为历史保留；原生模式及显式 --no-daemon 兼容模式的当前边界见运行记录。原生状态只属于当前受管 PTY，不订阅或控制用户的其他 daemon 会话，不收集对话正文或凭据。
+
+0.4.6：Codex 的带 app 身份的原生通知可直接建立当前 PTY 的身份，覆盖绝对路径、别名和远程 resume 入口；不需要修改这些命令，也不订阅共享后台。clear 不建立身份或表示退出，返回当前代次 Shell 提示符才清理未经 helper 的身份。其他 Agent 仍通过已接入入口识别。
+
+## Qoder CN CLI（0.4.6）
+
+只识别官方公开的 `qodercn`／`qoderclicn`，不把 Qoder IDE 的 `qoder` 或国际版当作 CN CLI。沿用 PATH、注册表持久 PATH 和已有 npm／用户安装目录发现；同目录优先原生 exe，再处理 cmd／bat；只跳过已确认目标缺失的标准 npm 包装器。
+
+`--settings` 只引用本次 runtime 的 hook 文件，使用原生 helper 的 exec 形式及 `args`，不引入 PowerShell 启动开销、不返回权限决定或上下文。只注册 Qoder 支持的事件，不注入 Claude 专用 PostToolBatch。显式用户 `--settings` 不覆盖、不合并私有内容。恢复参数为 `--resume <id>`。CLI 自行处理登录、模型、权限和目录信任；未信任目录中的 hook 可能被 CLI 阻止。
+
+状态基于官方 SessionStart、UserPromptSubmit、工具／交互通知、Stop、StopFailure 与实际退出；不以输出或进程存在猜状态。桥继续丢弃子 Agent、正文及认证信息，调用／启动代次隔离。Qoder 的 source=new 可切换前台会话。鼠标拖选与 Alt+V 图片粘贴复用正式终端能力。
+
+接口来源：[参数](https://docs.qoder.cn/en/cli/cli-reference)、[配置合并](https://docs.qoder.cn/en/cli/settings)、[Hooks](https://docs.qoder.cn/en/cli/hooks-reference)、[快捷键](https://docs.qoder.cn/en/cli/interface)。实际版本核查、未提交启动截图、合成 hook 与真实模型回合分别记录。

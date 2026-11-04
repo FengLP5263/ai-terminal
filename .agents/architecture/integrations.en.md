@@ -6,6 +6,7 @@
 | --- | --- |
 | Codex CLI | Uses current/persistent PATH and user installation. CLI owns authentication, trust and hook schema; the manager injects only session-scoped options. Recheck parsing, `/hooks`, and lifecycle after upgrades. |
 | Claude Code | Uses current/persistent PATH and user installation. CLI owns authentication, models, plugins and permissions; `--settings` is session-scoped. Model requests require explicit authorization. |
+| Qoder CN CLI | Public qodercn/qoderclicn entries, native/npm installs. CLI owns login, models and directory trust; settings are session-scoped and explicit user settings win. Verify synthetic state separately from real startup, without automatic trust approval or model prompts. |
 | PowerShell | Ordinary Windows shell. The manager owns its session process tree, not the user's profile; do not infer AI status. |
 | Git Bash | Optional Git for Windows installation. Load system/user startup configuration before adding session-scoped directory notifications and Agent entries; do not edit user files. When absent, explicitly offer available PowerShell/CMD. WSL and other Bash distributions are not substituted. |
 | User working directory | The user and that project's rules own its contents. Opening it does not authorize modifying its code. |
@@ -34,3 +35,15 @@ Literal-target checks for standard npm launchers execute no script, read no CLI 
 User decision on 2026-11-03: prioritize accurate Codex state indicators and defer the shared agents entry. Keep independent mode and session-scoped hooks; do not remove injected arguments, change user configuration, or infer state from output merely to restore for agents. The 0.166.0 startup source still excludes the shared server for incompatible session-level configuration. Restoring the entry must also verify cross-terminal state ownership, conversation switching, and shutdown; see [UI checks](../../docs/ui-rendering.en.md).
 
 Follow-up development uses explicit Codex OSC 7501 lifecycle to remove the conflict between default session overrides and the shared server. Retain the 2026-11-03 deferral as history; the runtime record defines native and explicit --no-daemon compatibility modes. Native lifecycle belongs only to the managed PTY; it does not subscribe to or control other user daemon sessions or collect conversation text/credentials.
+
+0.4.6: Native Codex notifications with app identity can establish identity for the current PTY, including absolute paths, aliases and remote resume entries. Do not rewrite these commands or subscribe to the shared server. Clear does not establish identity or mean exit; this generation's shell prompt clears identity established without a helper. Other Agents still require managed entries.
+
+## Qoder CN CLI (0.4.6)
+
+Recognize the official public `qodercn`/`qoderclicn` commands only, keeping Qoder IDE's `qoder` and international CLI distinct. Reuse PATH, persistent registry PATH and existing npm/user installation directories. Prefer native exe within a directory before cmd/bat; skip only confirmed stale standard npm wrappers.
+
+Session `--settings` points only to a runtime hook file. Exec-form native helpers with `args` avoid a PowerShell launch per event and return no permission decision or context. Register only Qoder events, excluding Claude's PostToolBatch. Preserve explicit user `--settings` without merging private contents. Resume uses `--resume <id>`. Login, models, permissions and directory trust remain CLI-owned; the CLI may block hooks in untrusted directories.
+
+Status follows official SessionStart, UserPromptSubmit, tool/interaction notices, Stop, StopFailure and actual process exit, never terminal-output heuristics or process presence. The bridge still drops child Agents, conversation content and authentication data, with invocation/generation isolation. Qoder source=new can switch foreground conversation. Reuse production drag selection and Alt+V image paste.
+
+Sources: [flags](https://docs.qoder.cn/en/cli/cli-reference), [settings merge](https://docs.qoder.cn/en/cli/settings), [hooks](https://docs.qoder.cn/en/cli/hooks-reference), [shortcuts](https://docs.qoder.cn/en/cli/interface). Record installed-version checks, unsubmitted startup captures, synthetic hooks and real model tasks separately.

@@ -115,7 +115,7 @@ pub fn agent_arguments(
 ) -> Result<Vec<String>, String> {
     let mut arguments = Vec::new();
     match spec.agent {
-        Agent::Claude => {
+        Agent::Claude | Agent::QoderCn => {
             let mut hooks = serde_json::Map::new();
             for event in [
                 "SessionStart",
@@ -133,10 +133,18 @@ pub fn agent_arguments(
                 "Elicitation",
                 "ElicitationResult",
             ] {
+                if spec.agent == Agent::QoderCn && event == "PostToolBatch" {
+                    continue;
+                }
                 hooks.insert(event.into(),serde_json::json!([{"hooks":[{"type":"command","command":helper,"args":["--hook"],"timeout":2}]}]));
             }
             std::fs::create_dir_all(runtime).map_err(|e| e.to_string())?;
-            let path = runtime.join(format!("{}-claude.json", spec.id));
+            let kind = if spec.agent == Agent::QoderCn {
+                "qoder-cn"
+            } else {
+                "claude"
+            };
+            let path = runtime.join(format!("{}-{kind}.json", spec.id));
             let bytes = serde_json::to_vec(&serde_json::json!({"hooks":hooks}))
                 .map_err(|e| e.to_string())?;
             if std::fs::read(&path).ok().as_deref() != Some(bytes.as_slice()) {

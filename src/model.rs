@@ -8,6 +8,7 @@ use std::{
 pub enum Agent {
     Codex,
     Claude,
+    QoderCn,
     #[default]
     Shell,
     Cmd,
@@ -21,6 +22,7 @@ impl Agent {
         match self {
             Self::Codex => "Codex",
             Self::Claude => "Claude Code",
+            Self::QoderCn => "Qoder CN",
             Self::Shell => "PowerShell",
             Self::Cmd => "CMD",
             Self::Bash => "Git Bash",

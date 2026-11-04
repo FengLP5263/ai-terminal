@@ -58,6 +58,7 @@ fn drag_slot(slot: usize, source: usize, destination: usize) -> usize {
 pub struct Icons {
     codex: Arc<Mutex<IconRaster>>,
     claude: Arc<Mutex<IconRaster>>,
+    qoder: Arc<Mutex<IconRaster>>,
 }
 struct IconRaster {
     name: &'static str,
@@ -144,6 +145,10 @@ impl Icons {
                 "agent-claude",
                 include_bytes!("../assets/icons/claude-color.png"),
             ),
+            qoder: load(
+                "agent-qoder-cn",
+                include_bytes!("../assets/icons/qoder.png"),
+            ),
         }
     }
     pub fn paint(&self, painter: &egui::Painter, rect: Rect, agent: Agent) {
@@ -157,11 +162,11 @@ impl Icons {
         painter.circle_filled(rect.center(), rect.width() / 2.0, Color32::from_gray(29));
         let icon = snap_square(rect.center(), chrome::AVATAR_ICON);
         match agent {
-            Agent::Codex | Agent::Claude => {
-                let texture = if agent == Agent::Codex {
-                    &self.codex
-                } else {
-                    &self.claude
+            Agent::Codex | Agent::Claude | Agent::QoderCn => {
+                let texture = match agent {
+                    Agent::Codex => &self.codex,
+                    Agent::QoderCn => &self.qoder,
+                    _ => &self.claude,
                 };
                 painter.image(
                     texture.lock().unwrap().texture(

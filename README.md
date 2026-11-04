@@ -6,7 +6,7 @@
 
 **给多个 AI 会话，一个清爽的工作空间。**
 
-在熟悉的终端里使用 Codex 和 Claude Code，随时查看会话状态，需要时一键返回。
+在熟悉的终端里使用 Codex、Claude Code 和 Qoder CN CLI，随时查看会话状态，需要时一键返回。
 
 [![GitHub Release](https://img.shields.io/github/v/release/FengLP5263/ai-terminal?label=release)](https://github.com/FengLP5263/ai-terminal/releases/latest)
 [![Platform](https://img.shields.io/badge/platform-Windows%20x64-0078D4)](#平台支持)
@@ -39,11 +39,11 @@ AI 任务可能运行很久。打开多个窗口后，来回确认哪个会话�
 | 功能 | 你可以做什么 |
 | --- | --- |
 | **真正的终端** | 新建 PowerShell、CMD 或 Git Bash，在里面直接运行已安装的命令行工具。 |
-| **Agent 会话识别** | 启动 Codex 或 Claude Code 后显示对应头像；其他命令仍可作为普通终端使用。 |
+| **Agent 会话识别** | 启动 Codex、Claude Code 或 Qoder CN CLI 后显示对应头像；其他命令仍可作为普通终端使用。 |
 | **任务状态** | 在侧栏和浮窗中查看支持的 Agent 的进行中、需要处理、完成或失败状态。状态来自支持的生命周期通知和进程退出，并非对所有 CLI 的通用推断。 |
 | **置顶浮窗** | 只显示会话头像和状态，一次最多显示 10 个；拖动头像区域可查看其余会话，点击头像回到会话。 |
 | **整理自己的工作区** | 拖动会话排序、重命名、设置颜色、收起侧栏；使用 Ctrl + 滚轮调整整个界面大小。 |
-| **熟悉的终端体验** | 支持中文、ANSI 颜色和系统彩色 emoji；Codex／Claude Code 可使用剪贴板图片，具体交互由对应 CLI 处理。 |
+| **熟悉的终端体验** | 支持中文、ANSI 颜色和系统彩色 emoji；Codex／Claude Code／Qoder CN CLI 可使用剪贴板图片，具体交互由对应 CLI 处理。 |
 | **中英双语** | 自动跟随系统语言，也可在设置中手动选择简体中文或 English。 |
 
 ## 平台支持
@@ -66,16 +66,16 @@ AI 任务可能运行很久。打开多个窗口后，来回确认哪个会话�
 ```powershell
 cd 'C:\path\to\your-project'
 codex
-# 或运行 claude
+# 或运行 claude / qodercn
 ```
 
-请事先自行安装并配置 [Codex CLI](https://github.com/openai/codex) 或 [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview)。AI Terminal 沿用 CLI 自己的登录、模型、信任和权限设置。
+请事先自行安装并配置 [Codex CLI](https://github.com/openai/codex)、[Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview) 或 [Qoder CN CLI](https://docs.qoder.cn/cli/installation)。AI Terminal 沿用 CLI 自己的登录、模型、信任和权限设置。
 
 ### 3. 按自己的方式管理
 
 在左上角齿轮中设置语言和浮窗；悬停会话头像可查看信息，点击即可切换。浮窗可拖动位置，并可在设置中关闭。按住 <kbd>Ctrl</kbd> 滚动鼠标滚轮可缩放整个界面。
 
-在受管终端里交互式启动 `powershell`、`cmd` 或 `bash` 时，头像会跟随当前 Shell；`exit` 逐层恢复。启动 Codex／Claude 时优先显示 Agent 头像，退出后恢复当前 Shell。单次脚本命令和 Agent 内部的工具命令不会因此改变 Shell 头像。
+在受管终端里交互式启动 `powershell`、`cmd` 或 `bash` 时，头像会跟随当前 Shell；`exit` 逐层恢复。启动 Codex／Claude／Qoder CN 时优先显示 Agent 头像，退出后恢复当前 Shell。单次脚本命令和 Agent 内部的工具命令不会因此改变 Shell 头像。
 
 ## 常见问题
 
@@ -89,7 +89,7 @@ codex
 
 ### 为什么 Agent 没有显示状态？
 
-状态依赖 CLI 支持的明确生命周期通知。0.4.5 起默认接收 Codex 原生状态并保留共享 agents 总览，已在 Codex 0.166.0 验证。未提供原生通知的旧 Codex 可显式运行 `codex --no-daemon`，再用 `/hooks` 审查兼容 hook；该模式没有共享入口。0.4.4 及更早版本的 Codex 接入、以及 Claude 仍使用 hook。没有状态不代表任务已经结束；程序不会替你信任 hook 或修改用户级 CLI 配置。
+状态依赖 CLI 支持的明确生命周期通知。0.4.5 起默认接收 Codex 原生状态并保留共享 agents 总览，已在 Codex 0.166.0 验证。未提供原生通知的旧 Codex 可显式运行 `codex --no-daemon`，再用 `/hooks` 审查兼容 hook；该模式没有共享入口。0.4.4 及更早版本的 Codex 接入、以及 Claude／Qoder CN 仍使用 hook。没有状态不代表任务已经结束；程序不会替你信任 hook 或修改用户级 CLI 配置。
 
 ### 重启后可以继续之前的对话吗？
 
@@ -97,7 +97,7 @@ codex
 
 ### 怎么查看终端历史和粘贴图片？
 
-普通滚轮用于查看历史；全屏应用接管鼠标滚轮时可用 <kbd>Shift</kbd> + 滚轮查看本地历史。识别到 Codex／Claude Code 时，可通过 <kbd>Ctrl</kbd> + <kbd>V</kbd> 或 <kbd>Shift</kbd> + <kbd>Insert</kbd> 将剪贴板图片交给 CLI 处理。
+普通滚轮用于查看历史；全屏应用接管鼠标滚轮时可用 <kbd>Shift</kbd> + 滚轮查看本地历史。识别到 Codex／Claude Code／Qoder CN CLI 时，可通过 <kbd>Ctrl</kbd> + <kbd>V</kbd> 或 <kbd>Shift</kbd> + <kbd>Insert</kbd> 将剪贴板图片交给 CLI 处理。
 
 ### 会保存我的对话或 API Key 吗？
 
@@ -127,6 +127,6 @@ rustup component add rustfmt clippy
 
 项目代码使用 [MIT License](LICENSE)。第三方组件保留各自的许可证，详见[第三方声明](THIRD_PARTY_NOTICES.md)。
 
-## 0.4.5 更新
+## 0.4.6 更新
 
-Codex 可在保留准确状态通知的同时使用 `← for agents` 总览。会话排序改为卡片跟随鼠标、列表让位；失败红点查看后消失，Claude 双三角模式标识大小一致。完整功能、升级说明和验证范围见[中英文更新日志](CHANGELOG.md)；每次发行的 ZIP 均附带两份日志。
+新增 Qoder CN CLI 支持；修复通过绝对路径或远程恢复命令启动 Codex 后头像和状态未接入的问题。Codex 保留共享 agents 总览，状态仍来自明确生命周期通知。完整功能、升级说明和验证范围见[中英文更新日志](CHANGELOG.md)；每次发行的 ZIP 均附带两份日志。

@@ -65,6 +65,8 @@ Git Bash 原生启动与截图核查（仅 Windows，PowerShell 或 Git Bash 均
 
 Shell 头像的原生截图核查（仅 Windows，PowerShell／Git Bash）：`cargo build --offline --locked --release --bins --example shell_switch_probe`，再运行 `target/release/examples/shell_switch_probe.exe output/<unique-shell-switch-probe>`。使用正式 App 控件和 B 图标、隔离会话与系统目录，不读取用户 profile、不启动 Agent／模型；只向自身窗口注入 CMD→PowerShell→CMD→逐层 exit 的输入，生成五张截图并正常退出。capture.json 仅说明截图已生成，必须人工确认内容、头像和正常退出，不能当作自动视觉验收。
 
+同一探针追加 `codex-direct`：`target/release/examples/shell_switch_probe.exe output/<unique-codex-direct> codex-direct`，在当前已信任目录以绝对路径启动真实 `codex --remote unix:// -C <cwd>`，生成 Shell／Codex 两张正式界面截图。不发送模型提示、不确认信任或 hook、不停止共享后台；结束只回收自己的终端。POSIX 原生限制不变，没有新增 project 动作。
+
 侧栏溢出与滚动条截图（仅 Windows，PowerShell／Git Bash）：`cargo build --offline --locked --release --bins --example workspace_probe`，再运行 `target/release/examples/workspace_probe.exe output/<unique-sidebar-probe> 1160 many`。many 模式生成 30 个合成会话，在展开、缩放和收起后滚动并悬停滚动条，写出 PNG／JSON；仅使用自身的 ANSI 样例 PTY，不启动 Agent 或模型。检查滚动条保持细窄、不遮挡头像，并核对正常退出。
 
 全屏滚轮／拖选截图（仅 Windows）：`cargo build --offline --locked --release --example scroll_probe`，再用 `rustc --edition=2024 --crate-name mouse_console tests/fixtures/mouse_console.rs -o output/mouse-console.exe` 构建本地样例，运行 `target/release/examples/scroll_probe.exe output/mouse-console.exe output/<unique-selection-probe>`。检查上下翻页、普通左键拖选的高亮及连接说明截图和正常退出；复制行为由 `tests/terminal_interaction.rs` 的真实 ConPTY 回归覆盖。原生探针只向自身窗口输入，不写系统剪贴板、不启动 Agent 或模型。
@@ -85,3 +87,5 @@ README 公开截图（仅 Windows）：构建 `cargo build --offline --locked --
 Codex 原生状态／总览与模式图标（仅 Windows）：构建 `cargo build --offline --locked --release --bins --example agents_status_probe`。在已有可信目录运行 `target/release/examples/agents_status_probe.exe codex output/<unique-agents-probe>`，只发送左箭头进入 agents 总览和 Esc 返回，生成三张 PNG 与有限状态 JSON；不发送提示词、不接受项目／hook 信任、不停止用户共享后台。`target/release/examples/agents_status_probe.exe badges output/<unique-badge-probe>` 使用固定 PowerShell 文本，生成 100%／146%／200% 的相邻三角／暂停／emoji 截图。检查 JSON、退出码及实际图像；启动导航不是模型回合。POSIX 原生限制与既有入口一致，没有新增 project 动作。
 
 侧栏拖动及失败未读截图（仅 Windows，PowerShell／Git Bash）：`cargo build --offline --locked --release --example sidebar_drag_probe`，再运行 `target/release/examples/sidebar_drag_probe.exe output/<unique-sidebar-drag-probe>`。正式侧栏和浮窗组件、标准 B 图标、固定示例目录；生成展开／收起的未读、已读、拖动卡片和松手排序共八张原生 PNG 及 result.json。只向探针自身 egui 发送合成输入，不启动 PTY、Agent 或模型，不读用户配置、不注入系统鼠标。核对进程退出码、抓取点、卡片让位与红点清除，截图完成不替代视觉检查。
+
+Qoder CN 启动／合成状态截图（仅 Windows，PowerShell／Git Bash）：`cargo build --offline --locked --release --bins --example qoder_cn_probe`；`target/release/examples/qoder_cn_probe.exe output/<unique-qoder-fixture> fixture` 生成七种状态图；省略 fixture 时仅启动已安装的 Qoder CN 并截图，不输入提示或确认信任。默认模式使用当前目录；请在已有可信目录执行。result.json 分别记录 synthetic、hook_connected、事件名称及未发送模型请求，必须核对退出码和实际画面。

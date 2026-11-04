@@ -75,25 +75,28 @@ impl CliSearch {
                         .to_owned()
                 });
         }
-        let stem = match agent {
-            Agent::Codex => "codex",
-            Agent::Claude => "claude",
-            Agent::Shell => "powershell",
-            Agent::Cmd => "cmd",
-            Agent::Bash => "bash",
+        let stems: &[&str] = match agent {
+            Agent::Codex => &["codex"],
+            Agent::Claude => &["claude"],
+            Agent::QoderCn => &["qodercn", "qoderclicn"],
+            Agent::Shell => &["powershell"],
+            Agent::Cmd => &["cmd"],
+            Agent::Bash => &["bash"],
         };
         let mut stale = Vec::new();
         for directory in &self.directories {
             for extension in ["exe", "cmd", "bat"] {
-                let candidate = directory.join(format!("{stem}.{extension}"));
-                if candidate.is_file() {
-                    if matches!(agent, Agent::Codex | Agent::Claude)
-                        && let Some(target) = stale_npm_target(&candidate)
-                    {
-                        stale.push(format!("{} → {}", candidate.display(), target.display()));
-                        continue;
+                for stem in stems {
+                    let candidate = directory.join(format!("{stem}.{extension}"));
+                    if candidate.is_file() {
+                        if !agent.is_shell()
+                            && let Some(target) = stale_npm_target(&candidate)
+                        {
+                            stale.push(format!("{} → {}", candidate.display(), target.display()));
+                            continue;
+                        }
+                        return Ok(candidate);
                     }
-                    return Ok(candidate);
                 }
             }
         }

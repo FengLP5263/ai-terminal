@@ -45,3 +45,5 @@ Starting with 0.4.3, both root CHANGELOG files are covered by source identity an
 Agent source icons remain 640×640. Area-filter them at the physical display size, sharing at most 12 cached sizes per avatar and aligning to integer pixels; no per-frame resampling. Native emoji tiles fit complete clusters inside cells, preserve VS15 text presentation, and keep emulator coordinates unchanged.
 
 Provenance and the registry archive hash for the local winit 0.30.13 patch (Apache-2.0) are in vendor/winit/UPSTREAM.md; the original LICENSE is retained. Package source identity covers its Cargo.toml, build.rs, and sources/embedded assets under src. The dependency inventory records the local patch and collects that LICENSE automatically.
+
+Qoder CN uses the 640-pixel Qoder asset from Lobe Icons, with provenance, MIT license and SHA-256 in assets/icons. It shares the bounded physical-size area-filtered cache. Agent::QoderCn adds an identity only, preserving persisted session fields, authentication boundaries and the terminal history limit.

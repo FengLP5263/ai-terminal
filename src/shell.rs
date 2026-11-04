@@ -61,6 +61,12 @@ pub fn build(
     for (agent, name, key) in [
         (Agent::Codex, "codex.exe", "AI_TERMINAL_REAL_CODEX"),
         (Agent::Claude, "claude.exe", "AI_TERMINAL_REAL_CLAUDE"),
+        (Agent::QoderCn, "qodercn.exe", "AI_TERMINAL_REAL_QODER_CN"),
+        (
+            Agent::QoderCn,
+            "qoderclicn.exe",
+            "AI_TERMINAL_REAL_QODER_CN",
+        ),
         (
             Agent::Shell,
             "powershell.exe",
@@ -207,6 +213,10 @@ pub fn shim_agent() -> Option<Agent> {
         Some(Agent::Codex)
     } else if name.eq_ignore_ascii_case(std::ffi::OsStr::new("claude")) {
         Some(Agent::Claude)
+    } else if name.eq_ignore_ascii_case(std::ffi::OsStr::new("qodercn"))
+        || name.eq_ignore_ascii_case(std::ffi::OsStr::new("qoderclicn"))
+    {
+        Some(Agent::QoderCn)
     } else if name.eq_ignore_ascii_case(std::ffi::OsStr::new("powershell")) {
         Some(Agent::Shell)
     } else if name.eq_ignore_ascii_case(std::ffi::OsStr::new("cmd")) {
@@ -252,6 +262,7 @@ fn notice(name: &str, agent: Agent, invocation: &str, exit_code: Option<i32>) {
             match agent {
                 Agent::Codex => "codex",
                 Agent::Claude => "claude",
+                Agent::QoderCn => "qodercn",
                 Agent::Shell => "powershell",
                 Agent::Cmd => "cmd",
                 Agent::Bash => "bash",
@@ -357,10 +368,11 @@ fn keep_launcher_alive() {
 pub fn run_agent(agent: Agent, args: Vec<OsString>) -> i32 {
     let result = (|| -> Result<i32, String> {
         let root = PathBuf::from(std::env::var_os("AI_TERMINAL_SHIM_DIR").ok_or("缺少会话信息")?);
-        let key = if agent == Agent::Codex {
-            "AI_TERMINAL_REAL_CODEX"
-        } else {
-            "AI_TERMINAL_REAL_CLAUDE"
+        let key = match agent {
+            Agent::Codex => "AI_TERMINAL_REAL_CODEX",
+            Agent::Claude => "AI_TERMINAL_REAL_CLAUDE",
+            Agent::QoderCn => "AI_TERMINAL_REAL_QODER_CN",
+            _ => return Err("不是 Agent 类型".into()),
         };
         let binary = std::env::var_os(key)
             .map(PathBuf::from)
@@ -390,7 +402,7 @@ pub fn run_agent(agent: Agent, args: Vec<OsString>) -> i32 {
         let explicit_settings = args
             .iter()
             .any(|arg| arg == "--settings" || arg.to_string_lossy().starts_with("--settings="));
-        let injected = if agent == Agent::Claude && explicit_settings {
+        let injected = if matches!(agent, Agent::Claude | Agent::QoderCn) && explicit_settings {
             Vec::new()
         } else if agent == Agent::Codex && args.iter().any(|arg| arg == "--no-daemon") {
             launch::codex_legacy_overrides()
