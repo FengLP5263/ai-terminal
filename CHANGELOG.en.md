@@ -4,6 +4,35 @@
 
 Record user-visible additions, improvements, fixes, and compatibility changes for each release; omit categories that do not apply. Review both languages together, use the same version entry in GitHub Releases, and ship both files in the ZIP. Historical summaries follow existing GitHub release notes and UTC publication dates; development versions without a separate release do not receive invented release dates.
 
+## [0.4.8] - 2026-11-05
+
+### Added
+
+- Kimi Code 2.5.0 native OSC 7501 lifecycle uses explicit root-session events for working, interaction/login waits, completion and failure; child Agents, message bodies and stale invocations are ignored.
+- TRAE CLI 0.213.1 receives lifecycle hooks through invocation-scoped `-c` options, preserving CLI trust review and later user overrides.
+- Community zcode-app-cli 3.17.2-44 / runtime 0.17.1 receives start, tool and completion events through a credential-free basic-settings snapshot, leaving user files and authentication unchanged.
+
+### Fixed
+
+- Floating hints use an owned native window for full names, Agent and status text beyond capsule bounds, with monitor-aware placement, scaling, long-title wrapping, mouse passthrough and no focus activation.
+- ZCode shares the explicit hook-event reducer: start/tool execution shows Working, questions show Needs attention, Stop shows Completed and explicit failure shows Failed. Remove preview.2’s unconfirmed downgrade.
+
+### Changed
+
+- README support tables and icons cover six Agents. Refresh four native workspace/floating captures in Chinese and English; English examples, names and controls use English.
+
+### Compatibility and upgrade notes
+
+- Restart existing CLIs in the new version. Users review login, directory and hook trust in the CLI; no automatic authorization or model request is performed.
+- Existing ZCode hooks, custom lists, MCP/plugins, unknown settings or explicit `ZCODE_CLI_SETTINGS_FILE` preserve the original configuration and skip integration. Only credential-free basic options are copied; provider/credential files are never opened. Snapshot settings changes last only for that invocation.
+- Status reflects the last explicit notification. If ZCode emits no failure/interruption event, the previous state remains; terminal text, silence and timeouts are not used to infer results.
+- The current enterprise TRAE CLI requires an Enterprise flagship account and PAT. Personal subscriptions and third-party model API keys do not replace login; remote services cannot be assumed to execute local hooks.
+
+### Verification
+
+- 190 Rust and 14 Python regressions, governance, formatting and Clippy pass. The optimized release passes six-PTY smoke, owned-process cleanup, bilingual main-image captures and native floating-hint checks.
+- Native hints cover 100%/142%/200% zoom, long titles, no activation, mouse passthrough and hiding on leave. Real startup checks cover Kimi directory-trust notifications, ZCode basic-settings snapshot/TUI and the TRAE login page. After actual ZCode use, the user requested direct hook-state display. Development made no model requests in this run and does not claim real failure/interruption-turn coverage for every CLI.
+
 ## [0.4.8-preview.2] - 2026-11-05
 
 ### Fixed

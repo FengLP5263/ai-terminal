@@ -96,4 +96,4 @@ package 另将图标来源清单和可获得的原始许可复制到 ZIP 的 age
 
 0.4.8 预览 README 截图：Release 构建 `readme_capture` 后分别运行 `target/release/examples/readme_capture.exe output/readme-zh` 和 `target/release/examples/readme_capture.exe output/readme-en en`，每次使用全新目录；英文模式同时切换控件、名称及终端合成文本。`island_probe` 一次生成六种 Agent 的中英文浮窗；检查退出码、result.json 和四张实际 PNG 后原样复制到 assets/readme 并更新 SOURCE.json。不是模型验收。
 
-原生浮窗提示核查（Windows）：`cargo build --offline --locked --release --example island_hint_probe` 后运行 `target/release/examples/island_hint_probe.exe output/<unique-hint-probe>`。探针只向自己的 egui 窗口输入合成悬停，在 100%／142%／200% 缩放检查完整中英文提示超出胶囊、长名称换行、归属窗口、无激活、鼠标穿透和离开隐藏；生成原生提示 PNG、状态待确认截图与 JSON，不启动 Agent／模型、不操作用户窗口。位置纯函数另覆盖负坐标显示器与工作区边缘。截图需人工检查，合成模型不可用状态不等于真实模型请求。
+原生浮窗提示核查（Windows）：`cargo build --offline --locked --release --example island_hint_probe` 后运行 `target/release/examples/island_hint_probe.exe output/<unique-hint-probe>`。探针只向自己的 egui 窗口输入合成悬停，在 100%／142%／200% 缩放检查完整中英文提示超出胶囊、长名称换行、归属窗口、无激活、鼠标穿透和离开隐藏；生成原生提示 PNG、hook 进行中状态截图与 JSON，不启动 Agent／模型、不操作用户窗口。位置纯函数另覆盖负坐标显示器与工作区边缘。截图需人工检查，合成 hook 状态不等于真实模型请求。

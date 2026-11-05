@@ -465,7 +465,7 @@ mod hint_tests {
                     name: "PowerShell：较长的会话名称 ✨".into(),
                     agent: Agent::ZCode,
                     color: None,
-                    activity: Activity::Unconfirmed,
+                    activity: Activity::Working,
                     unread: false,
                 }],
                 locale: Locale::ZhCn,
@@ -486,10 +486,7 @@ mod hint_tests {
                 );
             }
             let hint = hint.expect("native hint metadata");
-            assert_eq!(
-                hint.text,
-                "PowerShell：较长的会话名称 ✨ · ZCode · 状态待确认"
-            );
+            assert_eq!(hint.text, "PowerShell：较长的会话名称 ✨ · ZCode · 进行中");
             assert!(hint.anchor.x > 0.0 && hint.anchor.x < width);
         }
     }

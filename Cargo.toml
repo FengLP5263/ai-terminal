@@ -1,6 +1,6 @@
 [package]
 name = "ai-terminal"
-version = "0.4.8-preview.2"
+version = "0.4.8"
 edition = "2024"
 rust-version = "1.92"
 description = "A small native workspace for coding-agent terminals"

@@ -1,27 +1,27 @@
 {
   "description": "Native Release captures with fixed synthetic content and production avatar badges; per-file versions identify newer captures. No private data or real model requests.",
-  "version": "0.4.8-preview.1",
+  "version": "0.4.8",
   "profile": "release",
   "model_requests": false,
   "user_profiles": false,
   "files": {
     "workspace.png": {
-      "sha256": "46075b8cd2a04e0e39df5281974ea4a5b092cc98d0d4b28a4698c5941d1becd0",
-      "bytes": 135261,
+      "sha256": "7715385b7b6ede23d82d7199fe52d9d75305581aad4aa384eb83dc8d3f9362e1",
+      "bytes": 135214,
       "width": 1680,
       "height": 1020,
       "source": "examples/readme_capture.rs",
-      "version": "0.4.8-preview.1",
+      "version": "0.4.8",
       "language": "zh-CN",
       "unmodified_native_capture": true
     },
     "floating.png": {
-      "sha256": "e19bfc4ee4e1a9e337f4d3b212944430c702979fd7ad38e1f439316317ec0ea3",
-      "bytes": 15796,
+      "sha256": "d260bfa51bd84658899af0530d1c67468c900e2192f840b077964a885fdd1ae7",
+      "bytes": 15778,
       "width": 732,
       "height": 72,
       "source": "examples/island_probe.rs",
-      "version": "0.4.8-preview.1",
+      "version": "0.4.8",
       "language": "zh-CN",
       "unmodified_native_capture": true
     },
@@ -86,22 +86,22 @@
       "original_asset_provenance": "assets/icons/SOURCE.json"
     },
     "workspace.en.png": {
-      "sha256": "c811abda1810ea3a9ccd8a2340567dd9567e0b0dbcdd58c4af47f53fe8fe3276",
-      "bytes": 146744,
+      "sha256": "de0515f415bdb470a814dd9d23a53b1539c830b1901132d8b653ceb46ee7c4fe",
+      "bytes": 146755,
       "width": 1680,
       "height": 1020,
       "source": "examples/readme_capture.rs en",
-      "version": "0.4.8-preview.1",
+      "version": "0.4.8",
       "language": "en",
       "unmodified_native_capture": true
     },
     "floating.en.png": {
-      "sha256": "fbbb6cce3c4dbe14ec99983835d8ed6fec9d8266a5350f0ff0af5eb1fb688781",
-      "bytes": 15799,
+      "sha256": "385031b8e381e0798af273ec5ebc8d826e096b395723a7d975734ebac616662f",
+      "bytes": 15797,
       "width": 732,
       "height": 72,
       "source": "examples/island_probe.rs",
-      "version": "0.4.8-preview.1",
+      "version": "0.4.8",
       "language": "en",
       "unmodified_native_capture": true
     }

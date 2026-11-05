@@ -7,7 +7,6 @@ pub enum Activity {
     Idle,
     Completed,
     Working,
-    Unconfirmed,
     Failed,
     Waiting,
     Exited,
@@ -52,15 +51,6 @@ pub struct Status {
 
 impl Status {
     /// Returns false for a different agent's events or a late event from an old turn.
-    /// A partial hook transport cannot certify that an ongoing turn is still
-    /// running: some model failures never emit Stop. Preserve explicit results.
-    pub fn apply_partial_lifecycle(&mut self, event: &HookEvent, viewing: bool) -> bool {
-        let changed = self.apply(event, viewing);
-        if changed && self.activity == Activity::Working {
-            self.activity = Activity::Unconfirmed;
-        }
-        changed
-    }
     pub fn apply(&mut self, event: &HookEvent, viewing: bool) -> bool {
         // Once the foreground TUI reports native lifecycle, delayed legacy
         // hooks must not overwrite a newer state or another selected chat.
@@ -282,28 +272,6 @@ mod tests {
             background_running: false,
             exit_code: None,
         }
-    }
-    #[test]
-    fn partial_lifecycle_does_not_claim_working_without_a_reliable_failure_end_event() {
-        let mut partial = Status::default();
-        assert!(partial.apply_partial_lifecycle(&event("UserPromptSubmit", "1"), false));
-        assert_eq!(partial.activity, Activity::Unconfirmed);
-        assert!(!partial.unread);
-        // If model rejection emits no ending hook, time/output cannot manufacture one.
-        let mut stale = event("Stop", "old");
-        assert!(!partial.apply_partial_lifecycle(&stale, false));
-        assert_eq!(partial.activity, Activity::Unconfirmed);
-        assert!(partial.apply_partial_lifecycle(&event("Stop", "1"), false));
-        assert_eq!(partial.activity, Activity::Completed);
-        assert!(partial.unread);
-        partial.apply_partial_lifecycle(&event("UserPromptSubmit", "2"), false);
-        assert_eq!(partial.activity, Activity::Unconfirmed);
-        stale = event("StopFailure", "2");
-        partial.apply_partial_lifecycle(&stale, false);
-        assert_eq!(partial.activity, Activity::Failed);
-        let mut full = Status::default();
-        full.apply(&event("UserPromptSubmit", "1"), false);
-        assert_eq!(full.activity, Activity::Working);
     }
     #[test]
     fn background_completion_is_visible_without_focusing_terminal() {

@@ -1,4 +1,4 @@
-//! Owned-window native tooltip and partial-lifecycle acceptance. Synthetic data only.
+//! Owned-window native tooltip and hook-lifecycle acceptance. Synthetic data only.
 #[cfg(not(windows))]
 fn main() {
     panic!("Native tooltip acceptance requires Windows");
@@ -153,11 +153,11 @@ mod windows {
     fn fixture(completed: bool) -> Status {
         let mut status = Status::default();
         let mut event:HookEvent=serde_json::from_value(serde_json::json!({"event_id":"one","local_id":"one","generation":"g","name":"UserPromptSubmit","session_id":"root","turn_id":"turn","background_running":false})).unwrap();
-        status.apply_partial_lifecycle(&event, false);
-        assert_eq!(status.activity, Activity::Unconfirmed);
+        status.apply(&event, false);
+        assert_eq!(status.activity, Activity::Working);
         if completed {
             event.name = "Stop".into();
-            status.apply_partial_lifecycle(&event, false);
+            status.apply(&event, false);
         }
         status
     }
@@ -178,9 +178,9 @@ mod windows {
                         &self
                             .output
                             .join(if input.viewport_id == floating::viewport_id() {
-                                "capsule-unconfirmed.png"
+                                "capsule-working.png"
                             } else {
-                                "partial-status.png"
+                                "hook-status.png"
                             }),
                         image.width() as u32,
                         image.height() as u32,
@@ -310,7 +310,7 @@ mod windows {
             egui::CentralPanel::default().show(ui, |ui| {
                 ui.heading("ZCode — local fixture");
                 let status = fixture(false);
-                assert_eq!(status.activity, Activity::Unconfirmed);
+                assert_eq!(status.activity, Activity::Working);
                 ai_terminal::connection_ui::show(ui, Agent::ZCode, &status);
                 let (avatar, _) =
                     ui.allocate_exact_size(egui::vec2(44.0, 44.0), egui::Sense::hover());

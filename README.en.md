@@ -32,7 +32,7 @@ Enable the floating bar to see session avatars and status above other windows. C
 
 ![AI Terminal floating session bar](assets/readme/floating.en.png)
 
-> Screenshots use the real 0.4.8-preview.1 interface with synthetic sessions, example directories and simulated status. They contain no real usernames, working directories or private conversations. Click an image for its original resolution.
+> Screenshots use the real 0.4.8 interface with synthetic sessions, example directories and simulated status. They contain no real usernames, working directories or private conversations. Click an image for its original resolution.
 
 ## Built for multiple sessions
 
@@ -54,14 +54,14 @@ Enable the floating bar to see session avatars and status above other windows. C
 | <img src="assets/readme/agent-claude.png" width="32" height="32" alt="Claude Code"> | [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview) | `claude` | Supported | Session-scoped hooks |
 | <img src="assets/readme/agent-qoder-cn.png" width="32" height="32" alt="Qoder CN CLI"> | [Qoder CN CLI](https://docs.qoder.cn/en/cli/installation) | `qodercn` / `qoderclicn` | Supported | Session-scoped hooks |
 | <img src="assets/readme/agent-kimi.png" width="32" height="32" alt="Kimi Code CLI"> | [Kimi Code CLI](https://www.kimi.com/code/docs/) | `kimi` | Supported | Native lifecycle (Kimi Code 2.5.0) |
-| <img src="assets/readme/agent-zcode.png" width="32" height="32" alt="ZCode"> | [ZCode](https://zcode.z.ai/) | `zcode` | Supported | Partial session hooks; submitted work is unconfirmed until explicit completion |
+| <img src="assets/readme/agent-zcode.png" width="32" height="32" alt="ZCode"> | [ZCode](https://zcode.z.ai/) | `zcode` | Supported | Session hooks: start / tools / completion; configuration limits below |
 | <img src="assets/readme/agent-trae.png" width="32" height="32" alt="TRAE CLI"> | [TRAE CLI](https://docs.trae.cn/cli_about-trae-code-cli-2) | `traecli` | Supported | Session-scoped hooks; review trust in the CLI |
 
-Status comes only from explicit lifecycle events, hooks and process exits. Without an event, the manager keeps “Awaiting task events” and never infers completion from terminal text or silence. The new integrations are available in the 0.4.8 preview, pending real model-turn acceptance; stable 0.4.7 still recognizes only identity and launch/exit for these three CLIs.
+Status comes only from explicit lifecycle events, hooks and process exits. Without an event, the manager keeps “Awaiting task events” and never infers completion from terminal text or silence. The new integrations are available from 0.4.8. Startup checks, synthetic events and real model turns are recorded separately; 0.4.7 still recognizes only identity and launch/exit for these three CLIs.
 
 - Kimi: the managed `kimi` entry enables OSC 7501 for this process, covering work, permission/question/login waits, completion and failure. Child-agent records and message bodies are discarded. Explicit `PI_PROGRAM_STATUS=0` keeps it disabled.
 - TRAE: the current enterprise CLI requires a TRAE Enterprise flagship account and its PAT; a personal subscription or third-party model API key is not a substitute. See the [official CLI guide](https://docs.trae.cn/cli_about-trae-code-cli-2). Invocation-scoped `-c` options provide lifecycle hooks without editing user/project files. Review trust in `/hooks`. Later explicit overrides remain CLI-owned; local hooks are not guaranteed with remote servers.
-- ZCode: applies only to community zcode-app-cli 3.17.2-44 / runtime 0.17.1. Start, tools, question tools and completion are supported. Its current hook interface lacks reliable approval-wait, task-failure and interruption events. Submitted work shows “Status unconfirmed” (a hollow gray marker) without a working animation. Explicit completion is required for completed status; explicit failure or abnormal exit is required for failed status. `ZCODE_CLI_SETTINGS_FILE` selects a basic settings snapshot for this process. Only credential-free basic options are allowed; existing hooks, nonempty custom lists, MCP/plugin definitions, unknown settings or an explicit environment override preserve the original configuration and skip integration. Provider/credential files are never opened. Settings changed in the snapshot last only for this invocation; status connection help explains the custom-configuration boundary.
+- ZCode: applies only to community zcode-app-cli 3.17.2-44 / runtime 0.17.1. Start, tools, question tools and completion are supported. Status follows received hooks directly: start/tool execution shows Working, question interactions show Needs attention, and Stop shows Completed. The interface lacks some approval-wait, task-failure and interruption events. Without a later event, the last state remains; explicit failure or abnormal exit is required for Failed. `ZCODE_CLI_SETTINGS_FILE` selects a basic settings snapshot for this process. Only credential-free basic options are allowed; existing hooks, nonempty custom lists, MCP/plugin definitions, unknown settings or an explicit environment override preserve the original configuration and skip integration. Provider/credential files are never opened. Settings changed in the snapshot last only for this invocation; status connection help explains the custom-configuration boundary.
 
 Restart existing CLI processes to apply these integrations. Review login, workspace trust and hook trust within each Agent.
 
@@ -110,7 +110,7 @@ Yes, use PowerShell or CMD directly. Git Bash is optional; selecting it when una
 
 ### Why is there no Agent status?
 
-Status depends on explicit CLI lifecycle notifications. Codex uses native events while preserving the shared agents overview; older versions can explicitly run `codex --no-daemon` for compatibility hooks. Claude Code and Qoder CN use session-scoped hooks. Stable 0.4.7 only recognizes Kimi Code, ZCode and TRAE CLI avatars and launch/exit. The table above describes integration in the 0.4.8 preview. Without notifications, status stays "Awaiting task events"; after a ZCode start event it shows "Status unconfirmed". The manager never trusts hooks or edits user/project hook configuration on your behalf.
+Status depends on explicit CLI lifecycle notifications. Codex uses native events while preserving the shared agents overview; older versions can explicitly run `codex --no-daemon` for compatibility hooks. Claude Code and Qoder CN use session-scoped hooks. Stable 0.4.7 only recognizes Kimi Code, ZCode and TRAE CLI avatars and launch/exit. The table above describes integration in 0.4.8. Without notifications, status stays "Awaiting task events"; a ZCode start event shows "Working", followed by subsequent hook updates. The manager never trusts hooks or edits user/project hook configuration on your behalf.
 
 ### Can I continue a conversation after restarting?
 
@@ -154,6 +154,6 @@ Project code is available under the [MIT License](LICENSE). Third-party componen
 
 Agent brand-icon provenance and licenses are recorded per file; see [third-party notices](THIRD_PARTY_NOTICES.en.md). ZIPs include provenance and available original license texts in agent-icons/.
 
-## 0.4.7 update
+## 0.4.8 update
 
-Add Kimi Code, ZCode and TRAE CLI avatar/launch recognition and a first-run Desktop shortcut; improve glyph caching for animated color TUIs and release retired atlas pages correctly. The table above lists support boundaries and icons for all six Agents. See the [bilingual changelog](CHANGELOG.en.md) for changes, upgrade notes and verification scope. Each release ZIP includes both files.
+Add Kimi Code native lifecycle and ZCode/TRAE CLI session-scoped task hooks. Fix clipped floating hints and follow ZCode hook states directly. Refresh Chinese and English workspace/floating screenshots. The table above lists support boundaries and icons for all six Agents. See the [bilingual changelog](CHANGELOG.en.md) for changes, upgrade notes and verification scope. Each release ZIP includes both files.

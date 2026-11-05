@@ -237,9 +237,6 @@ fn paint_status_on(
             Stroke::new(1.75, chrome::WORKING),
         ));
         ui.ctx().request_repaint_after(Duration::from_millis(80));
-    } else if activity == Activity::Unconfirmed {
-        painter.circle_filled(indicator, 5.5, surface);
-        painter.circle_stroke(indicator, 3.5, Stroke::new(1.25, chrome::SECONDARY));
     } else if activity == Activity::Waiting || unread {
         painter.circle_filled(indicator, 5.5, surface);
         painter.circle_filled(

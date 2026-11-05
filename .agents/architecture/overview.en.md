@@ -38,4 +38,4 @@ Known limits: all physical IME combinations, all image clipboard sources, sustai
 
 0.4.8 preview adds src/integration.rs for invocation-only lifecycle environment and credential-free basic settings snapshots. Native notifications retain Codex/Kimi app identity. TRAE/community ZCode keep the independent lightweight helper and authenticated bridge, without a proxy service or terminal-body scanning.
 
-0.4.8-preview.2: src/floating_hint.rs displays full floating-bar hints in an owned native tooltips_class32 window, outside the capsule client bounds, without a browser or another GPU viewport. Working events from ZCode’s partial lifecycle reduce to Status unconfirmed so a missing failure event cannot leave a working animation indefinitely.
+0.4.8-preview.2: src/floating_hint.rs displays full floating-bar hints in an owned native tooltips_class32 window, outside the capsule client bounds, without a browser or another GPU viewport. 0.4.8 restores the shared explicit-event reducer for ZCode and other hook Agents, without downgrading working events.
