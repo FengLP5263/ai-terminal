@@ -23,6 +23,8 @@ mod windows {
         position: Option<[f32; 2]>,
         moving: bool,
         posted: bool,
+        hint: Option<crate::floating_hint::Popup>,
+        hint_attempted: bool,
     }
 
     /// Called on the viewport's UI thread, never from a worker.
@@ -49,6 +51,8 @@ mod windows {
                 position,
                 moving: false,
                 posted: false,
+                hint: None,
+                hint_attempted: false,
             }));
             if unsafe { SetPropW(hwnd, PROPERTY.as_ptr(), data.cast()) } == 0 {
                 unsafe { drop(Box::from_raw(data)) };
@@ -83,6 +87,31 @@ mod windows {
         let mut rect = RECT::default();
         (unsafe { GetWindowRect(hwnd, &mut rect) } != 0)
             .then_some([rect.left as f32, rect.top as f32])
+    }
+
+    pub fn hint(ctx: &egui::Context, hint: Option<&crate::floating::HoverHint>) {
+        let hwnd = ctx
+            .data_mut(|d| d.get_temp::<usize>(egui::Id::new("floating-native-hwnd")))
+            .map(|h| h as HWND);
+        let Some((hwnd, data)) = hwnd.and_then(|h| state(h).map(|d| (h, d))) else {
+            return;
+        };
+        // No Windows call holds a reference into Geometry across reentrancy.
+        let mut popup = unsafe { (*data).hint.take() };
+        if let Some(value) = hint {
+            if popup.is_none() && !unsafe { (*data).hint_attempted } {
+                unsafe { (*data).hint_attempted = true };
+                popup = crate::floating_hint::Popup::new(hwnd);
+            }
+            if let Some(popup) = &mut popup {
+                popup.show(value, ctx.pixels_per_point());
+            }
+        } else if let Some(popup) = &mut popup {
+            popup.hide();
+        }
+        if state(hwnd) == Some(data) {
+            unsafe { (*data).hint = popup };
+        }
     }
 
     fn state(hwnd: HWND) -> Option<*mut Geometry> {
@@ -212,4 +241,4 @@ mod windows {
 }
 
 #[cfg(windows)]
-pub use windows::sync;
+pub use windows::{hint, sync};

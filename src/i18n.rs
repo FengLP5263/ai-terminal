@@ -89,6 +89,7 @@ pub fn activity(locale: Locale, state: crate::status::Activity) -> &'static str 
         Unknown => locale.text("等待任务通知", "Awaiting task events"),
         Idle => locale.text("就绪", "Ready"),
         Working => locale.text("进行中", "Working"),
+        Unconfirmed => locale.text("状态待确认", "Status unconfirmed"),
         Completed => locale.text("已完成", "Completed"),
         Waiting => locale.text("需要处理", "Needs attention"),
         Failed => locale.text("失败", "Failed"),

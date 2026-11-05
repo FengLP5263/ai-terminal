@@ -16,6 +16,8 @@ pub mod window_frame;
 pub mod zoom;
 
 pub mod floating;
+#[cfg(windows)]
+mod floating_hint;
 mod floating_native;
 pub mod i18n;
 pub mod settings;

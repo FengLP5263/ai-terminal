@@ -37,3 +37,5 @@ Known limits: all physical IME combinations, all image clipboard sources, sustai
 `vendor/winit` is an Apache-2.0 local snapshot pinned to 0.30.13. During Windows native movement, use the OS-suggested DPI rectangle to avoid repeated DPI transitions caused by upstream nudging toward the old monitor. Main and floating windows share this path; non-drag behavior remains upstream. Provenance, archive hash and scope are in that directory's UPSTREAM.md.
 
 0.4.8 preview adds src/integration.rs for invocation-only lifecycle environment and credential-free basic settings snapshots. Native notifications retain Codex/Kimi app identity. TRAE/community ZCode keep the independent lightweight helper and authenticated bridge, without a proxy service or terminal-body scanning.
+
+0.4.8-preview.2: src/floating_hint.rs displays full floating-bar hints in an owned native tooltips_class32 window, outside the capsule client bounds, without a browser or another GPU viewport. Working events from ZCode’s partial lifecycle reduce to Status unconfirmed so a missing failure event cannot leave a working animation indefinitely.

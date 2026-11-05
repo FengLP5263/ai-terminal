@@ -49,3 +49,5 @@ Windows 预览包通过 GitHub Releases 分发；尚无自动发布服务、云 
 `vendor/winit` 固定 0.30.13 的 Apache-2.0 本地快照。Windows 原生移动期间采用系统的 DPI 建议矩形，避免上游旧屏幕推回逻辑导致重复 DPI 变化；主窗口与浮窗共用该路径。非拖动路径保持上游实现。来源、归档哈希与范围见该目录 UPSTREAM.zh.md。
 
 0.4.8 预览新增 src/integration.rs：只准备本次 CLI 的生命周期环境和无凭据基础设置快照。原生通知保留 Codex／Kimi app 身份，TRAE／社区 ZCode 继续使用独立轻量 helper 与认证桥，不引入代理服务或终端正文扫描。
+
+0.4.8-preview.2：浮窗的完整悬停提示由 src/floating_hint.rs 的独立原生 tooltips_class32 窗口显示，归属浮窗而不受其客户区裁切；不引入浏览器或额外 GPU 视口。ZCode 不完整生命周期的工作事件归约为状态待确认，避免缺失失败事件时持续显示进行中。

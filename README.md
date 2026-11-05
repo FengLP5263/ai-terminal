@@ -54,14 +54,14 @@ AI 任务可能运行很久。打开多个窗口后，来回确认哪个会话�
 | <img src="assets/readme/agent-claude.png" width="32" height="32" alt="Claude Code"> | [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview) | `claude` | 支持 | 会话级 hook |
 | <img src="assets/readme/agent-qoder-cn.png" width="32" height="32" alt="Qoder CN CLI"> | [Qoder CN CLI](https://docs.qoder.cn/en/cli/installation) | `qodercn` / `qoderclicn` | 支持 | 会话级 hook |
 | <img src="assets/readme/agent-kimi.png" width="32" height="32" alt="Kimi Code CLI"> | [Kimi Code CLI](https://www.kimi.com/code/docs/) | `kimi` | 支持 | 原生生命周期（Kimi Code 2.5.0） |
-| <img src="assets/readme/agent-zcode.png" width="32" height="32" alt="ZCode"> | [ZCode](https://zcode.z.ai/) | `zcode` | 支持 | 会话级 hook：开始／工具／完成；有配置边界，见下文 |
+| <img src="assets/readme/agent-zcode.png" width="32" height="32" alt="ZCode"> | [ZCode](https://zcode.z.ai/) | `zcode` | 支持 | 有限会话 hook；提交后状态待确认，明确完成后显示完成 |
 | <img src="assets/readme/agent-trae.png" width="32" height="32" alt="TRAE CLI"> | [TRAE CLI](https://docs.trae.cn/cli_about-trae-code-cli-2) | `traecli` | 支持 | 会话级 hook；需在 CLI 内审查信任 |
 
 状态只来自明确生命周期、hook 与进程退出；未收到事件时保持“等待任务通知”，不根据终端文字或静默猜测完成。新增集成在 0.4.8 预览版提供，真实模型回合等待用户验收；稳定版 0.4.7 的三款新增 CLI 仍仅识别头像与启停。
 
 - Kimi：受管 `kimi` 入口为本次进程启用原生 OSC 7501，区分工作、授权／问题／登录等待、完成与失败；忽略子 Agent 记录和消息正文。显式 `PI_PROGRAM_STATUS=0` 保持关闭。
-- TRAE：本次 `-c` 参数提供生命周期 hook，不改用户／项目配置；启动后在 `/hooks` 中审查信任。显式后续配置仍由 CLI 解释，远端服务不承诺本机 hook 可用。
-- ZCode：仅针对社区 zcode-app-cli 3.17.2-44／运行时 0.17.1。支持开始、工具、问题工具与完成；当前 hook 接口缺少可靠的授权等待、任务失败及中断事件，不能保证这些状态实时同步。通过 `ZCODE_CLI_SETTINGS_FILE` 选择本次进程的基础设置快照，仅允许无凭据的基础选项；已有 hook、非空自定义列表、MCP／插件定义、未知设置或显式该环境变量时保留原配置并跳过接入。不会打开 provider／凭据文件。快照内的设置修改仅对本次调用有效；原配置有自定义内容时，状态连接说明会提示该边界。
+- TRAE：当前企业版 CLI 需要 TRAE 企业旗舰版账号及其 PAT，个人订阅或第三方模型 API Key 不能替代。参见[官方 CLI 说明](https://docs.trae.cn/cli_about-trae-code-cli-2)。本次 `-c` 参数提供生命周期 hook，不改用户／项目配置；启动后在 `/hooks` 中审查信任。显式后续配置仍由 CLI 解释，远端服务不承诺本机 hook 可用。
+- ZCode：仅针对社区 zcode-app-cli 3.17.2-44／运行时 0.17.1。支持开始、工具、问题工具与完成；当前 hook 接口缺少可靠的授权等待、任务失败及中断事件，提交后显示“状态待确认”（灰色空心标记），不持续显示进行中；收到明确完成通知才显示完成，明确失败或非正常退出才显示失败。通过 `ZCODE_CLI_SETTINGS_FILE` 选择本次进程的基础设置快照，仅允许无凭据的基础选项；已有 hook、非空自定义列表、MCP／插件定义、未知设置或显式该环境变量时保留原配置并跳过接入。不会打开 provider／凭据文件。快照内的设置修改仅对本次调用有效；原配置有自定义内容时，状态连接说明会提示该边界。
 
 已有 CLI 需退出后重新启动，才能应用本次会话集成。登录、目录与 hook 信任由你在 Agent 内确认。
 
@@ -110,7 +110,7 @@ codex
 
 ### 为什么 Agent 没有显示状态？
 
-状态依赖 CLI 明确的生命周期通知。Codex 默认使用原生状态并保留共享 agents 总览；旧版可显式运行 `codex --no-daemon` 使用兼容 hook。Claude Code 和 Qoder CN 通过会话级 hook 接入。Kimi Code、ZCode 与 TRAE CLI 在本版仅识别头像和启动／退出，尚未接入会话级任务通知，状态保持“等待任务通知”。管理器不替你信任 hook，也不修改用户或项目的 hook 配置。
+状态依赖 CLI 明确的生命周期通知。Codex 默认使用原生状态并保留共享 agents 总览；旧版可显式运行 `codex --no-daemon` 使用兼容 hook。Claude Code 和 Qoder CN 通过会话级 hook 接入。稳定版 0.4.7 的 Kimi Code、ZCode 与 TRAE CLI 仅识别头像和启停；0.4.8 预览的接入范围见上方表格。未接收到通知时显示“等待任务通知”，ZCode 收到开始事件后显示“状态待确认”。管理器不替你信任 hook，也不修改用户或项目的 hook 配置。
 
 ### 重启后可以继续之前的对话吗？
 

@@ -240,7 +240,11 @@ impl Session {
                 return true;
             }
         }
-        self.status.apply(event, viewing)
+        if self.display_agent() == Agent::ZCode {
+            self.status.apply_partial_lifecycle(event, viewing)
+        } else {
+            self.status.apply(event, viewing)
+        }
     }
     fn take_resources(&mut self) -> Option<SessionResources> {
         self.shells.clear();
@@ -1369,9 +1373,14 @@ impl App {
                 && self.sessions[0].status.activity == Activity::Completed
                 && self.sessions[1].status.activity == Activity::Waiting
                 && self.sessions[2].status.activity == Activity::Working
-                && self.sessions[3..]
-                    .iter()
-                    .all(|s| s.status.activity == Activity::Working)
+                && self.sessions[3..].iter().all(|s| {
+                    s.status.activity
+                        == if s.display_agent() == Agent::ZCode {
+                            Activity::Unconfirmed
+                        } else {
+                            Activity::Working
+                        }
+                })
                 && self.sessions.iter().all(|s| s.backend.is_some());
             let report = serde_json::json!({"ok":pass,"fixture_events":true,"gpu":self.gpu_info,"sessions":sessions,"manager_resident_bytes":crate::platform::resident_bytes(),"frames":self.frames,"ui_cpu_micros":self.ui_micros,"elapsed_ms":self.started.elapsed().as_millis()});
             let _ = std::fs::create_dir_all(&self.directory);
@@ -1686,6 +1695,43 @@ Send-State 'state=clear'; Wait-Step 5
         session.agent_ended();
         assert_eq!(session.display_agent(), Agent::Shell);
         assert!(!session.status.native_lifecycle);
+    }
+    #[test]
+    fn foreground_zcode_uses_partial_status_but_other_agents_keep_working() {
+        for agent in [Agent::ZCode, Agent::Claude, Agent::QoderCn] {
+            let mut session = Session::new(SessionSpec {
+                id: "one".into(),
+                name: "one".into(),
+                directory: PathBuf::new(),
+                agent: Agent::Shell,
+                agent_session_id: None,
+                color: None,
+            });
+            session.detected_agent = Some(agent);
+            session.invocation = Some("current".into());
+            let mut event: HookEvent = serde_json::from_value(serde_json::json!({
+                "event_id":"start", "local_id":"one", "generation":"g",
+                "name":"UserPromptSubmit", "session_id":"root", "turn_id":"turn",
+                "background_running":false, "invocation":"stale"
+            }))
+            .unwrap();
+            assert!(!session.event(&event, false));
+            assert_eq!(session.status.activity, Activity::Unknown);
+            event.invocation = Some("current".into());
+            assert!(session.event(&event, false));
+            assert_eq!(
+                session.status.activity,
+                if agent == Agent::ZCode {
+                    Activity::Unconfirmed
+                } else {
+                    Activity::Working
+                }
+            );
+            event.name = "Stop".into();
+            assert!(session.event(&event, false));
+            assert_eq!(session.status.activity, Activity::Completed);
+            assert!(session.status.unread);
+        }
     }
     #[test]
     fn startup_and_process_failures_mark_only_unviewed_sessions_unread() {

@@ -4,6 +4,23 @@
 
 Record user-visible additions, improvements, fixes, and compatibility changes for each release; omit categories that do not apply. Review both languages together, use the same version entry in GitHub Releases, and ship both files in the ZIP. Historical summaries follow existing GitHub release notes and UTC publication dates; development versions without a separate release do not receive invented release dates.
 
+## [0.4.8-preview.2] - 2026-11-05
+
+### Fixed
+
+- Floating-bar hover hints use an owned native window to display the full name, Agent and status beyond capsule bounds, with monitor-aware placement, scaling and long-title wrapping.
+- Community ZCode shows Status unconfirmed with a hollow gray marker after submission when reliable model-failure/interruption end events are unavailable, avoiding an indefinite working animation. Explicit completion, failure and process exit still update the result.
+
+### Compatibility and limits
+
+- Terminal error text, silence and timeouts are not used to infer results. Inspect errors in this ZCode version inside the CLI. Existing processes must be restarted in the new preview.
+- Clarify the TRAE enterprise CLI’s flagship account/PAT prerequisite and bilingual status guidance. This local preview is not a stable publication.
+
+### Verification and upgrade notes
+
+- 191 Rust and 14 Python regressions, governance, formatting and Clippy pass. The final optimized build passes six-PTY smoke, owned-process cleanup and native screenshot checks.
+- Native hints cover 100%/142%/200% zoom, full Chinese/English and long titles, mouse passthrough, no activation and hiding on leave. Missing ZCode end events use synthetic metadata; real error-turn acceptance remains with the user. No model request was made.
+
 ## [0.4.8-preview.1] - 2026-11-04
 
 ### Added

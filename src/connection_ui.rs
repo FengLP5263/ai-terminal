@@ -31,7 +31,11 @@ pub fn show(ui: &mut egui::Ui, agent: Agent, status: &Status) -> egui::Response 
                 } else {
                     crate::i18n::tr(ui.ctx(),"已连接 Agent 的任务通知","Connected to agent task events")
                 });
-                ui.label(crate::i18n::tr(ui.ctx(),"进行中、需要处理与已完成随任务通知更新。","Working, attention, failure and completion follow task events."));
+                if agent == Agent::ZCode {
+                    ui.label(crate::i18n::tr(ui.ctx(),"ZCode 失败／中断通知不完整，提交后显示“状态待确认”；明确完成后才显示完成。错误原因请在 CLI 内查看。","ZCode failure/interruption events are incomplete. Submitted work stays “Status unconfirmed” until explicit completion. Inspect errors in the CLI."));
+                } else {
+                    ui.label(crate::i18n::tr(ui.ctx(),"进行中、需要处理、失败与完成随任务通知更新。","Working, attention, failure and completion follow task events."));
+                }
             } else {
                 ui.label(match locale {crate::i18n::Locale::ZhCn=>format!("已识别 {}，尚未收到任务通知。",agent.label()),crate::i18n::Locale::En=>format!("Recognized {}. No task event received yet.",agent.label())});
                 if agent==Agent::Codex {
@@ -44,7 +48,7 @@ pub fn show(ui: &mut egui::Ui, agent: Agent, status: &Status) -> egui::Response 
                 } else if agent == Agent::Trae {
                     ui.label(crate::i18n::tr(ui.ctx(),"TRAE 通过本次启动的 -c 参数接入任务 hook。请在 /hooks 中审查信任；不修改用户或项目配置。","TRAE uses invocation-scoped -c task hooks. Review trust in /hooks; user and project files are not edited."));
                 } else if agent == Agent::ZCode {
-                    ui.label(crate::i18n::tr(ui.ctx(),"社区 zcode-app-cli 使用会话级设置快照接入开始、工具与完成通知。仅复制无凭据的基础设置；已有 hook、自定义设置或显式 ZCODE_CLI_SETTINGS_FILE 时保留原配置并跳过接入。授权等待和失败事件受上游接口限制。","Community zcode-app-cli uses an invocation-only settings snapshot for start, tool and completion events. Only credential-free basic settings are copied. Existing hooks, custom settings or explicit ZCODE_CLI_SETTINGS_FILE preserve the original configuration and skip integration. Approval waiting and failure events are limited by upstream interfaces."));
+                    ui.label(crate::i18n::tr(ui.ctx(),"社区 zcode-app-cli 使用会话级设置快照接入开始、工具与完成通知。仅复制无凭据的基础设置；已有 hook、自定义设置或显式 ZCODE_CLI_SETTINGS_FILE 时保留原配置并跳过接入。当前失败／中断事件不完整，提交后显示“状态待确认”；收到明确完成通知后才显示完成。授权等待也受上游接口限制。","Community zcode-app-cli uses an invocation-only settings snapshot for start, tool and completion events. Only credential-free basic settings are copied. Existing hooks, custom settings or explicit ZCODE_CLI_SETTINGS_FILE preserve the original configuration and skip integration. Failure/interruption events are incomplete: submitted work stays “Status unconfirmed” until an explicit completion event. Approval waits are also limited by upstream interfaces."));
                 } else {
                     ui.label(crate::i18n::tr(ui.ctx(),"在当前 Claude 输入 /hooks，检查状态钩子是否加载。手动指定配置文件时，请确认其中包含状态钩子。","Use /hooks in Claude to check the status hooks. Custom settings files must include them."));
                 }

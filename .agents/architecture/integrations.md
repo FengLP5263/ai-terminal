@@ -75,3 +75,5 @@ shell_switch_probe 的 `kimi`、`zcode`、`traecli` 模式在全新管理器工�
 Kimi Code 2.5.0 使用自身 pi-tui 的 OSC 7501 `app=kimi-code`；仅受管入口开启本次进程的 `PI_PROGRAM_STATUS`，显式关闭优先。TRAE CLI 0.213.1 使用自身 `-c` TOML hook 覆盖与 CLI 信任审查，实际事件和原生启动分别验证。ZCode 社区版使用其公开的 [Host integration v1](https://github.com/kingsword09/zcode-cli/blob/main/docs/HOST_INTEGRATION.md) 设置路径，不调用 vendor 私有入口；整份设置替换带来的配置保护与事件缺口见运行记录。没有将社区前端冒充官方 ZCode CLI。
 
 三者都不解析屏幕正文、不自动登录或确认信任。真实模型任务仍需用户验收。
+
+0.4.8-preview.2：社区 ZCode 缺少公开、可归属当前 TUI 回合的模型失败／中断结束事件。收到开始后显示“状态待确认”，而非持续进行中；内部 turn.failed、通知正文与调试日志均不作为稳定集成协议。明确完成 hook 才显示完成，非正常进程退出仍可显示失败。TRAE 当前企业 CLI 的认证前提是企业旗舰版账号及 PAT，个人订阅和第三方 API Key 不替代该登录。
