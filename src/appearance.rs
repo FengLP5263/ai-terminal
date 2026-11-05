@@ -28,19 +28,19 @@ pub fn setup(ctx: &egui::Context) {
     let faces: [(&str, &[u8]); 4] = [
         (
             "terminal-regular",
-            include_bytes!("../assets/fonts/Hack-Regular.ttf"),
+            include_bytes!("../assets/fonts/CascadiaMono-Regular.ttf"),
         ),
         (
             "terminal-bold",
-            include_bytes!("../assets/fonts/Hack-Bold.ttf"),
+            include_bytes!("../assets/fonts/CascadiaMono-Bold.ttf"),
         ),
         (
             "terminal-italic",
-            include_bytes!("../assets/fonts/Hack-Italic.ttf"),
+            include_bytes!("../assets/fonts/CascadiaMono-Italic.ttf"),
         ),
         (
             "terminal-bold-italic",
-            include_bytes!("../assets/fonts/Hack-BoldItalic.ttf"),
+            include_bytes!("../assets/fonts/CascadiaMono-BoldItalic.ttf"),
         ),
     ];
     for (name, bytes) in faces {
@@ -126,10 +126,10 @@ pub fn setup(ctx: &egui::Context) {
 
 pub fn terminal_font(size: f32) -> TerminalFont {
     static FACES: [&[u8]; 4] = [
-        include_bytes!("../assets/fonts/Hack-Regular.ttf"),
-        include_bytes!("../assets/fonts/Hack-Bold.ttf"),
-        include_bytes!("../assets/fonts/Hack-Italic.ttf"),
-        include_bytes!("../assets/fonts/Hack-BoldItalic.ttf"),
+        include_bytes!("../assets/fonts/CascadiaMono-Regular.ttf"),
+        include_bytes!("../assets/fonts/CascadiaMono-Bold.ttf"),
+        include_bytes!("../assets/fonts/CascadiaMono-Italic.ttf"),
+        include_bytes!("../assets/fonts/CascadiaMono-BoldItalic.ttf"),
     ];
     TerminalFont::new(FontSettings {
         font_type: FontId::new(size, FontFamily::Name("terminal-regular".into())),
@@ -139,7 +139,7 @@ pub fn terminal_font(size: f32) -> TerminalFont {
         FontId::new(size, FontFamily::Name("terminal-italic".into())),
         FontId::new(size, FontFamily::Name("terminal-bold-italic".into())),
     )
-    .with_native_font("Hack", &FACES)
+    .with_native_font("Cascadia Mono", &FACES)
 }
 
 /// The approved B artwork is embedded; startup performs no asset-file I/O.

@@ -28,6 +28,9 @@ const FRAG_SRC: &str = include_str!("shader/fragment.glsl");
 mod buffer_capacity;
 #[cfg(target_os = "windows")]
 use buffer_capacity::grown_capacity;
+#[cfg(target_os = "windows")]
+#[path = "mesh_batch.rs"]
+mod mesh_batch;
 
 #[cfg(target_os = "windows")]
 unsafe fn upload_reusing_buffer(
@@ -128,6 +131,8 @@ pub struct Painter {
     vertex_buffer_capacity: usize,
     #[cfg(target_os = "windows")]
     index_buffer_capacity: usize,
+    #[cfg(target_os = "windows")]
+    mesh_batch: mesh_batch::MeshBatch,
 
     textures: HashMap<egui::TextureId, glow::Texture>,
 
@@ -303,6 +308,8 @@ impl Painter {
                 vertex_buffer_capacity: 0,
                 #[cfg(target_os = "windows")]
                 index_buffer_capacity: 0,
+                #[cfg(target_os = "windows")]
+                mesh_batch: Default::default(),
                 textures: Default::default(),
                 next_native_tex_id: 1 << 32,
                 textures_to_destroy: Vec::new(),
@@ -443,6 +450,13 @@ impl Painter {
 
         unsafe { self.prepare_painting(screen_size_px, pixels_per_point) };
 
+        // Never overwrite storage while earlier meshes in this paint call
+        // still reference it. Keep growth bounded to the largest visible frame.
+        #[cfg(target_os = "windows")]
+        let batched = self.upload_mesh_batch(clipped_primitives);
+        #[cfg(target_os = "windows")]
+        let mut mesh_index = 0;
+
         for egui::ClippedPrimitive {
             clip_rect,
             primitive,
@@ -452,6 +466,13 @@ impl Painter {
 
             match primitive {
                 Primitive::Mesh(mesh) => {
+                    #[cfg(target_os = "windows")]
+                    if batched {
+                        let range = self.mesh_batch.ranges[mesh_index];
+                        mesh_index += 1;
+                        self.paint_batched_mesh(mesh, range);
+                        continue;
+                    }
                     self.paint_mesh(mesh);
                 }
                 Primitive::Callback(callback) => {
@@ -551,6 +572,31 @@ impl Painter {
             }
 
             check_for_gl_error!(&self.gl, "paint_mesh");
+        } else {
+            log::warn!("Failed to find texture {:?}", mesh.texture_id);
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    fn upload_mesh_batch(&mut self, primitives: &[egui::ClippedPrimitive]) -> bool {
+        if !self.mesh_batch.rebuild(primitives) { return false; }
+        unsafe {
+            self.gl.bind_buffer(glow::ARRAY_BUFFER, Some(self.vbo));
+            upload_reusing_buffer(&self.gl, glow::ARRAY_BUFFER, bytemuck::cast_slice(&self.mesh_batch.vertices), &mut self.vertex_buffer_capacity);
+            self.gl.bind_buffer(glow::ELEMENT_ARRAY_BUFFER, Some(self.element_array_buffer));
+            upload_reusing_buffer(&self.gl, glow::ELEMENT_ARRAY_BUFFER, bytemuck::cast_slice(&self.mesh_batch.indices), &mut self.index_buffer_capacity);
+        }
+        true
+    }
+
+    #[cfg(target_os = "windows")]
+    fn paint_batched_mesh(&mut self, mesh: &Mesh, range: mesh_batch::DrawRange) {
+        if let Some(texture) = self.texture(mesh.texture_id) {
+            unsafe {
+                self.gl.bind_texture(glow::TEXTURE_2D, Some(texture));
+                self.gl.draw_elements(glow::TRIANGLES, range.index_count, glow::UNSIGNED_INT, range.index_offset_bytes);
+            }
+            check_for_gl_error!(&self.gl, "paint_batched_mesh");
         } else {
             log::warn!("Failed to find texture {:?}", mesh.texture_id);
         }

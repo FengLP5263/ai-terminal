@@ -62,6 +62,7 @@ struct Engine {
     retired: Vec<TextureHandle>,
     frame: u64,
     family: String,
+    cjk_family: String,
     identity: usize,
     _registration: Option<RegisteredFonts>,
     _apartment: Apartment,
@@ -116,7 +117,10 @@ fn with_engine<T>(
             }
         };
         let engine = engines[index].1.as_mut()?;
-        if engine.family != font.family || engine.identity != font.identity() {
+        if engine.family != font.family
+            || engine.cjk_family != font.cjk_family
+            || engine.identity != font.identity()
+        {
             engines[index].1 = Engine::new(font).ok();
         }
         run(engines[index].1.as_mut()?).ok()
@@ -207,6 +211,7 @@ impl Engine {
                 retired: Vec::new(),
                 frame: 0,
                 family: font.family.clone(),
+                cjk_family: font.cjk_family.clone(),
                 identity: font.identity(),
                 _registration: registration,
                 _apartment: apartment,
@@ -273,7 +278,8 @@ impl Engine {
                     length: text.len() as u32,
                 };
                 layout.SetFontCollection(&self.system_collection, range)?;
-                layout.SetFontFamilyName(w!("Microsoft YaHei UI"), range)?;
+                let cjk: Vec<u16> = self.cjk_family.encode_utf16().chain(Some(0)).collect();
+                layout.SetFontFamilyName(PCWSTR(cjk.as_ptr()), range)?;
             }
             let fallback = self.factory.GetSystemFontFallback()?;
             layout
@@ -565,7 +571,44 @@ mod tests {
     fn native() -> NativeFont {
         NativeFont {
             family: "Consolas".into(),
+            cjk_family: "Microsoft YaHei UI".into(),
             faces: &[],
+        }
+    }
+    #[test]
+    fn glyph_raster_does_not_retain_ink_from_previous_tile_sizes() {
+        let keys: Vec<_> = [
+            ("W", 14, 10, 20, 16, 0),
+            ("i", 22, 12, 28, 21, 0),
+            ("文", 22, 24, 28, 21, 0),
+            ("👩‍💻", 32, 64, 42, 0, 4),
+            ("original-files.sha256", 22, 248, 32, 24, 0),
+            (" ", 14, 9, 18, 14, 0),
+        ]
+        .into_iter()
+        .map(|(text, pixels, width, height, baseline, style)| Key {
+            text: text.into(),
+            pixels,
+            width,
+            height,
+            baseline,
+            style,
+        })
+        .collect();
+        let expected: Vec<_> = keys
+            .iter()
+            .map(|key| Engine::new(&native()).unwrap().raster(key).unwrap())
+            .collect();
+        let mut engine = Engine::new(&native()).unwrap();
+        for _ in 0..4 {
+            for (key, pixels) in keys.iter().zip(&expected) {
+                assert_eq!(
+                    &engine.raster(key).unwrap(),
+                    pixels,
+                    "dirty tile for {:?}",
+                    key.text
+                );
+            }
         }
     }
     #[test]

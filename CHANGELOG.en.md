@@ -4,6 +4,93 @@
 
 Record user-visible additions, improvements, fixes, and compatibility changes for each release; omit categories that do not apply. Review both languages together, use the same version entry in GitHub Releases, and ship both files in the ZIP. Historical summaries follow existing GitHub release notes and UTC publication dates; development versions without a separate release do not receive invented release dates.
 
+## [0.4.9] - 2026-11-05
+
+### Fixed
+
+- Qoder automatic permission checks no longer falsely request attention. Correlate manual waits with tool IDs, reject delayed notices for settled tools, and preserve genuine questions and MCP waits.
+- Reply correctly to private cursor-position queries so responses do not leak into TUI input. Use the correct inverted glyphs and paint order for wide-character block cursors.
+- Full floating hints share native color-emoji rendering, with long-name wrapping, work-area positioning, no activation and mouse passthrough.
+- Ignore temporary sizing, invisible, already discarded and unknown-screen layouts when resizing terminals; restrict main-terminal UI and background state processing to the root viewport.
+- Fix intermittent stretched, overlapping or flashing text on Windows OpenGL by uploading the frame's vertices and indices before drawing, retaining buffer-capacity reuse.
+
+### Changed
+
+- Default to four original embedded Cascadia Mono faces: regular, bold, italic and bold-italic. CJK continues to use system Microsoft YaHei UI with natural native default rendering parameters.
+- Bundle the original Cascadia SIL OFL 1.1 and font provenance, checking font identity and license completeness on build and archive verification. Include local protocol patches in source identity and third-party licensing records.
+
+### Compatibility and validation
+
+- Keep the fixed `%LOCALAPPDATA%/ai-terminal` session-data directory and existing names, directories, order and UI preferences. CLI login, trust and permission decisions remain with the user.
+- Pass 201 Rust and 16 Python regressions, governance, formatting and Clippy; verify native six-PTY smoke, five typography scales and three full-hint scales.
+- Capture 656 fixed-table frames at 100%/103%/110%/200% with identical fixed-region pixels and visible grids, including 512 consecutive captures at 103%. See the rendering-check document for reproduction images and scope.
+- The user tested preview.5, reported no issues and authorized stable publication. Synthetic events, controlled graphics fixtures and real Agent use are recorded separately. Developer checks made no paid model requests and do not establish coverage of every CLI or long-duration interaction.
+
+## [0.4.9-preview.5] - 2026-11-05
+
+### Fixed
+
+- Fix occasional stretched, overlapping or briefly flashing text on the Windows OpenGL path: upload the frame's vertices and indices before drawing in their original order, avoiding repeated overwrites of regions referenced by earlier meshes in the same paint call.
+- Retain GPU buffer capacity reuse. Reusable CPU staging contains only current visible-frame geometry; textures, clipping, callback order and the selected fonts retain their behavior.
+
+### Developer checks
+
+- A fixed local file table and changing glyphs in another terminal region captured one corrupt frame on the old path; the same 48 comparisons on the new path had no pixel differences. Record this controlled reproduction separately from long-term acceptance in a real user session.
+- Add regressions for cross-texture/callback index offsets, size overflow, repeated-frame clearing and raster independence from prior glyphs.
+
+## [0.4.9-preview.4] - 2026-11-05
+
+### Fixed
+
+- Terminal sizing ignores measurement, invisible, already discarded and unknown-screen layouts; real window changes still resize ConPTY.
+- Main-terminal drawing and background state processing are restricted to the root viewport, keeping floating/hint geometry and minimized state separate.
+- Retain preview.3's selected Cascadia Mono plus Microsoft YaHei UI and native default font rendering parameters.
+
+### Developer checks
+
+- Add real-ConPTY layout-isolation regressions. Record single Qoder startup captures separately from full reproduction of the user's duplicate-page report; defensive regressions do not establish acceptance of every scenario.
+
+## [0.4.9-preview.3] - 2026-11-05
+
+### Changed
+
+- Adopt the visually selected Cascadia Mono + Microsoft YaHei UI combination, retaining size and 0.4.8 native default rendering parameters; preview.1 GDI classic fitting stays reverted.
+- Embed four original regular/bold/italic/bold-italic faces from Microsoft's official v2407.24 archive. No Latin font installation is needed; system CJK/emoji fonts are not copied.
+
+### Packaging and checks
+
+- Pin font archive, revision and per-file SHA-256; bundle the original SIL OFL 1.1 and provenance. Reject tampered fonts or declared fonts without provenance/licenses; old archives remain verifiable.
+- Production UI and probes share the new defaults. Preference for the independent system-font sample and actual acceptance of this embedded version are recorded separately. Workspace directories and session format are unchanged.
+
+## [0.4.9-preview.2] - 2026-11-05
+
+### Fixed
+
+- Revert preview.1 GDI classic stem fitting after visual user acceptance found it stiffer. Restore 0.4.8 native default rendering parameters; retain the accepted status, protocol, cursor and emoji fixes.
+
+### Development checks
+
+- typography_probe adds fixed-size comparisons with original antialiasing: Hack/Consolas/Cascadia Mono and Microsoft YaHei UI/Microsoft YaHei/DengXian, with interactive switching. It uses local fonts and fixed samples, without changing daily font/session settings or installing/copying system fonts.
+- Default terminal fonts remain Hack/Microsoft YaHei UI. Candidate shape and clarity require visual user choice; passing regressions does not establish better appearance.
+
+## [0.4.9-preview.1] - 2026-11-05
+
+### Fixed
+
+- Qoder automatic approval no longer reports false attention. Correlate manual permission waits by tool ID, reject delayed notices for settled tools, and preserve genuine questions/MCP waits.
+- Add private cursor-position queries with correctly prefixed responses, allowing TUIs to recognize them; ordinary responses are unchanged.
+- Floating hints share production color emoji rendering while retaining long-title wrapping, work-area placement, mouse passthrough and no activation.
+- Correct wide-character block-cursor inversion and drawing order so the final Chinese input character is not obscured by a black block or adjacent backgrounds.
+
+### Improved
+
+- Keep font files and adjust native physical-pixel stem fitting for ordinary terminal text to improve small-size/fractional-scale clarity; emoji retains its color parameters.
+
+### Compatibility and acceptance
+
+- Ordinary/private query regressions, synthetic hooks, native screenshots and real model tasks are recorded separately. This preview does not claim complete long-running Agent acceptance. No automatic trust approval or paid model request.
+- Daily startup retains the fixed `%LOCALAPPDATA%/ai-terminal` data directory and existing session directories; isolated probes do not migrate user data.
+
 ## [0.4.8] - 2026-11-05
 
 ### Added

@@ -17,6 +17,8 @@ Start here for current guidance. Versioned documents are historical records of t
 - [Data and assets](../.agents/architecture/data-and-assets.en.md) · [External integrations](../.agents/architecture/integrations.en.md)
 - [Application icon](../assets/branding/README.en.md) · [Icon concepts](../design/icon-concepts/README.en.md) · [Third-party notices](../THIRD_PARTY_NOTICES.en.md)
 
+- [0.4.9 rendering reproduction and acceptance](rendering-0.4.9.en.md)
+
 ## Historical records
 
 - [Windows 10 compatibility fixes and outstanding verification](windows10-compatibility.en.md)

@@ -32,6 +32,8 @@ pub struct HookEvent {
     pub tool_name: Option<String>,
     pub tool_use_id: Option<String>,
     pub notification_type: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub permission_mode: Option<String>,
     pub source: Option<String>,
     pub background_running: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -47,9 +49,51 @@ pub struct Status {
     pub last_event: Option<String>,
     pub native_lifecycle: bool,
     waiting_tool: Option<String>,
+    qoder_settled_tools: std::collections::VecDeque<String>,
 }
 
 impl Status {
+    /// Qoder permission notifications can race automatic decisions and tool results.
+    pub fn apply_qoder(&mut self, event: &HookEvent, viewing: bool) -> bool {
+        if event.name == "Notification"
+            && event.notification_type.as_deref() == Some("permission_prompt")
+            && (matches!(
+                event.permission_mode.as_deref(),
+                Some(
+                    "auto"
+                        | "bypass_permissions"
+                        | "bypassPermissions"
+                        | "yolo"
+                        | "dont_ask"
+                        | "dontAsk"
+                )
+            ) || event
+                .tool_use_id
+                .as_ref()
+                .is_some_and(|id| self.qoder_settled_tools.contains(id)))
+        {
+            return false;
+        }
+        let accepted = self.apply(event, viewing);
+        if accepted && event.name == "SessionStart" && event.source.as_deref() != Some("compact") {
+            self.qoder_settled_tools.clear();
+        }
+        if accepted
+            && matches!(
+                event.name.as_str(),
+                "PostToolUse" | "PostToolUseFailure" | "PermissionDenied"
+            )
+            && let Some(id) = &event.tool_use_id
+            && !self.qoder_settled_tools.contains(id)
+        {
+            if self.qoder_settled_tools.len() == 32 {
+                self.qoder_settled_tools.pop_front();
+            }
+            self.qoder_settled_tools.push_back(id.clone());
+        }
+        accepted
+    }
+
     /// Returns false for a different agent's events or a late event from an old turn.
     pub fn apply(&mut self, event: &HookEvent, viewing: bool) -> bool {
         // Once the foreground TUI reports native lifecycle, delayed legacy
@@ -135,6 +179,9 @@ impl Status {
                             | "agent_needs_input"
                     )
                 ) {
+                    if self.activity != Activity::Waiting || self.waiting_tool.is_none() {
+                        self.waiting_tool = event.tool_use_id.clone();
+                    }
                     self.activity = Activity::Waiting;
                 }
             }
@@ -268,11 +315,83 @@ mod tests {
             tool_name: None,
             tool_use_id: None,
             notification_type: None,
+            permission_mode: None,
             source: None,
             background_running: false,
             exit_code: None,
         }
     }
+    #[test]
+    fn qoder_automatic_permission_checks_do_not_imply_user_attention() {
+        for mode in ["auto", "bypass_permissions", "dont_ask"] {
+            let mut status = Status::default();
+            status.apply_qoder(&event("UserPromptSubmit", "turn"), false);
+            let mut notice = event("Notification", "turn");
+            notice.notification_type = Some("permission_prompt".into());
+            notice.permission_mode = Some(mode.into());
+            notice.tool_name = Some("Bash".into());
+            notice.tool_use_id = Some("shell".into());
+            assert!(!status.apply_qoder(&notice, false));
+            assert_eq!(status.activity, Activity::Working);
+            assert!(!status.unread);
+
+            // The same mode must not suppress a genuine question or MCP dialog.
+            let mut question = event("PreToolUse", "turn");
+            question.tool_name = Some("AskUserQuestion".into());
+            question.tool_use_id = Some("question".into());
+            question.permission_mode = Some(mode.into());
+            status.apply_qoder(&question, false);
+            assert_eq!(status.activity, Activity::Waiting);
+            status.apply_qoder(&notice, false);
+            assert_eq!(status.activity, Activity::Waiting);
+            let mut done = event("PostToolUse", "turn");
+            done.tool_use_id = Some("shell".into());
+            status.apply_qoder(&done, false);
+            assert_eq!(status.activity, Activity::Waiting);
+            done.tool_use_id = Some("question".into());
+            status.apply_qoder(&done, false);
+            assert_eq!(status.activity, Activity::Working);
+            notice.notification_type = Some("elicitation_dialog".into());
+            status.apply_qoder(&notice, false);
+            assert_eq!(status.activity, Activity::Waiting);
+        }
+    }
+
+    #[test]
+    fn qoder_manual_permission_waits_are_correlated_and_late_notices_are_ignored() {
+        let mut status = Status::default();
+        status.apply_qoder(&event("UserPromptSubmit", "turn"), false);
+        let mut notice = event("Notification", "turn");
+        notice.notification_type = Some("permission_prompt".into());
+        notice.permission_mode = Some("default".into());
+        notice.tool_use_id = Some("permission".into());
+        assert!(status.apply_qoder(&notice, false));
+        assert_eq!(status.activity, Activity::Waiting);
+        let mut done = event("PostToolUse", "turn");
+        done.tool_use_id = Some("other".into());
+        status.apply_qoder(&done, false);
+        assert_eq!(status.activity, Activity::Waiting);
+        done.tool_use_id = Some("permission".into());
+        status.apply_qoder(&done, false);
+        assert_eq!(status.activity, Activity::Working);
+        assert!(!status.apply_qoder(&notice, false));
+        status.apply_qoder(&event("Stop", "turn"), false);
+        assert!(!status.apply_qoder(&notice, false));
+        assert_eq!(status.activity, Activity::Completed);
+        assert!(status.unread);
+        for n in 0..40 {
+            done.tool_use_id = Some(format!("tool-{n}"));
+            status.apply_qoder(&done, false);
+        }
+        assert_eq!(status.qoder_settled_tools.len(), 32);
+
+        // Other Agents keep their own explicit notification semantics.
+        let mut other = Status::default();
+        notice.permission_mode = Some("auto".into());
+        other.apply(&notice, false);
+        assert_eq!(other.activity, Activity::Waiting);
+    }
+
     #[test]
     fn background_completion_is_visible_without_focusing_terminal() {
         let mut s = Status::default();

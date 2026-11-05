@@ -1,6 +1,4 @@
 {
-  "upstream": "https://github.com/source-foundry/Hack",
-  "version": "v3.003",
   "files": {
     "Hack-Regular.ttf": {
       "url": "https://raw.githubusercontent.com/source-foundry/Hack/v3.003/build/ttf/Hack-Regular.ttf",
@@ -26,6 +24,55 @@
       "url": "https://raw.githubusercontent.com/source-foundry/Hack/v3.003/LICENSE.md",
       "bytes": 3744,
       "sha256": "1f61bb7c790c59b4b0ecdf304628b94e42ae4c8020094a8c3da73381ab212623"
+    },
+    "CascadiaMono-Regular.ttf": {
+      "family": "Cascadia Mono",
+      "url": "https://github.com/microsoft/cascadia-code/releases/download/v2407.24/CascadiaCode-2407.24.zip",
+      "archive_path": "ttf/static/CascadiaMono-Regular.ttf",
+      "bytes": 575912,
+      "sha256": "06520d032ec274fa5040b22c6f4a1d829081b24ba40b2da56dae89bf10c7b481"
+    },
+    "CascadiaMono-Bold.ttf": {
+      "family": "Cascadia Mono",
+      "url": "https://github.com/microsoft/cascadia-code/releases/download/v2407.24/CascadiaCode-2407.24.zip",
+      "archive_path": "ttf/static/CascadiaMono-Bold.ttf",
+      "bytes": 581704,
+      "sha256": "b22cb603ed23cac36e8444846e1841caca21719a5e852780a8d37ae7a49b0a36"
+    },
+    "CascadiaMono-Italic.ttf": {
+      "family": "Cascadia Mono",
+      "url": "https://github.com/microsoft/cascadia-code/releases/download/v2407.24/CascadiaCode-2407.24.zip",
+      "archive_path": "ttf/static/CascadiaMono-Italic.ttf",
+      "bytes": 435820,
+      "sha256": "8d98a33e7617c14dd1d200b4900bc6c2d5d7165abb5c09e9d2fd51c38ce9c9ff"
+    },
+    "CascadiaMono-BoldItalic.ttf": {
+      "family": "Cascadia Mono",
+      "url": "https://github.com/microsoft/cascadia-code/releases/download/v2407.24/CascadiaCode-2407.24.zip",
+      "archive_path": "ttf/static/CascadiaMono-BoldItalic.ttf",
+      "bytes": 439072,
+      "sha256": "ecaeab55e6334408f8ff1fde78a99ddaeb3bb7fad4fcd177df8475c88a7d240f"
+    },
+    "LICENSE-Cascadia.txt": {
+      "url": "https://raw.githubusercontent.com/microsoft/cascadia-code/v2407.24/LICENSE",
+      "bytes": 4489,
+      "sha256": "51882cd3cdba4e16f220f44ddb08a635c38c44ea6e0975db2574f4be6f958238"
     }
-  }
+  },
+  "families": {
+    "Hack": {
+      "upstream": "https://github.com/source-foundry/Hack",
+      "version": "v3.003",
+      "license_file": "LICENSE.md"
+    },
+    "Cascadia Mono": {
+      "upstream": "https://github.com/microsoft/cascadia-code",
+      "version": "v2407.24",
+      "revision": "56bcca3f2c1e4cb19458954f0e2bb4635960df91",
+      "archive_url": "https://github.com/microsoft/cascadia-code/releases/download/v2407.24/CascadiaCode-2407.24.zip",
+      "archive_sha256": "e67a68ee3386db63f48b9054bd196ea752bc6a4ebb4df35adce6733da50c8474",
+      "license_file": "LICENSE-Cascadia.txt"
+    }
+  },
+  "default_family": "Cascadia Mono"
 }

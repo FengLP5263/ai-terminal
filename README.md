@@ -98,6 +98,8 @@ codex
 
 在受管终端里交互式启动 `powershell`、`cmd` 或 `bash` 时，头像会跟随当前 Shell；`exit` 逐层恢复。启动 Codex／Claude／Qoder CN／Kimi Code／ZCode／TRAE CLI 时优先显示 Agent 头像，退出后恢复当前 Shell。单次脚本命令和 Agent 内部的工具命令不会因此改变 Shell 头像。
 
+0.4.9 的终端默认使用内嵌 **Cascadia Mono** 与系统**微软雅黑 UI**；保持原来的自然渲染方式，常规、粗体、斜体和粗斜体随程序提供，无需另外安装英文字体。来源和许可见[第三方说明](THIRD_PARTY_NOTICES.md)。
+
 ## 常见问题
 
 ### 已经安装 CLI，为什么提示找不到命令？
@@ -154,6 +156,6 @@ rustup component add rustfmt clippy
 
 Agent 品牌图标的来源与许可按文件分别记录，详见[第三方说明](THIRD_PARTY_NOTICES.md)；ZIP 的 agent-icons/ 附带来源清单和可获得的原始许可。
 
-## 0.4.8 更新
+## 0.4.9 更新
 
-接入 Kimi Code 原生生命周期及 ZCode／TRAE CLI 的会话级任务 hook；修复浮窗悬停提示裁切，ZCode 状态直接跟随 hook。更新中英文工作区与浮窗主图。支持范围和六种 Agent 图标见上方表格。完整功能、升级说明和验证范围见[中英文更新日志](CHANGELOG.md)；每次发行的 ZIP 均附带两份日志。
+修复 Qoder 自动审批的错误状态提示、TUI 光标查询与中文块光标、浮窗提示的彩色 emoji，以及偶发文字重叠闪烁。默认字体采用 Cascadia Mono＋微软雅黑 UI，保持自然渲染和原有会话目录。完整范围见[更新日志](CHANGELOG.md)，受控复现截图与用户验收见[0.4.9 渲染核查](docs/rendering-0.4.9.md)。每次发行的 ZIP 均附带中英文日志和第三方许可。

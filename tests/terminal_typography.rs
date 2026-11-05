@@ -46,7 +46,7 @@ fn mixed_terminal_glyphs_share_a_baseline_and_use_real_weight_faces() {
     let (tx, _) = mpsc::channel();
     let mut backend=TerminalBackend::new(1293,ctx.clone(),tx,BackendSettings {
         shell:"powershell.exe".into(),
-        args:vec!["-NoLogo".into(),"-NoProfile".into(),"-Command".into(),"[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false); [Console]::Write(([char]27)+'[2J'+([char]27)+'[H'+'ABCxyz 0123 你好 '+([char]27)+'[1m'+'BOLD '+([char]27)+'[3m'+'SLANT'+([char]27)+'[0m'+' DONE'); Start-Sleep -Seconds 20".into()],
+        args:vec!["-NoLogo".into(),"-NoProfile".into(),"-Command".into(),"[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false); [Console]::Write(([char]27)+'[2J'+([char]27)+'[H'+'ABCxyz 0123 你好 '+([char]27)+'[1m'+'BOLD '+([char]27)+'[0;3m'+'ITALIC '+([char]27)+'[1;3m'+'BOTH'+([char]27)+'[0m'+' DONE'); Start-Sleep -Seconds 20".into()],
         ..Default::default()
     }).unwrap();
     let deadline = Instant::now() + Duration::from_secs(8);

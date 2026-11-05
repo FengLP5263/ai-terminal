@@ -12,6 +12,8 @@ ORIGINAL_TEXT = {'CLAUDE.md', 'assets/fonts/LICENSE.md'}
 
 # These locally authored vendor patch notes preserve original upstream materials.
 VENDOR_PAIRS = (
+    ('vendor/alacritty_terminal/UPSTREAM.zh.md', 'vendor/alacritty_terminal/UPSTREAM.md'),
+    ('vendor/vte/UPSTREAM.zh.md', 'vendor/vte/UPSTREAM.md'),
     ('vendor/egui_term/UPSTREAM.zh.md', 'vendor/egui_term/UPSTREAM.en.md'),
     ('vendor/egui-winit/UPSTREAM.zh.md', 'vendor/egui-winit/UPSTREAM.md'),
     ('vendor/egui_glow/UPSTREAM.zh.md', 'vendor/egui_glow/UPSTREAM.md'),

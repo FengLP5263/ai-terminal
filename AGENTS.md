@@ -19,7 +19,7 @@ Windows 原生 Agent 终端管理器。只做项目／会话导航、真实终�
 
 ## 源码与兼容性
 
-- 生产源码为 `src/` 及 `vendor/egui_term/src/`、`vendor/egui-winit/src/`、`vendor/egui_glow/src/`、`vendor/winit/src/` 中的本地补丁；字体为 `assets/fonts/`。不为治理重排源码。
+- 生产源码为 `src/` 及 `vendor/egui_term/src/`、`vendor/egui-winit/src/`、`vendor/egui_glow/src/`、`vendor/winit/src/`、`vendor/alacritty_terminal/src/`、`vendor/vte/src/` 中的本地补丁；字体为 `assets/fonts/`。不为治理重排源码。
 - `src/bin/ai-terminal-hook.rs` 必须保持独立、轻量，不初始化字体或 GPU。
 - 状态只来自 Agent 明确的生命周期／交互通知与进程退出。不得用输出静默、铃声或进程存在判断完成。
 - 点开会话保留现有运行进程，未启动时直接打开其 Shell，并清除未读；绿点表示本轮完成且尚未查看，查看后消失，不等于项目验收通过。

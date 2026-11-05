@@ -35,3 +35,7 @@ package 会调用 Cargo release 构建，生成独立版本目录和 ZIP，记�
 本地 winit 补丁的 Cargo 清单、build.rs、Rust 源码及嵌入资产也必须计入源码身份；保留上游 Apache-2.0 许可证和双语 UPSTREAM 来源记录，并通过 Cargo metadata 收集进依赖许可证清单。
 
 图标来源和可获得的原始许可保存在 ZIP 的 agent-icons/，双语 THIRD_PARTY_NOTICES 也随包携带。按 SOURCE.json 的逐文件来源核查许可范围，不把独立官方品牌资产套用 Lobe MIT；回读包内清单与许可原文。统一 Windows／POSIX 入口和参数不变。
+
+0.4.9 的 alacritty_terminal／vte 本地协议补丁也纳入 Cargo 清单与 Rust 源文件摘要，原始 Apache-2.0／MIT 许可通过依赖清单收集。打包回归必须证明修改这两个 crate 的生产源码会改变 source_sha256。
+
+0.4.9-preview.3 默认内嵌 Cascadia Mono 四种静态字形，中文用系统 Microsoft YaHei UI；不重新启用 preview.1 的 GDI classic 拟合。package 核对 assets/fonts/SOURCE.json 的全部字节与哈希，并复制原始 Cascadia OFL 和字体来源；verify-package 保留旧包兼容，新包声明 fonts 元数据时要求完整来源与许可。Windows／POSIX 入口和参数不变。

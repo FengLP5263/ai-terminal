@@ -14,6 +14,9 @@ use std::sync::{
 pub fn viewport_id() -> egui::ViewportId {
     egui::ViewportId::from_hash_of("session-status-bar")
 }
+pub fn hint_viewport_id() -> egui::ViewportId {
+    egui::ViewportId::from_hash_of("session-status-hint")
+}
 #[derive(Clone, Debug, PartialEq)]
 pub struct Item {
     pub id: String,
@@ -41,6 +44,7 @@ pub struct FloatingBar {
     receiver: Receiver<Action>,
     icons: Icons,
     placement_request: Arc<Mutex<Option<[f32; 2]>>>,
+    hint: Arc<Mutex<Option<HoverHint>>>,
 }
 impl FloatingBar {
     pub fn new(icons: Icons) -> Self {
@@ -51,6 +55,7 @@ impl FloatingBar {
             receiver,
             icons,
             placement_request: Arc::new(Mutex::new(None)),
+            hint: Arc::new(Mutex::new(None)),
         }
     }
     pub fn update(&self, snapshot: Snapshot, ctx: &egui::Context) {
@@ -64,6 +69,9 @@ impl FloatingBar {
         self.receiver.try_iter().take(32).collect()
     }
     pub fn show(&self, ctx: &egui::Context, position: Option<[f32; 2]>) {
+        #[cfg(windows)]
+        crate::floating_hint::show(ctx, self.hint.lock().unwrap().clone());
+        let hover = self.hint.clone();
         let snapshot = self.snapshot.clone();
         let sender = self.sender.clone();
         let icons = self.icons.clone();
@@ -126,10 +134,12 @@ impl FloatingBar {
             };
             let snapshot = snapshot.lock().unwrap().clone();
             let (action, hint) = body_with_hint(ui, &snapshot, &icons);
-            #[cfg(windows)]
-            crate::floating_native::hint(ui.ctx(), hint.as_ref());
-            #[cfg(not(windows))]
-            let _ = hint;
+            let mut current_hint = hover.lock().unwrap();
+            if *current_hint != hint {
+                *current_hint = hint;
+                ui.ctx().request_repaint_of(egui::ViewportId::ROOT);
+            }
+            drop(current_hint);
             if let Some(action) = action {
                 dispatch(&sender, ui.ctx(), action);
             }
@@ -168,7 +178,7 @@ pub fn status_color(activity: Activity) -> Color32 {
 pub fn body(ui: &mut egui::Ui, snapshot: &Snapshot, icons: &Icons) -> Option<Action> {
     body_with_hint(ui, snapshot, icons).0
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) struct HoverHint {
     pub text: String,
     pub anchor: Pos2,

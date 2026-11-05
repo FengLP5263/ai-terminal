@@ -7,7 +7,8 @@
 | egui_term 本地快照 | MIT | vendor/egui_term/LICENSE、UPSTREAM.md，固定上游 revision |
 | Alacritty terminal | Apache-2.0 | Cargo.lock 锁定；上游 https://github.com/alacritty/alacritty |
 | egui / eframe | MIT OR Apache-2.0 | Cargo.lock 锁定；上游 https://github.com/emilk/egui |
-| Hack v3.003 四种字形 | 以原文件为准（MIT／Bitstream Vera 条款） | assets/fonts/LICENSE.md、SOURCE.json |
+| Cascadia Mono v2407.24 四种字形（默认） | SIL Open Font License 1.1 | 微软官方发布包；assets/fonts/LICENSE-Cascadia.txt、SOURCE.json |
+| Hack v3.003 四种字形（对比样例） | 以原文件为准（MIT／Bitstream Vera 条款） | assets/fonts/LICENSE.md、SOURCE.json |
 | 其他 Rust 依赖 | 以各 Cargo 元数据和原文件为准 | package 清单记录版本、声明与可找到的许可证 |
 
 Windows 系统字体只在运行时读取，不随包复制。项目 LICENSE 适用于本项目代码，不替代第三方许可。

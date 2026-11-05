@@ -98,6 +98,8 @@ Use the gear at the top left to set the language and floating bar. Hover over a 
 
 Interactively launching `powershell`, `cmd` or `bash` through a managed entry updates the avatar to the current shell; `exit` restores each level. Codex/Claude/Qoder CN/Kimi Code/ZCode/TRAE CLI take avatar priority while active, then return to the current shell. One-off scripts and tool commands inside Agents do not change shell identity.
 
+Version 0.4.9 defaults to embedded **Cascadia Mono** with system **Microsoft YaHei UI** for CJK, retaining original native rendering. Regular, bold, italic and bold-italic ship with the app, with no separate Latin font installation. See [third-party notices](THIRD_PARTY_NOTICES.en.md) for provenance and licensing.
+
 ## Frequently asked questions
 
 ### Why is an installed CLI not found?
@@ -154,6 +156,6 @@ Project code is available under the [MIT License](LICENSE). Third-party componen
 
 Agent brand-icon provenance and licenses are recorded per file; see [third-party notices](THIRD_PARTY_NOTICES.en.md). ZIPs include provenance and available original license texts in agent-icons/.
 
-## 0.4.8 update
+## 0.4.9 update
 
-Add Kimi Code native lifecycle and ZCode/TRAE CLI session-scoped task hooks. Fix clipped floating hints and follow ZCode hook states directly. Refresh Chinese and English workspace/floating screenshots. The table above lists support boundaries and icons for all six Agents. See the [bilingual changelog](CHANGELOG.en.md) for changes, upgrade notes and verification scope. Each release ZIP includes both files.
+Fix false Qoder automatic-permission status, TUI cursor queries and wide-character block cursors, color emoji in floating hints, and intermittent overlapping/flashing text. Default to Cascadia Mono plus Microsoft YaHei UI, retaining natural rendering and existing session directories. See the [changelog](CHANGELOG.en.md) for scope and [0.4.9 rendering checks](docs/rendering-0.4.9.en.md) for controlled reproduction images and user acceptance. Release ZIPs include both changelogs and third-party licenses.

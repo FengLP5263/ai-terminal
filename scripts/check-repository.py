@@ -52,7 +52,9 @@ def check():
             if personal.search(text):errors.append('personal absolute path: '+name)
             if path.suffix=='.ps1' and any(ord(c)>127 for c in text) and not path.read_bytes().startswith(b'\xef\xbb\xbf'):
                 errors.append('PowerShell Chinese text needs UTF-8 BOM: '+name)
-            if path.suffix=='.md':
+            # Published crate READMEs can reference files omitted upstream.
+            # Validate project-authored vendor provenance, preserve original docs.
+            if path.suffix=='.md' and (not name.startswith('vendor/') or path.name.startswith('UPSTREAM')):
                 for target in re.findall(r'\]\(([^)]+)\)',text):
                     target=target.strip('<>').split('#',1)[0]
                     if not target or '://' in target or target.startswith(('/', '${', '%')):continue
@@ -85,7 +87,7 @@ def check():
 def main():
     argparse.ArgumentParser(description=__doc__,formatter_class=argparse.RawDescriptionHelpFormatter).parse_args()
     paths,errors,bilingual_pairs=check()
-    report={'ok':not errors,'candidate_files':len(paths),'font_identities_checked':5,'icon_identities_checked':len(json.loads((ROOT/'assets/icons/SOURCE.json').read_text(encoding='utf-8'))['files']),'branding_identities_checked':3,'native_console_identities_checked':3,'bilingual_document_pairs_checked':len(bilingual_pairs),'errors':errors}
+    report={'ok':not errors,'candidate_files':len(paths),'font_identities_checked':len(json.loads((ROOT/'assets/fonts/SOURCE.json').read_text(encoding='utf-8'))['files']),'icon_identities_checked':len(json.loads((ROOT/'assets/icons/SOURCE.json').read_text(encoding='utf-8'))['files']),'branding_identities_checked':3,'native_console_identities_checked':3,'bilingual_document_pairs_checked':len(bilingual_pairs),'errors':errors}
     print(json.dumps(report,ensure_ascii=False,indent=2))
     return 1 if errors else 0
 

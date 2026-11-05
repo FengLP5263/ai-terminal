@@ -101,6 +101,74 @@ fn key(key: Key) -> Event {
 }
 
 #[test]
+fn unknown_viewport_geometry_does_not_resize_conpty_to_the_default_canvas() {
+    let ctx = egui::Context::default();
+    ai_terminal::appearance::setup(&ctx);
+    let mut backend = terminal(&ctx, "Start-Sleep -Seconds 20");
+    let before: egui_term::WindowSize = backend.sync().terminal_size.into();
+    let _ = ctx.run_ui(egui::RawInput::default(), |ui| {
+        let view = TerminalView::new(ui, &mut backend)
+            .set_font(ai_terminal::appearance::terminal_font(14.0));
+        ui.add(view);
+    });
+    let after: egui_term::WindowSize = backend.sync().terminal_size.into();
+    assert_eq!(
+        (after.num_cols, after.num_lines),
+        (before.num_cols, before.num_lines)
+    );
+    frame(&ctx, &mut backend, vec![], false);
+    let real: egui_term::WindowSize = backend.sync().terminal_size.into();
+    assert_ne!(
+        (real.num_cols, real.num_lines),
+        (before.num_cols, before.num_lines),
+        "real viewport resize remains enabled"
+    );
+}
+
+#[test]
+fn sizing_and_invisible_layouts_do_not_resize_the_live_terminal() {
+    let ctx = egui::Context::default();
+    ai_terminal::appearance::setup(&ctx);
+    let mut backend = terminal(&ctx, "Start-Sleep -Seconds 20");
+    frame(&ctx, &mut backend, vec![], false);
+    let before: egui_term::WindowSize = backend.sync().terminal_size.into();
+    for sizing in [true, false] {
+        let _ = ctx.run_ui(
+            egui::RawInput {
+                screen_rect: Some(egui::Rect::from_min_size(
+                    egui::Pos2::ZERO,
+                    egui::vec2(800.0, 500.0),
+                )),
+                ..Default::default()
+            },
+            |ui| {
+                let builder = egui::UiBuilder::new().max_rect(egui::Rect::from_min_size(
+                    egui::Pos2::ZERO,
+                    egui::vec2(9000.0, 9000.0),
+                ));
+                let builder = if sizing {
+                    builder.sizing_pass()
+                } else {
+                    builder.invisible()
+                };
+                ui.scope_builder(builder, |ui| {
+                    let view = TerminalView::new(ui, &mut backend)
+                        .set_font(ai_terminal::appearance::terminal_font(14.0))
+                        .set_size(egui::vec2(9000.0, 9000.0));
+                    ui.add(view);
+                });
+            },
+        );
+        let after: egui_term::WindowSize = backend.sync().terminal_size.into();
+        assert_eq!(
+            (after.num_cols, after.num_lines),
+            (before.num_cols, before.num_lines),
+            "a measurement-only pass resized the live ConPTY"
+        );
+    }
+}
+
+#[test]
 fn repaint_preserves_chinese_composition() {
     let ctx = egui::Context::default();
     let mut backend = terminal(&ctx, "Start-Sleep -Seconds 20");
@@ -304,6 +372,53 @@ fn renderer_honors_requested_beam_cursor() {
         }),
         "the requested caret was painted as a solid character block"
     );
+}
+
+#[test]
+fn wide_character_cursor_inverts_the_cell_color_above_both_backgrounds() {
+    let ctx = egui::Context::default();
+    let mut backend = terminal(
+        &ctx,
+        "[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false); $e=[char]27; [Console]::Write($e+'[2J'+$e+'[H'+$e+']12;#000000'+[char]7+$e+'[48;2;48;48;48m然后还有这个问题'+$e+'[0m'+$e+'[3;1HCURSOR_READY'+$e+'[1;15H'+$e+'[2 q'); Start-Sleep -Seconds 20",
+    );
+    frame(&ctx, &mut backend, vec![], false);
+    wait_text(&mut backend, "CURSOR_READY");
+    for scale in [1.0, 1.03, 1.1, 1.5] {
+        ctx.set_zoom_factor(scale);
+        frame(&ctx, &mut backend, vec![], false);
+        let output = frame(&ctx, &mut backend, vec![], false);
+        let size = backend.sync().terminal_size;
+        let cursor = output
+            .shapes
+            .iter()
+            .position(|s| {
+                matches!(&s.shape,
+                    egui::Shape::Rect(r) if r.fill == egui::Color32::BLACK
+                        && (r.rect.width()-size.cell_width*2.0).abs()<0.1
+                        && (r.rect.height()-size.cell_height).abs()<0.1
+                )
+            })
+            .expect("full two-cell black cursor");
+        assert!(
+            output
+                .shapes
+                .iter()
+                .enumerate()
+                .all(|(i, s)| !matches!(&s.shape,
+                    egui::Shape::Rect(r) if r.fill == egui::Color32::from_gray(48)
+                ) || i < cursor),
+            "wide spacer background covered cursor at {scale}"
+        );
+        assert!(
+            output.shapes[cursor + 1..]
+                .iter()
+                .any(|s| matches!(&s.shape,
+                    egui::Shape::Text(t) if t.galley.job.text == "题"
+                        && t.override_text_color == Some(egui::Color32::from_gray(48))
+                )),
+            "inverted glyph must use its gray cell background at {scale}"
+        );
+    }
 }
 
 #[test]
@@ -691,8 +806,7 @@ fn focus_loss_during_composition_does_not_block_input() {
     );
 }
 
-#[test]
-fn cursor_position_queries_receive_exactly_one_report_per_query() {
+fn cursor_position_reports(private: bool) {
     // Interactive CLI agents query the cursor with `ESC[6n` while their stdin is
     // in raw VT mode. The ConPTY passthrough must forward each query to the
     // embedded terminal, which must answer exactly once per query so agents
@@ -709,7 +823,12 @@ fn cursor_position_queries_receive_exactly_one_report_per_query() {
         tx,
         BackendSettings {
             shell: "python.exe".into(),
-            args: vec!["-X".into(), "utf8".into(), fixture.into()],
+            args: vec![
+                "-X".into(),
+                "utf8".into(),
+                fixture.into(),
+                if private { "private" } else { "standard" }.into(),
+            ],
             ..Default::default()
         },
     )
@@ -738,7 +857,7 @@ fn cursor_position_queries_receive_exactly_one_report_per_query() {
     for report in reports {
         let report_text = String::from_utf8_lossy(report);
         let params: Vec<&str> = report_text
-            .strip_prefix('[')
+            .strip_prefix(if private { "[?" } else { "[" })
             .and_then(|rest| rest.strip_suffix('R'))
             .map(|body| body.split(';').collect())
             .unwrap_or_default();
@@ -754,4 +873,13 @@ fn cursor_position_queries_receive_exactly_one_report_per_query() {
             "cursor report has non-numeric coordinates: {bytes:?}"
         );
     }
+}
+
+#[test]
+fn cursor_position_queries_receive_exactly_one_report_per_query() {
+    cursor_position_reports(false);
+}
+#[test]
+fn private_cursor_queries_preserve_the_private_response_prefix() {
+    cursor_position_reports(true);
 }
