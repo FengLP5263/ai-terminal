@@ -34,7 +34,7 @@ fn public_launcher_names_are_discovered_in_extension_order() {
 }
 
 #[test]
-fn identity_only_agents_never_inject_or_copy_user_configuration() {
+fn agent_arguments_are_scoped_and_do_not_write_user_configuration() {
     let root = tempfile::tempdir().unwrap();
     let runtime = root.path().join("runtime");
     let helper = root.path().join("ai-terminal-hook.exe");
@@ -48,11 +48,18 @@ fn identity_only_agents_never_inject_or_copy_user_configuration() {
             color: None,
         };
         let args = launch::agent_arguments(&spec, &runtime, &helper).unwrap();
-        assert!(
-            args.is_empty(),
-            "{} must launch without user-level hook injection",
-            agent.label()
-        );
+        if agent == Agent::Trae {
+            assert!(args.iter().any(|a| a.starts_with("hooks.SessionStart=")));
+            assert!(args.iter().any(|a| a.contains("$env:AI_TERMINAL_HELPER")));
+            assert_eq!(&args[args.len() - 2..], &["resume", "history"]);
+            assert!(
+                !args
+                    .iter()
+                    .any(|a| a.contains("trusted") || a.contains("bypass"))
+            );
+        } else {
+            assert!(args.is_empty());
+        }
     }
     assert!(!runtime.exists());
     for directory in [".kimi-code", ".zcode", ".trae", ".trae-cn"] {

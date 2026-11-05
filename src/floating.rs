@@ -125,7 +125,11 @@ impl FloatingBar {
                     .map(|r| (r.min * ui.ctx().pixels_per_point()).to_array())
             };
             let snapshot = snapshot.lock().unwrap().clone();
-            let action = body(ui, &snapshot, &icons);
+            let (action, hint) = body_with_hint(ui, &snapshot, &icons);
+            #[cfg(windows)]
+            crate::floating_native::hint(ui.ctx(), hint.as_ref());
+            #[cfg(not(windows))]
+            let _ = hint;
             if let Some(action) = action {
                 dispatch(&sender, ui.ctx(), action);
             }
@@ -162,6 +166,19 @@ pub fn status_color(activity: Activity) -> Color32 {
     }
 }
 pub fn body(ui: &mut egui::Ui, snapshot: &Snapshot, icons: &Icons) -> Option<Action> {
+    body_with_hint(ui, snapshot, icons).0
+}
+#[derive(Clone, Debug)]
+pub(crate) struct HoverHint {
+    pub text: String,
+    pub anchor: Pos2,
+}
+fn body_with_hint(
+    ui: &mut egui::Ui,
+    snapshot: &Snapshot,
+    icons: &Icons,
+) -> (Option<Action>, Option<HoverHint>) {
+    let mut hint = None;
     let mut action = None;
     egui::CentralPanel::default()
         .frame(egui::Frame::new().fill(Color32::TRANSPARENT))
@@ -260,54 +277,19 @@ pub fn body(ui: &mut egui::Ui, snapshot: &Snapshot, icons: &Icons) -> Option<Act
                                             } else {
                                                 i18n::activity(snapshot.locale, item.activity)
                                             };
-                                            let hint = format!(
+                                            let hint_text = format!(
                                                 "{} · {} · {}",
                                                 item.name,
                                                 item.agent.label(),
                                                 status
                                             );
-                                            if rail.width() < 240.0 {
-                                                // Paint the hint without a hit-test layer in tiny windows.
-                                                if response.hovered() && !response.dragged() {
-                                                    let painter = ui
-                                                        .ctx()
-                                                        .layer_painter(egui::LayerId::new(
-                                                            egui::Order::Tooltip,
-                                                            egui::Id::new((
-                                                                "floating-hint",
-                                                                &item.id,
-                                                            )),
-                                                        ))
-                                                        .with_clip_rect(rail.shrink(4.0));
-                                                    let rect = Rect::from_min_size(
-                                                        rail.min + Vec2::new(4.0, 4.0),
-                                                        Vec2::new(
-                                                            (rail.width() - 8.0).max(1.0),
-                                                            21.0,
-                                                        ),
-                                                    );
-                                                    painter.rect_filled(
-                                                        rect,
-                                                        4,
-                                                        Color32::from_gray(35),
-                                                    );
-                                                    let text = painter.layout_no_wrap(
-                                                        hint,
-                                                        egui::FontId::proportional(12.0),
-                                                        chrome::TEXT,
-                                                    );
-                                                    painter.galley(
-                                                        rect.min + Vec2::new(4.0, 3.0),
-                                                        text,
-                                                        chrome::TEXT,
-                                                    );
-                                                }
-                                            } else {
-                                                response.clone().on_hover_ui(|ui| {
-                                                    ui.set_max_width(
-                                                        (rail.width() - 16.0).max(20.0),
-                                                    );
-                                                    ui.add(egui::Label::new(hint).truncate());
+                                            if response.hovered()
+                                                && !response.dragged()
+                                                && !response.clicked()
+                                            {
+                                                hint = Some(HoverHint {
+                                                    text: hint_text,
+                                                    anchor: rect.center(),
                                                 });
                                             }
                                             if response.clicked() {
@@ -330,7 +312,7 @@ pub fn body(ui: &mut egui::Ui, snapshot: &Snapshot, icons: &Icons) -> Option<Act
                 },
             );
         });
-    action
+    (action, hint)
 }
 
 /// Position in physical screen pixels; width remains in egui points.
@@ -465,5 +447,47 @@ pub fn restore_main(ctx: &egui::Context) {
         egui::ViewportCommand::Focus,
     ] {
         ctx.send_viewport_cmd_to(egui::ViewportId::ROOT, command);
+    }
+}
+
+#[cfg(test)]
+mod hint_tests {
+    use super::*;
+    #[test]
+    fn short_capsules_request_full_native_hint_without_covering_avatar_hit_targets() {
+        for width in [96.0, 152.0, 488.0] {
+            let ctx = egui::Context::default();
+            appearance::setup(&ctx);
+            let icons = Icons::new(&ctx);
+            let snapshot = Snapshot {
+                items: vec![Item {
+                    id: "one".into(),
+                    name: "PowerShell：较长的会话名称 ✨".into(),
+                    agent: Agent::ZCode,
+                    color: None,
+                    activity: Activity::Working,
+                    unread: false,
+                }],
+                locale: Locale::ZhCn,
+                ..Default::default()
+            };
+            let mut hint = None;
+            for tick in 0..4 {
+                let _ = ctx.run_ui(
+                    egui::RawInput {
+                        screen_rect: Some(Rect::from_min_size(Pos2::ZERO, Vec2::new(width, 48.0))),
+                        time: Some(tick as f64 * 0.1),
+                        events: vec![egui::Event::PointerMoved(Pos2::new(28.0, 24.0))],
+                        ..Default::default()
+                    },
+                    |ui| {
+                        hint = body_with_hint(ui, &snapshot, &icons).1;
+                    },
+                );
+            }
+            let hint = hint.expect("native hint metadata");
+            assert_eq!(hint.text, "PowerShell：较长的会话名称 ✨ · ZCode · 进行中");
+            assert!(hint.anchor.x > 0.0 && hint.anchor.x < width);
+        }
     }
 }

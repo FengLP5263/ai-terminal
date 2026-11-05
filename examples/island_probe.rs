@@ -145,6 +145,17 @@ impl eframe::App for Probe {
                 self.prefs.language = Language::En;
                 i18n::apply(ctx, Language::En);
                 self.snapshot.locale = Locale::En;
+                for (i, item) in self.snapshot.items.iter_mut().take(6).enumerate() {
+                    item.name = [
+                        "Web app ✨",
+                        "API service",
+                        "Release 🚀",
+                        "Documentation",
+                        "Code review",
+                        "Desktop app",
+                    ][i]
+                        .into();
+                }
                 self.stage = 4;
             }
             4 if elapsed > 7.0 => {
@@ -234,26 +245,31 @@ fn main() -> eframe::Result {
             let icons = Icons::new(&cc.egui_ctx);
             let snapshot = Snapshot {
                 items: [
-                    ("长时间开发 👩🏽‍💻", Activity::Working),
-                    ("构建完成 🚀", Activity::Completed),
-                    ("需要确认", Activity::Waiting),
-                    ("运行失败", Activity::Failed),
+                    ("网站开发 ✨", Activity::Working),
+                    ("接口联调", Activity::Waiting),
+                    ("发布准备 🚀", Activity::Completed),
+                    ("文档整理", Activity::Working),
+                    ("代码审查", Activity::Idle),
+                    ("桌面应用", Activity::Failed),
                 ]
                 .into_iter()
                 .enumerate()
                 .map(|(i, (name, activity))| Item {
                     id: format!("session-{i}"),
                     name: name.into(),
-                    agent: if i % 2 == 0 {
-                        ai_terminal::model::Agent::Codex
-                    } else {
-                        ai_terminal::model::Agent::Claude
-                    },
+                    agent: [
+                        ai_terminal::model::Agent::Codex,
+                        ai_terminal::model::Agent::Claude,
+                        ai_terminal::model::Agent::QoderCn,
+                        ai_terminal::model::Agent::Kimi,
+                        ai_terminal::model::Agent::ZCode,
+                        ai_terminal::model::Agent::Trae,
+                    ][i],
                     color: None,
                     activity,
                     unread: true,
                 })
-                .chain((4..12).map(|i| Item {
+                .chain((6..12).map(|i| Item {
                     id: format!("session-{i}"),
                     name: format!("Session {i}"),
                     agent: ai_terminal::model::Agent::Shell,

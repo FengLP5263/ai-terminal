@@ -212,19 +212,13 @@ fn island_clicks_identify_sessions_and_keep_failure_question_and_completion_dist
         .rect
         .center();
     frame(vec![Event::PointerMoved(pos)]);
-    let mut tooltip_seen = false;
     for _ in 0..20 {
         let (out, _) = frame(vec![]);
-        if let Some(rect) = text_rect(&out, "Session 2 👩🏽‍💻 · Codex · Needs attention")
-        {
-            assert!(
-                rect.top() >= 0.0 && rect.bottom() <= 48.0,
-                "tooltip must fit in its native window: {rect:?}"
-            );
-            tooltip_seen = true;
-        }
+        assert!(
+            text_rect(&out, "Session 2 👩🏽‍💻 · Codex · Needs attention").is_none(),
+            "the native hint must not be painted/clipped inside the capsule"
+        );
     }
-    assert!(tooltip_seen, "hover shows the session name and status");
     frame(pointer(pos, true));
     let (_, action) = frame(pointer(pos, false));
     assert_eq!(action, Some(Action::Activate("2".into())));

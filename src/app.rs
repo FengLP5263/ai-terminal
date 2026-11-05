@@ -92,19 +92,28 @@ impl Session {
         };
         self.status.unread = unread;
     }
+    #[cfg(test)]
     fn codex_program(&mut self, state: egui_term::CodexProgramStatus, viewing: bool) {
-        // app=codex is an explicit identity notification even when an absolute
-        // launcher or alias bypassed the session shim. Clear has no app identity.
-        if (!self.display_agent().is_shell() && self.display_agent() != Agent::Codex)
-            || (state == egui_term::CodexProgramStatus::Clear && !self.status.codex_native)
-        {
+        self.program_event(state.into(), viewing);
+    }
+    fn program_event(&mut self, event: egui_term::ProgramEvent, viewing: bool) {
+        if event.state == egui_term::CodexProgramStatus::Clear && !self.status.native_lifecycle {
+            return;
+        }
+        let agent = match event.app {
+            Some(egui_term::ProgramApp::Codex) => Agent::Codex,
+            Some(egui_term::ProgramApp::Kimi) => Agent::Kimi,
+            None if self.status.native_lifecycle => self.display_agent(),
+            None => return,
+        };
+        if !self.display_agent().is_shell() && self.display_agent() != agent {
             return;
         }
         if self.detected_agent.is_none() && self.spec.agent.is_shell() {
-            self.detected_agent = Some(Agent::Codex);
+            self.detected_agent = Some(agent);
             self.status = Status::default();
         }
-        self.status.codex_program(state, viewing);
+        self.status.codex_program(event.state, viewing);
         self.last_event = Some(Instant::now());
     }
     fn event(&mut self, event: &HookEvent, viewing: bool) -> bool {
@@ -199,13 +208,15 @@ impl Session {
                 if process.exited() {
                     return false;
                 }
-                let native_connected = agent == Agent::Codex
-                    && self.detected_agent == Some(Agent::Codex)
+                let native_connected = matches!(agent, Agent::Codex | Agent::Kimi)
+                    && self.detected_agent == Some(agent)
                     && self.invocation.is_none()
-                    && self.status.codex_native;
+                    && self.status.native_lifecycle;
                 self.detected_agent = Some(agent);
-                if let Some(backend) = &self.backend {
-                    backend.set_codex_notifications(agent == Agent::Codex);
+                if let Some(backend) = &self.backend
+                    && !native_connected
+                {
+                    backend.set_codex_notifications(matches!(agent, Agent::Codex | Agent::Kimi));
                 }
                 self.invocation = Some(invocation);
                 self.agent_process = Some(process);
@@ -496,7 +507,8 @@ impl App {
         match result {
             Ok((backend, job, generation)) => {
                 backend.set_codex_notifications(
-                    session.spec.agent.is_shell() || session.spec.agent == Agent::Codex,
+                    session.spec.agent.is_shell()
+                        || matches!(session.spec.agent, Agent::Codex | Agent::Kimi),
                 );
                 session.backend = Some(backend);
                 session.job = Some(job);
@@ -782,8 +794,8 @@ impl App {
                 PtyEvent::Title(title) if title.starts_with(egui_term::CODEX_PROGRAM_EVENT) => {
                     let viewing = focused && self.active.as_deref() == Some(&session.spec.id);
                     if let Some(backend) = &session.backend {
-                        for state in backend.take_codex_program_statuses(&title) {
-                            session.codex_program(state, viewing);
+                        for state in backend.take_program_events(&title) {
+                            session.program_event(state, viewing);
                         }
                     }
                 }
@@ -802,7 +814,7 @@ impl App {
                     if let Some(path) =
                         ai_terminal::shell::directory_from_title(&title, &session.generation)
                     {
-                        if (session.status.codex_native && session.invocation.is_none())
+                        if (session.status.native_lifecycle && session.invocation.is_none())
                             || session.agent_process.as_ref().is_some_and(|p| p.exited())
                         {
                             session.agent_ended();
@@ -1582,7 +1594,7 @@ Send-State 'state=clear'; Wait-Step 5
                     .contains("BYPASS_READY")
             });
             assert_eq!(app.sessions[0].display_agent(), Agent::Shell);
-            assert!(!app.sessions[0].status.codex_native);
+            assert!(!app.sessions[0].status.native_lifecycle);
             let arguments = std::fs::read_to_string(root.path().join("args.txt")).unwrap();
             assert!(arguments.starts_with("--remote|unix://|-C|"));
             assert!(arguments.ends_with("|resume|fixture-history"));
@@ -1598,7 +1610,7 @@ Send-State 'state=clear'; Wait-Step 5
             {
                 std::fs::write(root.path().join(format!("step{step}")), "").unwrap();
                 wait_for_app(&mut app, &ctx, |app| {
-                    app.sessions[0].status.codex_native
+                    app.sessions[0].status.native_lifecycle
                         && app.sessions[0].status.activity == activity
                 });
                 assert_eq!(app.sessions[0].display_agent(), Agent::Codex);
@@ -1611,7 +1623,7 @@ Send-State 'state=clear'; Wait-Step 5
             wait_for_app(&mut app, &ctx, |app| {
                 app.sessions[0].display_agent() == Agent::Shell
             });
-            assert!(!app.sessions[0].status.codex_native);
+            assert!(!app.sessions[0].status.native_lifecycle);
             assert_eq!(app.sessions[0].backend.as_ref().unwrap().pty_id(), pid);
             assert_eq!(app.sessions[0].spec.name, "Custom name");
             assert_eq!(
@@ -1636,12 +1648,91 @@ Send-State 'state=clear'; Wait-Step 5
         });
         session.codex_program(egui_term::CodexProgramStatus::Clear, false);
         assert_eq!(session.display_agent(), Agent::Shell);
-        assert!(!session.status.codex_native);
+        assert!(!session.status.native_lifecycle);
         for agent in [Agent::Claude, Agent::QoderCn] {
             session.detected_agent = Some(agent);
             session.codex_program(egui_term::CodexProgramStatus::Working, false);
             assert_eq!(session.display_agent(), agent);
-            assert!(!session.status.codex_native);
+            assert!(!session.status.native_lifecycle);
+        }
+    }
+    #[test]
+    fn kimi_root_lifecycle_drives_identity_unread_and_cannot_steal_codex() {
+        let mut session = Session::new(SessionSpec {
+            id: "kimi".into(),
+            name: "custom".into(),
+            directory: PathBuf::new(),
+            agent: Agent::Shell,
+            agent_session_id: Some("saved".into()),
+            color: None,
+        });
+        let event = |state| egui_term::ProgramEvent {
+            app: Some(egui_term::ProgramApp::Kimi),
+            state,
+        };
+        session.program_event(event(egui_term::CodexProgramStatus::Clear), false);
+        assert_eq!(session.display_agent(), Agent::Shell);
+        session.program_event(event(egui_term::CodexProgramStatus::Working), false);
+        assert_eq!(session.display_agent(), Agent::Kimi);
+        session.program_event(event(egui_term::CodexProgramStatus::Done), false);
+        assert_eq!(session.status.activity, Activity::Completed);
+        assert!(session.status.unread);
+        session.codex_program(egui_term::CodexProgramStatus::Working, false);
+        assert_eq!(session.display_agent(), Agent::Kimi);
+        assert_eq!(session.status.activity, Activity::Completed);
+        assert_eq!(session.spec.agent_session_id.as_deref(), Some("saved"));
+        session.status.acknowledge();
+        assert!(!session.status.unread);
+        session.agent_ended();
+        assert_eq!(session.display_agent(), Agent::Shell);
+        assert!(!session.status.native_lifecycle);
+    }
+    #[test]
+    fn foreground_hook_agents_follow_events_and_reject_stale_invocations() {
+        for agent in [Agent::ZCode, Agent::Claude, Agent::QoderCn, Agent::Trae] {
+            let mut session = Session::new(SessionSpec {
+                id: "one".into(),
+                name: "one".into(),
+                directory: PathBuf::new(),
+                agent: Agent::Shell,
+                agent_session_id: None,
+                color: None,
+            });
+            session.detected_agent = Some(agent);
+            session.invocation = Some("current".into());
+            let mut event: HookEvent = serde_json::from_value(serde_json::json!({
+                "event_id":"start", "local_id":"one", "generation":"g",
+                "name":"UserPromptSubmit", "session_id":"root", "turn_id":"turn",
+                "background_running":false, "invocation":"stale"
+            }))
+            .unwrap();
+            assert!(!session.event(&event, false));
+            assert_eq!(session.status.activity, Activity::Unknown);
+            event.invocation = Some("current".into());
+            assert!(session.event(&event, false));
+            assert_eq!(session.status.activity, Activity::Working);
+            assert!(!session.status.unread);
+            event.name = "PreToolUse".into();
+            event.tool_name = Some("AskUserQuestion".into());
+            event.tool_use_id = Some("question".into());
+            assert!(session.event(&event, false));
+            assert_eq!(session.status.activity, Activity::Waiting);
+            event.name = "PostToolUse".into();
+            assert!(session.event(&event, false));
+            assert_eq!(session.status.activity, Activity::Working);
+            event.name = "Stop".into();
+            assert!(session.event(&event, false));
+            assert_eq!(session.status.activity, Activity::Completed);
+            assert!(session.status.unread);
+            event.name = "UserPromptSubmit".into();
+            event.turn_id = Some("next".into());
+            assert!(session.event(&event, false));
+            assert_eq!(session.status.activity, Activity::Working);
+            assert!(!session.status.unread);
+            event.name = "StopFailure".into();
+            assert!(session.event(&event, false));
+            assert_eq!(session.status.activity, Activity::Failed);
+            assert!(session.status.unread);
         }
     }
     #[test]
@@ -1739,7 +1830,7 @@ Send-State 'state=clear'; Wait-Step 5
             app.receive_events(&ctx);
             std::thread::sleep(Duration::from_millis(10));
         }
-        assert!(app.sessions[0].status.codex_native);
+        assert!(app.sessions[0].status.native_lifecycle);
         assert!(app.sessions[0].status.unread);
         assert_eq!(app.sessions[1].status.activity, Activity::Unknown);
         app.floating_action(

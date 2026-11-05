@@ -61,3 +61,7 @@ Qoder CN：运行 tests/qoder_cn.rs 的发现、配置、恢复和真实 helper 
 Codex 直接启动回归使用 App 的真实 Shell／ConPTY 和绝对路径伪 codex.cmd，保留 --remote／-C／resume 参数，核对未识别阶段、原生状态、隐藏后台归约、clear 临时交接、返回提示符与重复调用。`shell_switch_probe` 可追加 `codex-direct` 做实际绝对路径／--remote unix:// 启动截图，仅在已信任目录使用，不发送模型提示、不确认信任、不关闭共享后台；截图需人工核对，不等于真实模型回合。
 
 0.4.7 三款新增入口的真实启动用 shell_switch_probe 的 kimi／zcode／traecli 模式，命令见 scripts/README.md；仅向自建窗口输入启动命令，聚焦终端空白区后发送 Esc／Ctrl+C，核查身份和返回 Shell，不输入提示、不接受信任。记录 ZCode 官方或社区发行来源；本机 zcode-app-cli 不等于官方独立 CLI。README 六枚深色底衬头像用 agent_icons_capture 复用正式组件原生生成，不启动 PTY 或 Agent；人工核对后原样复制并记录来源。
+
+0.4.8 预览：Kimi 的真实目录信任页应收到原生 permission 状态，探针只取消，不接受信任。ZCode 的会话级设置快照与 TRAE 的会话参数通过合成 helper／ConPTY 测试核查；启动 TUI 不代表 hook 已获信任或模型回合已通过。ZCode 自定义配置保留、子事件过滤及 camelCase turnId 别名另有回归；缺失的授权／失败／中断事件不得补猜测。readme_capture 的可选 `en` 参数切换控件、名称和终端文本，并等待固定样例末行；公开使用中英文两套主图，逐张人工检查，不采用不完整截图。
+
+原生浮窗提示核查（Windows）：`cargo build --offline --locked --release --example island_hint_probe` 后运行 `target/release/examples/island_hint_probe.exe output/<unique-hint-probe>`。探针只向自己的 egui 窗口输入合成悬停，在 100%／142%／200% 缩放检查完整中英文提示超出胶囊、长名称换行、归属窗口、无激活、鼠标穿透和离开隐藏；生成原生提示 PNG、hook 进行中状态截图与 JSON，不启动 Agent／模型、不操作用户窗口。位置纯函数另覆盖负坐标显示器与工作区边缘。截图需人工检查，合成 hook 状态不等于真实模型请求。

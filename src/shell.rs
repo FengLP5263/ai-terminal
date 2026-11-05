@@ -424,9 +424,12 @@ pub fn run_agent(agent: Agent, args: Vec<OsString>) -> i32 {
         } else {
             launch::agent_arguments(&spec, &runtime, &helper)?
         };
+        let child_environment =
+            crate::integration::environment(agent, &runtime.join(&invocation), &helper);
         keep_launcher_alive();
         notice("ShellAgentStarted", agent, &invocation, None);
         let status = std::process::Command::new(binary)
+            .envs(child_environment)
             .args(injected)
             .args(args)
             .env("AI_TERMINAL_INVOCATION", &invocation)

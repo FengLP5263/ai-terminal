@@ -110,10 +110,18 @@ impl eframe::App for Capture {
             )
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    ai_terminal::ui_text::label(ui, "网站开发 ✨", 14.0, chrome::TEXT);
+                    ai_terminal::ui_text::label(
+                        ui,
+                        &self.snapshot.items[0].name,
+                        14.0,
+                        chrome::TEXT,
+                    );
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         ui.label("100%");
-                        ui.colored_label(chrome::WORKING, "进行中");
+                        ui.colored_label(
+                            chrome::WORKING,
+                            i18n::activity(self.snapshot.locale, Activity::Working),
+                        );
                         ui.colored_label(chrome::SECONDARY, "C:\\Workspace\\web-app");
                     });
                 });
@@ -132,8 +140,15 @@ impl eframe::App for Capture {
                 .cells
                 .iter()
                 .map(|cell| cell.cell.c)
+                // Wide-cell padding is present in the raw grid; compare the
+                // fixed sample without whitespace, for both locales.
+                .filter(|ch| !ch.is_whitespace())
                 .collect::<String>()
-                .contains("AI Terminal")
+                .contains(if self.snapshot.locale == Locale::En {
+                    "Returntoanysessionandpickupwhereyouleftoff."
+                } else {
+                    "回到任何一个会话，继续你的工作。"
+                })
         {
             ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::default()));
             self.requested = true;
@@ -148,6 +163,7 @@ fn main() -> eframe::Result {
         !output.join("workspace.png").exists(),
         "Use a fresh directory"
     );
+    let english = std::env::args().nth(2).as_deref() == Some("en");
     let verify = output.clone();
     eframe::run_native(
         "ai-terminal public README capture",
@@ -161,28 +177,58 @@ fn main() -> eframe::Result {
         },
         Box::new(move |cc| {
             appearance::setup(&cc.egui_ctx);
-            i18n::apply(&cc.egui_ctx, Language::ZhCn);
+            i18n::apply(
+                &cc.egui_ctx,
+                if english {
+                    Language::En
+                } else {
+                    Language::ZhCn
+                },
+            );
             ai_terminal::window_frame::apply_dark(cc);
-            let lines = [
-                "AI Terminal  ·  多会话，也可以从容",
-                "",
-                "› 帮我整理今天的开发任务。",
-                "",
-                "• 三个项目正在并行推进，你可以随时切换回来。",
-                "",
-                "  网站开发    正在完善界面与交互",
-                "  接口联调    有一项操作等待你确认",
-                "  发布准备    构建已完成，等你回来查看",
-                "",
-                "  这次更新",
-                "  ✓ 更清晰的头像与完整的表情 ✨",
-                "  ✓ 跨屏拖动、缩放与窗口恢复更稳定",
-                "  ✓ 紧凑的工作区，也保留舒适的留白",
-                "",
-                "  Ctrl + 滚轮缩放 · 拖动会话排序 · 点击头像返回终端",
-                "",
-                "回到任何一个会话，继续你的工作。",
-            ];
+            let lines = if english {
+                vec![
+                    "AI Terminal  ·  Your agents, one workspace",
+                    "",
+                    "› Keep today's development tasks in view.",
+                    "",
+                    "• Six coding agents. Your familiar terminal.",
+                    "",
+                    "  Web app       Refining the interface and interactions",
+                    "  API service   One action needs your approval",
+                    "  Release       Build complete, ready for your review",
+                    "",
+                    "  Stay in the flow",
+                    "  ✓ Native lifecycle events and session hooks",
+                    "  ✓ Clear avatars and unread completion badges ✨",
+                    "  ✓ Switch sessions without restarting your agents",
+                    "",
+                    "  Ctrl + wheel to zoom · Drag sessions to reorder",
+                    "",
+                    "Return to any session and pick up where you left off.",
+                ]
+            } else {
+                vec![
+                    "AI Terminal  ·  多会话，也可以从容",
+                    "",
+                    "› 帮我整理今天的开发任务。",
+                    "",
+                    "• 六种编程 Agent，在熟悉的终端里继续工作。",
+                    "",
+                    "  网站开发    正在完善界面与交互",
+                    "  接口联调    有一项操作等待你确认",
+                    "  发布准备    构建已完成，等你回来查看",
+                    "",
+                    "  保持专注",
+                    "  ✓ 原生生命周期与会话级任务通知",
+                    "  ✓ 清晰的头像与未读完成标记 ✨",
+                    "  ✓ 随时切换会话，不用重新启动 Agent",
+                    "",
+                    "  Ctrl + 滚轮缩放 · 拖动会话排序",
+                    "",
+                    "回到任何一个会话，继续你的工作。",
+                ]
+            };
             let expression = lines
                 .into_iter()
                 .map(|line| format!("'{}'", line.replace('\'', "''")))
@@ -216,27 +262,66 @@ fn main() -> eframe::Result {
             let snapshot = Snapshot {
                 items: [
                     (
-                        "网站开发 ✨",
+                        if english {
+                            "Web app ✨"
+                        } else {
+                            "网站开发 ✨"
+                        },
                         Agent::Codex,
                         Activity::Working,
                         Some(SessionColor::Blue),
                     ),
                     (
-                        "接口联调",
+                        if english {
+                            "API service"
+                        } else {
+                            "接口联调"
+                        },
                         Agent::Claude,
                         Activity::Waiting,
                         Some(SessionColor::Purple),
                     ),
                     (
-                        "发布准备 🚀",
-                        Agent::Codex,
+                        if english {
+                            "Release 🚀"
+                        } else {
+                            "发布准备 🚀"
+                        },
+                        Agent::QoderCn,
                         Activity::Completed,
                         Some(SessionColor::Green),
                     ),
-                    ("文档整理", Agent::Claude, Activity::Idle, None),
+                    (
+                        if english {
+                            "Documentation"
+                        } else {
+                            "文档整理"
+                        },
+                        Agent::Kimi,
+                        Activity::Working,
+                        None,
+                    ),
+                    (
+                        if english {
+                            "Code review"
+                        } else {
+                            "代码审查"
+                        },
+                        Agent::ZCode,
+                        Activity::Idle,
+                        None,
+                    ),
+                    (
+                        if english {
+                            "Desktop app"
+                        } else {
+                            "桌面应用"
+                        },
+                        Agent::Trae,
+                        Activity::Waiting,
+                        None,
+                    ),
                     ("PowerShell", Agent::Shell, Activity::Idle, None),
-                    ("CMD", Agent::Cmd, Activity::Idle, None),
-                    ("Git Bash", Agent::Bash, Activity::Idle, None),
                 ]
                 .into_iter()
                 .enumerate()
@@ -250,7 +335,7 @@ fn main() -> eframe::Result {
                 })
                 .collect(),
                 active: Some("readme-0".into()),
-                locale: Locale::ZhCn,
+                locale: if english { Locale::En } else { Locale::ZhCn },
             };
             Ok(Box::new(Capture {
                 renderer: egui_term::TextRendererSession::new(&cc.egui_ctx),
