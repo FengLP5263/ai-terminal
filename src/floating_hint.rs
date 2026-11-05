@@ -1,233 +1,227 @@
-//! An owned, non-activating native tooltip can extend beyond the capsule HWND.
+//! An owned non-activating viewport, sharing production text shaping and color emoji.
+use crate::{
+    floating::{HoverHint, hint_viewport_id},
+    ui_text,
+};
+use egui::{Color32, Pos2, Vec2};
 use windows_sys::Win32::{
-    Foundation::{HWND, POINT, RECT},
+    Foundation::{HWND, RECT},
     Graphics::Gdi::*,
-    UI::{Controls::*, WindowsAndMessaging::*},
+    UI::{HiDpi::GetDpiForWindow, WindowsAndMessaging::*},
 };
 
-pub(crate) struct Popup {
-    window: HWND,
-    owner: HWND,
-    text: Vec<u16>,
-    font: HFONT,
-    scale: f32,
-    last: Option<(String, [i32; 4], i32, f32)>,
+fn window(ctx: &egui::Context, title: &str, key: &str) -> Option<HWND> {
+    fn owned(hwnd: HWND) -> bool {
+        let mut pid = 0;
+        unsafe {
+            GetWindowThreadProcessId(hwnd, &mut pid);
+        }
+        pid == std::process::id()
+    }
+    let id = egui::Id::new(key);
+    if let Some(hwnd) = ctx
+        .data_mut(|d| d.get_temp::<usize>(id))
+        .map(|p| p as HWND)
+        .filter(|&h| {
+            if !owned(h) {
+                return false;
+            }
+            let mut buf = [0u16; 128];
+            let n = unsafe { GetWindowTextW(h, buf.as_mut_ptr(), buf.len() as i32) };
+            String::from_utf16_lossy(&buf[..n as usize]) == title
+        })
+    {
+        return Some(hwnd);
+    }
+    struct Find<'a> {
+        title: &'a str,
+        result: Option<HWND>,
+    }
+    unsafe extern "system" fn visit(hwnd: HWND, data: isize) -> i32 {
+        if !owned(hwnd) {
+            return 1;
+        }
+        let find = unsafe { &mut *(data as *mut Find<'_>) };
+        let mut buf = [0u16; 128];
+        let n = unsafe { GetWindowTextW(hwnd, buf.as_mut_ptr(), buf.len() as i32) };
+        if String::from_utf16_lossy(&buf[..n as usize]) == find.title {
+            find.result = Some(hwnd);
+            return 0;
+        }
+        1
+    }
+    let mut find = Find {
+        title,
+        result: None,
+    };
+    unsafe {
+        EnumWindows(Some(visit), &mut find as *mut _ as isize);
+    }
+    if let Some(hwnd) = find.result {
+        ctx.data_mut(|d| d.insert_temp(id, hwnd as usize));
+    }
+    find.result
 }
-impl Popup {
-    pub fn new(owner: HWND) -> Option<Self> {
-        let init = INITCOMMONCONTROLSEX {
-            dwSize: size_of::<INITCOMMONCONTROLSEX>() as u32,
-            dwICC: ICC_WIN95_CLASSES,
-        };
-        // SAFETY: all calls and resources are confined to the owning viewport UI thread.
-        unsafe {
-            if InitCommonControlsEx(&init) == 0 {
-                return None;
-            }
-            let window = CreateWindowExW(
-                WS_EX_TOPMOST
-                    | WS_EX_TOOLWINDOW
-                    | WS_EX_NOACTIVATE
-                    | WS_EX_LAYERED
-                    | WS_EX_TRANSPARENT,
-                TOOLTIPS_CLASSW,
-                std::ptr::null(),
-                WS_POPUP | TTS_ALWAYSTIP | TTS_NOPREFIX | TTS_NOANIMATE | TTS_NOFADE,
-                CW_USEDEFAULT,
-                CW_USEDEFAULT,
-                CW_USEDEFAULT,
-                CW_USEDEFAULT,
-                owner,
-                std::ptr::null_mut(),
-                std::ptr::null_mut(),
-                std::ptr::null(),
-            );
-            if window.is_null() {
-                return None;
-            }
-            let mut popup = Self {
-                window,
-                owner,
-                text: vec![0],
-                font: std::ptr::null_mut(),
-                scale: 0.0,
-                last: None,
-            };
-            SetLayeredWindowAttributes(window, 0, 255, LWA_ALPHA);
-            // Classic tooltip colors are predictable across system light/dark themes.
-            let empty = [0u16];
-            SetWindowTheme(window, empty.as_ptr(), empty.as_ptr());
-            SendMessageW(window, TTM_SETTIPBKCOLOR, 0x232323, 0);
-            SendMessageW(window, TTM_SETTIPTEXTCOLOR, 0xeeeeee, 0);
-            let margin = RECT {
-                left: 7,
-                top: 5,
-                right: 7,
-                bottom: 5,
-            };
-            SendMessageW(window, TTM_SETMARGIN, 0, &margin as *const _ as isize);
-            let info = popup.info();
-            if SendMessageW(window, TTM_ADDTOOLW, 0, &info as *const _ as isize) == 0 {
-                return None;
-            }
-            Some(popup)
+fn anchor(owner: HWND, zoom: f32) -> Option<([i32; 4], [i32; 4], f32)> {
+    let mut bar = RECT::default();
+    let mut work = MONITORINFO {
+        cbSize: size_of::<MONITORINFO>() as u32,
+        ..Default::default()
+    };
+    unsafe {
+        if GetWindowRect(owner, &mut bar) == 0
+            || GetMonitorInfoW(
+                MonitorFromWindow(owner, MONITOR_DEFAULTTONEAREST),
+                &mut work,
+            ) == 0
+        {
+            return None;
         }
+        let scale = GetDpiForWindow(owner) as f32 / 96.0 * zoom;
+        Some((
+            [bar.left, bar.top, bar.right, bar.bottom],
+            [
+                work.rcWork.left,
+                work.rcWork.top,
+                work.rcWork.right,
+                work.rcWork.bottom,
+            ],
+            scale.max(0.1),
+        ))
     }
-    fn info(&mut self) -> TTTOOLINFOW {
-        TTTOOLINFOW {
-            // V2 excludes lpReserved and works with both classic and themed controls.
-            cbSize: std::mem::offset_of!(TTTOOLINFOW, lpReserved) as u32,
-            uFlags: TTF_TRACK | TTF_ABSOLUTE,
-            hwnd: self.owner,
-            uId: 1,
-            lpszText: self.text.as_mut_ptr(),
-            ..Default::default()
-        }
+}
+pub fn show(ctx: &egui::Context, hint: Option<HoverHint>) {
+    let Some(hint) = hint else {
+        return;
+    };
+    let Some(owner) = window(ctx, "ai-terminal status", "floating-native-hwnd") else {
+        return;
+    };
+    let Some((bar, work, scale)) = anchor(owner, ctx.zoom_factor()) else {
+        return;
+    };
+    let text: String = hint
+        .text
+        .chars()
+        .take(2048)
+        .map(|c| if c == '\0' { ' ' } else { c })
+        .collect();
+    let max_width = 420.0f32
+        .min((work[2] - work[0]) as f32 / scale - 16.0)
+        .max(32.0);
+    let rows = (((work[3] - work[1]) as f32 / scale - 12.0) / 16.0).clamp(1.0, 64.0) as usize;
+    let galley = ui_text::layout_rows(
+        ctx,
+        &text,
+        12.0,
+        Color32::from_rgb(238, 238, 238),
+        max_width,
+        rows,
+    );
+    let initial = galley.size() + Vec2::new(16.0, 12.0);
+    let physical = origin_for(
+        bar,
+        bar[0] + (hint.anchor.x * scale).round() as i32,
+        [
+            (initial.x * scale).ceil() as i32,
+            (initial.y * scale).ceil() as i32,
+        ],
+        work,
+        (6.0 * scale).round() as i32,
+    );
+    let exists = ctx.input(|i| i.raw.viewports.contains_key(&hint_viewport_id()));
+    let mut builder = egui::ViewportBuilder::default()
+        .with_title("ai-terminal hint")
+        .with_icon(crate::appearance::window_icon())
+        .with_decorations(false)
+        .with_transparent(true)
+        .with_resizable(false)
+        .with_taskbar(false)
+        .with_active(false)
+        .with_mouse_passthrough(true)
+        .with_always_on_top();
+    if !exists {
+        builder = builder
+            .with_inner_size(initial)
+            .with_position([physical[0] as f32 / scale, physical[1] as f32 / scale]);
     }
-    pub fn hide(&mut self) {
-        if self.last.take().is_some() {
-            let info = self.info();
-            unsafe {
-                SendMessageW(
-                    self.window,
-                    TTM_TRACKACTIVATE,
-                    0,
-                    &info as *const _ as isize,
+    let owner = owner as usize;
+    ctx.show_viewport_deferred(hint_viewport_id(), builder, move |ui, _| {
+        let owner = owner as HWND;
+        egui::CentralPanel::default()
+            .frame(egui::Frame::new().fill(Color32::from_rgb(35, 35, 35)))
+            .show(ui, |ui| {
+                let Some((bar, work, scale)) = anchor(owner, ui.ctx().zoom_factor()) else {
+                    return;
+                };
+                let width = 420.0f32
+                    .min((work[2] - work[0]) as f32 / scale - 16.0)
+                    .max(32.0);
+                let galley = ui_text::layout_rows(
+                    ui.ctx(),
+                    &text,
+                    12.0,
+                    Color32::from_rgb(238, 238, 238),
+                    width,
+                    rows,
                 );
-            }
-        }
-    }
-    pub fn show(&mut self, hint: &crate::floating::HoverHint, scale: f32) {
-        let mut bar = RECT::default();
-        let mut origin = POINT::default();
-        let mut work = MONITORINFO {
-            cbSize: size_of::<MONITORINFO>() as u32,
-            ..Default::default()
-        };
-        unsafe {
-            if GetClientRect(self.owner, &mut bar) == 0
-                || ClientToScreen(self.owner, &mut origin) == 0
-                || GetMonitorInfoW(
-                    MonitorFromWindow(self.owner, MONITOR_DEFAULTTONEAREST),
-                    &mut work,
-                ) == 0
-            {
-                self.hide();
-                return;
-            }
-        }
-        let bar = [
-            origin.x,
-            origin.y,
-            origin.x + bar.right,
-            origin.y + bar.bottom,
-        ];
-        let anchor = origin.x + (hint.anchor.x * scale).round() as i32;
-        let signature = (hint.text.clone(), bar, anchor, scale);
-        if self.last.as_ref() == Some(&signature) {
-            return;
-        }
-        unsafe {
-            if self.scale != scale {
-                let face: Vec<u16> = "Segoe UI\0".encode_utf16().collect();
-                let font = CreateFontW(
-                    -(12.0 * scale).round() as i32,
-                    0,
-                    0,
-                    0,
-                    FW_NORMAL as i32,
-                    0,
-                    0,
-                    0,
-                    DEFAULT_CHARSET as u32,
-                    OUT_DEFAULT_PRECIS as u32,
-                    CLIP_DEFAULT_PRECIS as u32,
-                    CLEARTYPE_QUALITY as u32,
-                    DEFAULT_PITCH as u32,
-                    face.as_ptr(),
+                let size = galley.size() + Vec2::new(16.0, 12.0);
+                let pos = Pos2::new(8.0, 6.0);
+                ui.painter()
+                    .galley(pos, galley.clone(), Color32::from_rgb(238, 238, 238));
+                ui_text::paint_emoji(
+                    ui.painter(),
+                    pos,
+                    &galley,
+                    12.0,
+                    Color32::from_rgb(238, 238, 238),
                 );
-                if !font.is_null() {
-                    SendMessageW(self.window, WM_SETFONT, font as usize, 0);
-                    if !self.font.is_null() {
-                        DeleteObject(self.font);
+                if let Some(hwnd) = window(ui.ctx(), "ai-terminal hint", "floating-hint-hwnd") {
+                    let dimensions = [
+                        (size.x * scale).ceil() as i32,
+                        (size.y * scale).ceil() as i32,
+                    ];
+                    let place = origin_for(
+                        bar,
+                        bar[0] + (hint.anchor.x * scale).round() as i32,
+                        dimensions,
+                        work,
+                        (6.0 * scale).round() as i32,
+                    );
+                    unsafe {
+                        let style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+                        let required =
+                            (WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW | WS_EX_TRANSPARENT) as isize;
+                        if style & required != required {
+                            SetWindowLongPtrW(hwnd, GWL_EXSTYLE, style | required);
+                        }
+                        if GetWindow(hwnd, GW_OWNER) != owner {
+                            SetWindowLongPtrW(hwnd, GWLP_HWNDPARENT, owner as isize);
+                        }
+                        let mut rect = RECT::default();
+                        if GetWindowRect(hwnd, &mut rect) != 0
+                            && [
+                                rect.left,
+                                rect.top,
+                                rect.right - rect.left,
+                                rect.bottom - rect.top,
+                            ] != [place[0], place[1], dimensions[0], dimensions[1]]
+                        {
+                            SetWindowPos(
+                                hwnd,
+                                HWND_TOPMOST,
+                                place[0],
+                                place[1],
+                                dimensions[0],
+                                dimensions[1],
+                                SWP_NOACTIVATE,
+                            );
+                            ui.ctx().request_repaint();
+                        }
                     }
-                    self.font = font;
                 }
-                self.scale = scale;
-            }
-            let text: Vec<u16> = hint
-                .text
-                .chars()
-                .take(2048)
-                .map(|c| if c == '\0' { ' ' } else { c })
-                .chain(std::iter::once('\0'))
-                .collect::<String>()
-                .encode_utf16()
-                .collect();
-            let old = std::mem::replace(&mut self.text, text);
-            let info = self.info();
-            let max_width = (420.0 * scale).round() as i32;
-            SendMessageW(
-                self.window,
-                TTM_SETMAXTIPWIDTH,
-                0,
-                max_width
-                    .min(work.rcWork.right - work.rcWork.left - 16)
-                    .max(1) as isize,
-            );
-            SendMessageW(
-                self.window,
-                TTM_UPDATETIPTEXTW,
-                0,
-                &info as *const _ as isize,
-            );
-            drop(old);
-            // Activate only the owned tooltip; neither the capsule nor main window receives focus.
-            SendMessageW(
-                self.window,
-                TTM_TRACKACTIVATE,
-                1,
-                &info as *const _ as isize,
-            );
-            let mut bounds = RECT::default();
-            if GetWindowRect(self.window, &mut bounds) != 0 {
-                let pos = origin_for(
-                    bar,
-                    anchor,
-                    [bounds.right - bounds.left, bounds.bottom - bounds.top],
-                    [
-                        work.rcWork.left,
-                        work.rcWork.top,
-                        work.rcWork.right,
-                        work.rcWork.bottom,
-                    ],
-                    (6.0 * scale).round() as i32,
-                );
-                let packed = (pos[0] as u16 as u32) | ((pos[1] as u16 as u32) << 16);
-                SendMessageW(self.window, TTM_TRACKPOSITION, 0, packed as isize);
-                SetWindowPos(
-                    self.window,
-                    HWND_TOPMOST,
-                    pos[0],
-                    pos[1],
-                    0,
-                    0,
-                    SWP_NOSIZE | SWP_NOACTIVATE,
-                );
-            }
-        }
-        self.last = Some(signature);
-    }
-}
-impl Drop for Popup {
-    fn drop(&mut self) {
-        unsafe {
-            DestroyWindow(self.window);
-            if !self.font.is_null() {
-                DeleteObject(self.font);
-            }
-        }
-    }
+            });
+    });
 }
 
 fn origin_for(bar: [i32; 4], anchor: i32, size: [i32; 2], work: [i32; 4], gap: i32) -> [i32; 2] {

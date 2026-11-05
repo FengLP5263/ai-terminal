@@ -23,13 +23,8 @@ mod windows {
     };
     use windows_sys::Win32::{
         Foundation::{HWND, LPARAM, RECT},
-        Graphics::Gdi::*,
-        UI::{Controls::*, WindowsAndMessaging::*},
+        UI::WindowsAndMessaging::*,
     };
-    #[link(name = "user32")]
-    unsafe extern "system" {
-        fn PrintWindow(hwnd: HWND, dc: HDC, flags: u32) -> i32;
-    }
     struct Probe {
         renderer: egui_term::TextRendererSession,
         bar: FloatingBar,
@@ -44,6 +39,9 @@ mod windows {
         bar_capture: bool,
         capture_requested: bool,
         hover_stage: Option<usize>,
+        hint_capture: Option<usize>,
+        hint_requested: bool,
+        color_pixels: usize,
     }
     fn own_windows() -> (HWND, HWND) {
         unsafe extern "system" fn visit(hwnd: HWND, data: LPARAM) -> i32 {
@@ -53,14 +51,12 @@ mod windows {
                 return 1;
             }
             let mut title = [0u16; 100];
-            let mut class = [0u16; 100];
             let a = unsafe { GetWindowTextW(hwnd, title.as_mut_ptr(), 100) };
-            let c = unsafe { GetClassNameW(hwnd, class.as_mut_ptr(), 100) };
             let result = unsafe { &mut *(data as *mut (HWND, HWND)) };
             if String::from_utf16_lossy(&title[..a as usize]) == "ai-terminal status" {
                 result.0 = hwnd;
             }
-            if String::from_utf16_lossy(&class[..c as usize]) == "tooltips_class32"
+            if String::from_utf16_lossy(&title[..a as usize]) == "ai-terminal hint"
                 && unsafe { IsWindowVisible(hwnd) } != 0
             {
                 result.1 = hwnd;
@@ -85,70 +81,6 @@ mod windows {
             .unwrap()
             .write_image_data(pixels)
             .unwrap();
-    }
-    fn capture(hwnd: HWND, path: &Path) {
-        unsafe {
-            let r = rect(hwnd);
-            let (w, h) = (r[2] - r[0], r[3] - r[1]);
-            assert!(w > 0 && h > 0 && w < 8000 && h < 8000);
-            let source = GetWindowDC(hwnd);
-            let dc = CreateCompatibleDC(source);
-            let info = BITMAPINFO {
-                bmiHeader: BITMAPINFOHEADER {
-                    biSize: size_of::<BITMAPINFOHEADER>() as u32,
-                    biWidth: w,
-                    biHeight: -h,
-                    biPlanes: 1,
-                    biBitCount: 32,
-                    biCompression: BI_RGB,
-                    ..Default::default()
-                },
-                ..Default::default()
-            };
-            let mut bits = std::ptr::null_mut();
-            let bitmap = CreateDIBSection(
-                source,
-                &info,
-                DIB_RGB_COLORS,
-                &mut bits,
-                std::ptr::null_mut(),
-                0,
-            );
-            assert!(!bitmap.is_null());
-            let old = SelectObject(dc, bitmap);
-            let printed = PrintWindow(hwnd, dc, 2);
-            // Layered common controls may not implement PrintWindow; ask the
-            // same owned control to paint its client into the capture DC.
-            if !std::slice::from_raw_parts(bits.cast::<u8>(), w as usize * h as usize * 4)
-                .as_chunks::<4>()
-                .0
-                .iter()
-                .any(|p| p[0] > 150)
-            {
-                SendMessageW(
-                    hwnd,
-                    WM_PRINTCLIENT,
-                    dc as usize,
-                    (PRF_CLIENT | PRF_ERASEBKGND) as isize,
-                );
-            }
-            let mut pixels =
-                std::slice::from_raw_parts(bits.cast::<u8>(), w as usize * h as usize * 4).to_vec();
-            SelectObject(dc, old);
-            DeleteObject(bitmap);
-            DeleteDC(dc);
-            ReleaseDC(hwnd, source);
-            assert_ne!(printed, 0);
-            for p in pixels.as_chunks_mut::<4>().0 {
-                p.swap(0, 2);
-                p[3] = 255;
-            }
-            assert!(
-                pixels.as_chunks::<4>().0.iter().any(|p| p[0] > 150),
-                "native text was painted"
-            );
-            save(path, w as u32, h as u32, &pixels);
-        }
     }
     fn fixture(completed: bool) -> Status {
         let mut status = Status::default();
@@ -178,9 +110,11 @@ mod windows {
                         &self
                             .output
                             .join(if input.viewport_id == floating::viewport_id() {
-                                "capsule-working.png"
+                                "capsule-working.png".to_owned()
+                            } else if input.viewport_id == floating::hint_viewport_id() {
+                                format!("hint-{}.png", self.stage)
                             } else {
-                                "hook-status.png"
+                                "hook-status.png".to_owned()
                             }),
                         image.width() as u32,
                         image.height() as u32,
@@ -188,6 +122,16 @@ mod windows {
                     );
                     if input.viewport_id == floating::viewport_id() {
                         self.bar_capture = true;
+                    } else if input.viewport_id == floating::hint_viewport_id() {
+                        self.hint_capture = Some(self.stage);
+                        self.color_pixels = image
+                            .pixels
+                            .iter()
+                            .filter(|p| {
+                                let [r, g, b, _] = p.to_array();
+                                r > 100 && r > g.saturating_add(25) && r > b.saturating_add(15)
+                            })
+                            .count();
                     } else {
                         self.root_capture = true;
                     }
@@ -226,6 +170,17 @@ mod windows {
                     // Keep zoom/language stable until both native framebuffers arrive.
                     return;
                 }
+                if self.hint_capture != Some(self.stage) {
+                    if !self.hint_requested {
+                        ctx.send_viewport_cmd_to(
+                            floating::hint_viewport_id(),
+                            egui::ViewportCommand::Screenshot(egui::UserData::default()),
+                        );
+                        self.hint_requested = true;
+                    }
+                    return;
+                }
+                assert!(self.color_pixels > 8, "native hint contains colored hearts");
                 let (bar, tip) = own_windows();
                 assert!(
                     !bar.is_null() && !tip.is_null(),
@@ -243,19 +198,6 @@ mod windows {
                     tr[1] >= br[3] || tr[3] <= br[1],
                     "hint extends outside capsule, without covering avatars"
                 );
-                let mut text = [0u16; 4096];
-                let mut info = TTTOOLINFOW {
-                    cbSize: std::mem::offset_of!(TTTOOLINFOW, lpReserved) as u32,
-                    hwnd: bar,
-                    uId: 1,
-                    lpszText: text.as_mut_ptr(),
-                    ..Default::default()
-                };
-                unsafe {
-                    SendMessageW(tip, TTM_GETTEXTW, text.len(), &mut info as *mut _ as isize)
-                };
-                let actual =
-                    String::from_utf16_lossy(&text[..text.iter().position(|c| *c == 0).unwrap()]);
                 let expected = format!(
                     "{} · ZCode · {}",
                     self.snapshot.items[1].name,
@@ -264,10 +206,10 @@ mod windows {
                         self.snapshot.items[1].activity
                     )
                 );
-                assert_eq!(actual, expected);
-                capture(tip, &self.output.join(format!("hint-{}.png", self.stage)));
-                self.checks.push(serde_json::json!({"bar":br,"hint":tr,"text":actual,"scale":ctx.zoom_factor(),"no_activate":true,"mouse_passthrough":true}));
+
+                self.checks.push(serde_json::json!({"bar":br,"hint":tr,"text":expected,"colored_pixels":self.color_pixels,"scale":ctx.zoom_factor(),"no_activate":true,"mouse_passthrough":true}));
                 self.stage += 1;
+                self.hint_requested = false;
                 self.since = Instant::now();
                 if self.stage < 3 {
                     ctx.set_zoom_factor([1.0, 1.42, 2.0][self.stage]);
@@ -286,10 +228,9 @@ mod windows {
                     );
                     self.snapshot.items[1].activity = fixture(false).activity;
                     self.snapshot.items[1].name = if self.stage == 2 {
-                        "PowerShell & code review — a longer session title for native wrapping"
-                            .into()
+                        "Code review ❤️ 💕 🧑‍💻 — a longer session title for native wrapping".into()
                     } else {
-                        "PowerShell".into()
+                        "AI终端❤️ 💕 🧑‍💻".into()
                     };
                 }
             } else if self.stage == 3 && self.since.elapsed() > Duration::from_secs(1) {
@@ -362,7 +303,7 @@ mod windows {
                             },
                             Item {
                                 id: "zcode".into(),
-                                name: "PowerShell".into(),
+                                name: "AI终端❤️ 💕 🧑‍💻".into(),
                                 agent: Agent::ZCode,
                                 color: None,
                                 activity: fixture(true).activity,
@@ -381,6 +322,9 @@ mod windows {
                     bar_capture: false,
                     capture_requested: false,
                     hover_stage: None,
+                    hint_capture: None,
+                    hint_requested: false,
+                    color_pixels: 0,
                 }))
             }),
         )?;

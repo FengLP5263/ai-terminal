@@ -13,11 +13,22 @@ fn is_emoji(cluster: &str) -> bool {
 }
 
 pub fn layout(ui: &Ui, text: &str, size: f32, color: Color32, width: f32) -> Arc<Galley> {
+    layout_rows(ui.ctx(), text, size, color, width, 1)
+}
+
+pub(crate) fn layout_rows(
+    ctx: &egui::Context,
+    text: &str,
+    size: f32,
+    color: Color32,
+    width: f32,
+    rows: usize,
+) -> Arc<Galley> {
     let mut job = egui::text::LayoutJob::default();
     job.wrap.max_width = width.max(1.0);
-    job.wrap.max_rows = 1;
+    job.wrap.max_rows = rows;
     job.wrap.break_anywhere = true;
-    let emoji_face = ui.fonts(|fonts| {
+    let emoji_face = ctx.fonts(|fonts| {
         fonts
             .families()
             .contains(&FontFamily::Name("ui-emoji".into()))
@@ -41,7 +52,7 @@ pub fn layout(ui: &Ui, text: &str, size: f32, color: Color32, width: f32) -> Arc
             },
         );
     }
-    let mut galley = ui.fonts_mut(|fonts| fonts.layout_job(job));
+    let mut galley = ctx.fonts_mut(|fonts| fonts.layout_job(job));
     if has_emoji {
         // TextEdit recolors selected glyph vertices. Degenerate only the transparent
         // outline geometry so selection cannot bring back monochrome emoji ghosts.
@@ -72,8 +83,14 @@ pub fn paint_emoji(
         if !is_emoji(cluster) {
             continue;
         }
-        let from = galley.pos_from_cursor(egui::text::CCursor::new(start));
-        let to = galley.pos_from_cursor(egui::text::CCursor::new(index));
+        let from = galley.pos_from_cursor(egui::text::CCursor {
+            index: egui::text::CharIndex(start),
+            prefer_next_row: true,
+        });
+        let to = galley.pos_from_cursor(egui::text::CCursor {
+            index: egui::text::CharIndex(index),
+            prefer_next_row: false,
+        });
         let rect = Rect::from_min_max(
             origin + from.min.to_vec2(),
             origin + egui::vec2(to.left(), from.bottom()),

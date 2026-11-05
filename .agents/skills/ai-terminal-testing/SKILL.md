@@ -65,3 +65,17 @@ Codex 直接启动回归使用 App 的真实 Shell／ConPTY 和绝对路径伪 c
 0.4.8 预览：Kimi 的真实目录信任页应收到原生 permission 状态，探针只取消，不接受信任。ZCode 的会话级设置快照与 TRAE 的会话参数通过合成 helper／ConPTY 测试核查；启动 TUI 不代表 hook 已获信任或模型回合已通过。ZCode 自定义配置保留、子事件过滤及 camelCase turnId 别名另有回归；缺失的授权／失败／中断事件不得补猜测。readme_capture 的可选 `en` 参数切换控件、名称和终端文本，并等待固定样例末行；公开使用中英文两套主图，逐张人工检查，不采用不完整截图。
 
 原生浮窗提示核查（Windows）：`cargo build --offline --locked --release --example island_hint_probe` 后运行 `target/release/examples/island_hint_probe.exe output/<unique-hint-probe>`。探针只向自己的 egui 窗口输入合成悬停，在 100%／142%／200% 缩放检查完整中英文提示超出胶囊、长名称换行、归属窗口、无激活、鼠标穿透和离开隐藏；生成原生提示 PNG、hook 进行中状态截图与 JSON，不启动 Agent／模型、不操作用户窗口。位置纯函数另覆盖负坐标显示器与工作区边缘。截图需人工检查，合成 hook 状态不等于真实模型请求。
+
+0.4.9：qoder_cn_probe fixture 扩展为 11 张状态图，覆盖自动审批、真实问题、手动等待、工具失败后恢复与迟到通知。island_hint_probe 使用实际 egui 提示视口截图，检查爱心／ZWJ 彩色 emoji、窗口归属、无激活、穿透及离开隐藏。`cargo build --offline --locked --release --example typography_probe` 后运行 `target/release/examples/typography_probe.exe output/<unique-typography-probe>`，用真实 PowerShell ConPTY 固定样例检查 100%／103%／110%／150%／200% 下的中英文、彩色 emoji 与灰色输入区黑色宽字符光标；不启动 Agent／模型或读取用户 profile。terminal_interaction 分别验证普通与私有光标查询，以及中文宽字符的背景／光标／反色字形顺序。原生图片逐张验收，不能仅以回归计数证明观感。
+
+Qoder 未提交输入验收：在已确认信任的目录运行 `target/release/examples/qoder_cn_probe.exe output/<unique-qoder-input> input`，仅输入固定标记、切换 100%／103%／110% 并按一次 Ctrl+C 后重新输入，不发送 Enter 或接受信任；记录四张原生截图、可见标记和真实事件名称。
+
+字体对比：`typography_probe output/<unique-font-check> compare` 打开交互窗口，分别切换三种英文／中文字体及缩放；不保存选择、不改用户工作区。自动截图用第二参数 `hack`／`consolas`／`cascadia`，第三参数可选 `yahei`／`dengxian`（默认微软雅黑 UI），仍捕获五档比例。候选系统字体须已安装；缺少时不能把回退字形冒充该字体。正式 App 仍使用 appearance.rs 默认字体和 0.4.8 原生参数。
+
+preview.3 的 typography_probe 默认使用正式内嵌 Cascadia Mono，而非本机同名字体；hack 模式明确使用原 Hack 字节，Consolas 仍为系统对比。验证常规／粗体／斜体／粗斜体、中文、emoji、100%／103%／110%／150%／200% 和真实 Qoder 未提交输入；不把用户对系统字体样例的选择冒充当前嵌入版本已经目视验收。
+
+Qoder input 探针必须等待已知空输入框占位文本和稳定的未提交标记；仅收到 SessionStart 不足以输入，鉴权／信任页不得继续。此正文匹配仅用于测试就绪，不参与生产状态归约。未完成四帧或被鉴权阻挡时 result.ok=false，不自动登录或授权。
+
+尺寸回归覆盖 terminal_interaction 的测量／未知视口，以及 App 的副窗口隔离（真实 ConPTY）。`qoder_cn_probe ... trace <isolated-directory>` 仅启动一次 CLI、103% 下四次程序化尺寸与最多 128 项布局记录；不发送提示或确认信任。鉴权／信任页截图不能证明真实模型回合通过，防御性布局回归也不能冒充用户重复页面现象已完整复现。
+
+Windows 闪烁核查：构建并运行 render_update_probe（完整命令见 scripts/README.md），用两个无 profile 的本地 PowerShell 固定样例比较表格像素与可见网格哈希；另一块区域变换字号，浮窗和悬停提示由 island_hint_probe 单独核查。覆盖 100%／103%／110%／200% 和较长的 103% 运行，记录探针进程内存、退出码与自身 PTY 回收。result.ok 或进程退出失败均不得通过；受控像素复现与用户真实 Agent 验收分别记录，不调用模型。

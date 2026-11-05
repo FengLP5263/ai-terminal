@@ -24,3 +24,7 @@ Before building, require a unique, dated, categorized, nonempty current Cargo-ve
 Source identity must also cover the local winit patch Cargo manifest, build.rs, Rust sources and embedded assets. Retain its upstream Apache-2.0 license and bilingual UPSTREAM provenance, and collect it in the dependency license inventory through Cargo metadata.
 
 ZIPs include icon provenance and available original licenses in agent-icons/, plus bilingual THIRD_PARTY_NOTICES. Check license scope per SOURCE.json entry rather than assigning Lobe MIT to independent official brand assets; read back packaged provenance and license bytes. Windows/POSIX entry points and arguments are unchanged.
+
+Include the 0.4.9 local alacritty_terminal/vte manifests and Rust sources in source identity; collect original Apache-2.0/MIT licenses through dependency inventory. Packaging regression must prove changes to either crate production source alter source_sha256.
+
+0.4.9-preview.3 embeds four static Cascadia Mono faces by default and uses system Microsoft YaHei UI for CJK; preview.1 GDI classic fitting remains reverted. package checks all asset bytes/hashes against assets/fonts/SOURCE.json and copies the original Cascadia OFL/provenance. verify-package retains old-archive compatibility and requires provenance/license files when new fonts metadata is declared. Windows/POSIX entry points and arguments are unchanged.

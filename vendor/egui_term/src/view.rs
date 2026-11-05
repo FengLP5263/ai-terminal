@@ -73,8 +73,25 @@ impl Widget for TerminalView<'_> {
         if view.snapshot_only {
             view.show(&mut state, &layout, &painter);
         } else {
-            view.resize(&layout)
-                .process_input(&layout, &mut state)
+            // Layout-only passes and the initial unknown 10000-point canvas
+            // are not real terminal sizes. Keep their geometry out of ConPTY.
+            let real_geometry = !ui.is_sizing_pass()
+                && ui.is_visible()
+                && !ui.ctx().will_discard()
+                && ui.input(|i| {
+                    i.raw.screen_rect.is_some_and(|r| {
+                        r.width().is_finite()
+                            && r.height().is_finite()
+                            && r.width() > 0.0
+                            && r.height() > 0.0
+                    })
+                });
+            let view = if real_geometry {
+                view.resize(&layout)
+            } else {
+                view
+            };
+            view.process_input(&layout, &mut state)
                 .show(&mut state, &layout, &painter);
         }
 
@@ -383,6 +400,7 @@ impl<'a> TerminalView<'a> {
             global_bg,
         ))];
         let mut foregrounds = Vec::new();
+        let mut cursor_backgrounds = Vec::new();
         let mut cursors = Vec::new();
         let window_focused = layout.ctx.input(|i| i.focused);
         let active = layout.has_focus() && window_focused;
@@ -433,12 +451,12 @@ impl<'a> TerminalView<'a> {
             if content.cursor_point == indexed.point {
                 match cursor_shape {
                     CursorShape::Block => {
-                        backgrounds.push(Shape::Rect(RectShape::filled(
+                        cursor_backgrounds.push(Shape::Rect(RectShape::filled(
                             rect,
                             CornerRadius::ZERO,
                             cursor_color,
                         )));
-                        fg = global_bg;
+                        fg = bg;
                         bg = cursor_color;
                     }
                     CursorShape::Beam => cursors.push(Shape::Rect(RectShape::filled(
@@ -549,6 +567,7 @@ impl<'a> TerminalView<'a> {
             }
         }
         painter.extend(backgrounds);
+        painter.extend(cursor_backgrounds);
         painter.extend(foregrounds);
         painter.extend(cursors);
         if layout.has_focus() && self.has_focus {

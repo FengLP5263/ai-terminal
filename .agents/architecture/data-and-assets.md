@@ -18,6 +18,7 @@ runtime/ 保存会话级 hook 配置；桥 token 只在进程环境和短消息�
 
 ## 资产与来源
 
+- assets/fonts/CascadiaMono-*.ttf：默认英文／数字字体，微软官方 v2407.24 的四种原始静态字形，SIL OFL 1.1；归档、固定提交、逐文件哈希与原始许可见 SOURCE.json、LICENSE-Cascadia.txt。
 - assets/fonts/Hack-*.ttf：官方 v3.003，来源、大小和 SHA-256 在 SOURCE.json，原许可证 LICENSE.md。
 - assets/branding：项目原创 B「会话叠窗」图标，SVG 与用户选定源字节相同，PNG／ICO 为固定导出；SOURCE.json 记录大小和 SHA-256，治理检查逐项核对。
 - assets/icons：OpenAI／Claude／Qoder 来自 Lobe Icons（MIT）；Kimi Code／ZCode 使用各自官方仓库的产品图标，TRAE 使用官方 CLI 文档站的图标。SOURCE.json 逐文件记录来源、许可声明、原始尺寸、变换、大小与 SHA-256，不跨来源套用许可证。
@@ -72,3 +73,11 @@ Kimi Code 使用官方仓库文档所用的 316×316 PNG，ZCode 使用官方仓
 0.4.7 的 README 支持表使用 assets/readme/agent-*.png：由 examples/agent_icons_capture.rs 原生调用正式头像绘制器，在深色底衬上生成六枚图标，保证浅色／深色文档页面的可读性。PNG 原样复制，逐文件版本、尺寸、SHA-256 与来源保存在 assets/readme/SOURCE.json；不含用户数据或真实模型会话。
 
 0.4.8 预览的 README 主图分别保存中文 workspace.png／floating.png 和英文 workspace.en.png／floating.en.png。四张图均由 Release 原生组件生成，使用合成内容与示例目录，原样复制并逐文件记录版本、语言、尺寸与 SHA-256；英文名称及终端样例也使用英文。ZCode 基础设置快照仅在受管调用的忽略 runtime 目录生成，不含 provider／凭据、自定义命令或会话正文，不改会话持久化格式。
+
+0.4.9 预览：新增本地 alacritty_terminal 0.26.0（Apache-2.0）与 vte 0.15.0（Apache-2.0 OR MIT）发布归档的最小协议补丁。保留原许可与双语来源，Cargo 清单和 src 下的 Rust 文件纳入制品摘要及依赖许可清单。字体文件和来源不变；preview.1 的 GDI classic 笔画拟合在用户目视验收后撤回；preview.2 恢复 0.4.8 默认渲染参数，emoji 同样保留原参数。背景先于块光标和反色字形绘制，宽字符占两格。
+
+0.4.9-preview.3 按用户目视选择采用 Cascadia Mono＋系统微软雅黑 UI，保持原生默认参数和字号。Hack 保留为对比样例；ZIP 附带 Cascadia-LICENSE.txt 与 FONT-SOURCE.json。新包声明字体但缺少来源／许可时拒绝验证，旧包继续可校验。不复制或安装系统中文／UI／emoji 字体。
+
+0.4.9-preview.5：egui_glow 的 CPU 暂存仅保留当前可见绘制的顶点、索引和范围；容量按最大帧复用，不持久化终端正文。新 mesh_batch.rs 与其 vendor 来源记录继续计入制品源码身份。
+
+发布源码中的上游终端录制保留为二进制差异，两个新增 vendor 快照禁止 Git 换行转换；Cascadia 原始许可保留全部字节及原始空白。项目自有源码继续执行正常格式与空白检查。

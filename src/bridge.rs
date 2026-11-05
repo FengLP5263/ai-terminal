@@ -151,6 +151,30 @@ pub fn report_hook() {
         {
             return Ok(());
         }
+        // Qoder puts only the notification's tool identity in details. Never
+        // forward details.input/message, which can contain private content.
+        let notification_detail = |key: &str| {
+            (field("hook_event_name").as_deref() == Some("Notification"))
+                .then(|| value.get("details")?.get(key)?.as_str())
+                .flatten()
+                .map(|s| s.chars().take(200).collect::<String>())
+        };
+        let permission_mode = field("permission_mode").and_then(|mode| {
+            Some(
+                match mode.as_str() {
+                    "default" => "default",
+                    "acceptEdits" | "accept_edits" => "accept_edits",
+                    "auto" => "auto",
+                    "bypassPermissions" | "bypass_permissions" | "yolo" | "YOLO" => {
+                        "bypass_permissions"
+                    }
+                    "dontAsk" | "dont_ask" => "dont_ask",
+                    "plan" => "plan",
+                    _ => return None,
+                }
+                .to_owned(),
+            )
+        });
         let event = HookEvent {
             invocation: std::env::var("AI_TERMINAL_INVOCATION").ok(),
             process_id: None,
@@ -162,9 +186,10 @@ pub fn report_hook() {
             name: field("hook_event_name").unwrap_or_default(),
             session_id: field("session_id").unwrap_or_default(),
             turn_id: field("turn_id").or_else(|| field("turnId")),
-            tool_name: field("tool_name"),
-            tool_use_id: field("tool_use_id"),
+            tool_name: field("tool_name").or_else(|| notification_detail("toolName")),
+            tool_use_id: field("tool_use_id").or_else(|| notification_detail("toolUseId")),
             notification_type: field("notification_type"),
+            permission_mode,
             source: field("source"),
             exit_code: value
                 .get("exit_code")
@@ -212,6 +237,7 @@ mod tests {
             tool_name: None,
             tool_use_id: None,
             notification_type: None,
+            permission_mode: None,
             source: None,
             background_running: false,
             exit_code: None,

@@ -240,7 +240,11 @@ impl Session {
                 return true;
             }
         }
-        self.status.apply(event, viewing)
+        if self.display_agent() == Agent::QoderCn {
+            self.status.apply_qoder(event, viewing)
+        } else {
+            self.status.apply(event, viewing)
+        }
     }
     fn take_resources(&mut self) -> Option<SessionResources> {
         self.shells.clear();
@@ -639,6 +643,9 @@ impl App {
     }
 
     fn background_tick(&mut self, ctx: &egui::Context) {
+        if ctx.viewport_id() != egui::ViewportId::ROOT {
+            return;
+        }
         if self.poll_shutdown(ctx) || self.shutdown_saved {
             return;
         }
@@ -1313,6 +1320,7 @@ impl App {
                                 tool_use_id: None,
                                 notification_type: (name == "Notification")
                                     .then(|| "permission_prompt".into()),
+                                permission_mode: None,
                                 source: if name == "ShellAgentStarted" {
                                     Some(
                                         ["codex", "claude", "qodercn", "kimi", "zcode", "traecli"]
@@ -1409,6 +1417,11 @@ impl eframe::App for App {
         self.background_tick(ctx);
     }
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        // A temporarily missing deferred callback must never render the main
+        // terminal into a floating/hint viewport and resize its live ConPTY.
+        if ui.ctx().viewport_id() != egui::ViewportId::ROOT {
+            return;
+        }
         let began = Instant::now();
         let ctx = ui.ctx().clone();
         if let Some(task) = &self.closing {
@@ -1509,6 +1522,87 @@ fn renderer_info(cc: &eframe::CreationContext<'_>) -> serde_json::Value {
 #[cfg(all(test, windows))]
 mod tests {
     use super::*;
+    #[test]
+    fn secondary_viewports_cannot_relayout_the_main_terminal() {
+        let root = tempfile::tempdir().unwrap();
+        let ctx = egui::Context::default();
+        let creation = eframe::CreationContext::_new_kittest(ctx.clone());
+        let mut app = App::new(&creation, root.path().join("data"), false, false);
+        use_built_helper(&mut app);
+        app.startup_pending = false;
+        app.preferences.sidebar_collapsed = true;
+        app.sessions.push(Session::new(SessionSpec {
+            id: "owner".into(),
+            name: "owner".into(),
+            directory: root.path().into(),
+            agent: Agent::Shell,
+            agent_session_id: None,
+            color: None,
+        }));
+        app.active = Some("owner".into());
+        app.start_session(0, &ctx);
+        app.can_draw = true;
+        let mut frame = eframe::Frame::_new_kittest();
+        let raw = egui::RawInput {
+            screen_rect: Some(egui::Rect::from_min_size(
+                egui::Pos2::ZERO,
+                egui::vec2(1200.0, 800.0),
+            )),
+            ..Default::default()
+        };
+        let _ = ctx.run_ui(raw, |ui| eframe::App::ui(&mut app, ui, &mut frame));
+        let before: egui_term::WindowSize = app.sessions[0]
+            .backend
+            .as_mut()
+            .unwrap()
+            .sync()
+            .terminal_size
+            .into();
+        for id in [
+            ai_terminal::floating::viewport_id(),
+            ai_terminal::floating::hint_viewport_id(),
+        ] {
+            let mut raw = egui::RawInput {
+                viewport_id: id,
+                screen_rect: Some(egui::Rect::from_min_size(
+                    egui::Pos2::ZERO,
+                    egui::vec2(488.0, 240.0),
+                )),
+                ..Default::default()
+            };
+            raw.viewports.insert(id, Default::default());
+            let _ = ctx.run_ui(raw, |ui| eframe::App::ui(&mut app, ui, &mut frame));
+            let after: egui_term::WindowSize = app.sessions[0]
+                .backend
+                .as_mut()
+                .unwrap()
+                .sync()
+                .terminal_size
+                .into();
+            assert_eq!(
+                (after.num_cols, after.num_lines),
+                (before.num_cols, before.num_lines),
+                "a child viewport changed the main ConPTY dimensions"
+            );
+        }
+        let id = ai_terminal::floating::viewport_id();
+        let mut raw = egui::RawInput {
+            viewport_id: id,
+            ..Default::default()
+        };
+        raw.viewports.insert(
+            id,
+            egui::ViewportInfo {
+                minimized: Some(true),
+                ..Default::default()
+            },
+        );
+        let _ = ctx.run_ui(raw, |ui| app.background_tick(ui.ctx()));
+        assert!(
+            app.can_draw,
+            "a minimized child cannot hide the main terminal"
+        );
+    }
     fn wait_for_app(app: &mut App, ctx: &egui::Context, mut ready: impl FnMut(&mut App) -> bool) {
         let deadline = Instant::now() + Duration::from_secs(10);
         loop {
@@ -1712,6 +1806,21 @@ Send-State 'state=clear'; Wait-Step 5
             assert!(session.event(&event, false));
             assert_eq!(session.status.activity, Activity::Working);
             assert!(!session.status.unread);
+            event.name = "Notification".into();
+            event.notification_type = Some("permission_prompt".into());
+            event.permission_mode = Some("auto".into());
+            assert_eq!(session.event(&event, false), agent != Agent::QoderCn);
+            assert_eq!(
+                session.status.activity,
+                if agent == Agent::QoderCn {
+                    Activity::Working
+                } else {
+                    Activity::Waiting
+                }
+            );
+            event.name = "PostToolUse".into();
+            assert!(session.event(&event, false));
+            assert_eq!(session.status.activity, Activity::Working);
             event.name = "PreToolUse".into();
             event.tool_name = Some("AskUserQuestion".into());
             event.tool_use_id = Some("question".into());
@@ -1995,6 +2104,7 @@ Send-State 'state=clear'; Wait-Step 5
                 tool_name: None,
                 tool_use_id: None,
                 notification_type: None,
+                permission_mode: None,
                 source: None,
                 background_running: false,
                 exit_code: None,
@@ -2237,6 +2347,7 @@ Send-State 'state=clear'; Wait-Step 5
             tool_name: None,
             tool_use_id: None,
             notification_type: None,
+            permission_mode: None,
             source: Some(source.into()),
             background_running: false,
             exit_code: None,

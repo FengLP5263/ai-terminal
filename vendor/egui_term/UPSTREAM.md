@@ -85,3 +85,11 @@ Unreleased: native glyph atlas keys exclude foreground/background colors; white 
 Unreleased retirement fix: run old-page cleanup before the glyph-cache hit return. Repeated cache hits in later frames now release retired textures; same-frame shapes retain valid handles. Native regressions verify both the texture free delta and same-frame shape references without adding polling or idle repaint.
 
 0.4.8 preview: OSC 7501 observations retain explicit Codex/Kimi root identity alongside state, accept known optional display fields without storing them, and reject child IDs, duplicate/unknown fields and unrecognized apps. Deduplication includes app identity; the same bounded 32-event queue, epoch filtering and coalesced ROOT wakeup remain. The Codex-only drain accessor remains available. Native hidden-ConPTY regression covers Kimi identity, discarded message metadata and child filtering.
+
+0.4.9: draw all cell backgrounds before two-cell block cursors and invert glyphs using the actual cell background, preventing spacer overpaint. Preview.2 reverts preview.1 GDI classic fitting to 0.4.8 native default rendering parameters, including color emoji. Atlas bounds, premultiplied alpha and nearest-neighbor sampling are preserved.
+
+Font comparison can select a system CJK family (default Microsoft YaHei UI); family changes invalidate the native engine without increasing cache capacity.
+
+0.4.9-preview.3: host default fonts are embedded Cascadia Mono (four faces) and system Microsoft YaHei UI. Native rendering parameters remain at their 0.4.8 defaults.
+
+0.4.9-preview.4: TerminalView suppresses ConPTY resize during sizing/invisible/already discarded passes and when raw screen geometry is unknown or invalid. Input processing remains independent, and visible real-window resizing stays enabled. No history copy, polling or idle repaint is added.
