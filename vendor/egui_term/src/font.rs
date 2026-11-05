@@ -16,12 +16,14 @@ impl Default for FontSettings {
 #[derive(Clone)]
 pub(crate) struct NativeFont {
     pub family: String,
+    pub cjk_family: String,
     pub faces: &'static [&'static [u8]],
 }
 impl std::fmt::Debug for NativeFont {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("NativeFont")
             .field("family", &self.family)
+            .field("cjk_family", &self.cjk_family)
             .field("face_count", &self.faces.len())
             .finish()
     }
@@ -61,8 +63,16 @@ impl TerminalFont {
     pub fn with_native_font(mut self, family: &str, faces: &'static [&'static [u8]]) -> Self {
         self.native = Some(std::sync::Arc::new(NativeFont {
             family: family.into(),
+            cjk_family: "Microsoft YaHei UI".into(),
             faces,
         }));
+        self
+    }
+    /// Select a system CJK face without changing the terminal's Latin cell metrics.
+    pub fn with_native_cjk_font(mut self, family: &str) -> Self {
+        if let Some(font) = &mut self.native {
+            std::sync::Arc::make_mut(font).cjk_family = family.into();
+        }
         self
     }
     pub fn font_type(&self) -> FontId {

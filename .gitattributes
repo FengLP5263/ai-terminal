@@ -13,3 +13,10 @@ Cargo.lock text eol=lf
 assets/windows/conpty/x64/*.dll binary
 assets/windows/conpty/x64/*.exe binary
 assets/windows/conpty/LICENSE.txt -text whitespace=cr-at-eol
+# Preserve published upstream streams and original font-license bytes.
+vendor/alacritty_terminal/** -text
+vendor/vte/** -text
+vendor/alacritty_terminal/UPSTREAM*.md text eol=lf
+vendor/vte/UPSTREAM*.md text eol=lf
+vendor/alacritty_terminal/tests/ref/**/*.recording binary
+assets/fonts/LICENSE-Cascadia.txt -text -whitespace

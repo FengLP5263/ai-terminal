@@ -7,7 +7,8 @@
 | Local egui_term snapshot | MIT | `vendor/egui_term/LICENSE` and `UPSTREAM.md`; fixed upstream revision. |
 | Alacritty terminal | Apache-2.0 | Pinned in `Cargo.lock`; upstream https://github.com/alacritty/alacritty. |
 | egui / eframe | MIT OR Apache-2.0 | Pinned in `Cargo.lock`; upstream https://github.com/emilk/egui. |
-| Four Hack v3.003 faces | Original files govern (MIT / Bitstream Vera terms) | `assets/fonts/LICENSE.md`, `SOURCE.json`. |
+| Four Cascadia Mono v2407.24 faces (default) | SIL Open Font License 1.1 | Microsoft official release archive; `assets/fonts/LICENSE-Cascadia.txt`, `SOURCE.json`. |
+| Four Hack v3.003 faces (comparison fixture) | Original files govern (MIT / Bitstream Vera terms) | `assets/fonts/LICENSE.md`, `SOURCE.json`. |
 | Other Rust dependencies | Their Cargo metadata and original files govern | Package inventory records versions, declarations, and available license text. |
 
 Windows system fonts are read at runtime and not bundled. The project's LICENSE applies to project code and does not replace third-party licenses. Local packaging produces `dependencies.json`, collects available LICENSE/COPYING/NOTICE files, and records missing texts. This notice records provenance and collection scope; it does not claim a complete legal review of all dependencies, runtimes, or distribution methods.

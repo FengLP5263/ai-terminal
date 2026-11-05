@@ -1,0 +1,23 @@
+{
+  "generator": "examples/render_update_probe.rs",
+  "data": "fixed synthetic local filenames and CJK glyph stress; no Agent/model or user profile",
+  "capture": "native GPU framebuffer, copied without editing",
+  "files": {
+    "before.png": {
+      "bytes": 349197,
+      "sha256": "ec812abbaa94eea48853c4b27233087d72a995502d2bb69754344bf765b7b86b",
+      "build_version": "0.4.9-preview.4",
+      "dirty_diagnostic_build": true,
+      "mode": "old per-mesh upload diagnostic, stage 6",
+      "local_evidence": "output/render-overlap-20261105/before/frame-6.png"
+    },
+    "after.png": {
+      "bytes": 207654,
+      "sha256": "bb028d6280c1eaa23657157eaaf9b7703854f168f6df31447ea10fcd72fc618d",
+      "build_version": "0.4.9-preview.5",
+      "dirty_diagnostic_build": true,
+      "mode": "final single-window pixel fixture, stage 511",
+      "local_evidence": "output/render-overlap-20261105/preview5/pixel-103-long/frame-511.png"
+    }
+  }
+}

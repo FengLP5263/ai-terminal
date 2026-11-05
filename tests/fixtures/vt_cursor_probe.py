@@ -54,10 +54,10 @@ def reader():
 t = threading.Thread(target=reader, daemon=True)
 t.start()
 
-sys.stdout.write("\x1b[6n")
+sys.stdout.write("\x1b[?6n" if "private" in sys.argv else "\x1b[6n")
 sys.stdout.flush()
 time.sleep(2)
-sys.stdout.write("\x1b[6n")
+sys.stdout.write("\x1b[?6n" if "private" in sys.argv else "\x1b[6n")
 sys.stdout.flush()
 time.sleep(2)
 stop.set()

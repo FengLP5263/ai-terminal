@@ -2,6 +2,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import shutil
 from pathlib import Path
 import tempfile
 import unittest
@@ -45,7 +46,7 @@ class ArchiveVerification(unittest.TestCase):
     def test_source_identity_covers_window_backend_build_sources_and_glow_shaders(self):
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder)
-            names=['CHANGELOG.md','CHANGELOG.en.md','build.rs','Cargo.toml','Cargo.lock','vendor/egui_term/Cargo.toml','vendor/egui-winit/Cargo.toml','vendor/winit/Cargo.toml','vendor/winit/build.rs','vendor/winit/src/platform_impl/windows/event_loop.rs','vendor/egui_glow/Cargo.toml','vendor/egui_glow/src/painter.rs','vendor/egui_glow/src/shader/fragment.glsl']
+            names=['CHANGELOG.md','CHANGELOG.en.md','build.rs','Cargo.toml','Cargo.lock','vendor/egui_term/Cargo.toml','vendor/alacritty_terminal/Cargo.toml','vendor/vte/Cargo.toml','vendor/egui-winit/Cargo.toml','vendor/winit/Cargo.toml','vendor/winit/build.rs','vendor/winit/src/platform_impl/windows/event_loop.rs','vendor/egui_glow/Cargo.toml','vendor/egui_glow/src/painter.rs','vendor/egui_glow/src/shader/fragment.glsl','vendor/alacritty_terminal/src/term/mod.rs','vendor/vte/src/ansi.rs']
             for name in names:
                 path=root/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(b'original')
             for name in ['src','vendor/egui_term/src','vendor/egui-winit/src','assets/fonts','assets/icons','assets/branding']:(root/name).mkdir(parents=True,exist_ok=True)
@@ -60,6 +61,33 @@ class ArchiveVerification(unittest.TestCase):
             nested=Path(folder)/'nested';nested.mkdir();path=nested/'unsafe.zip';self.fixture(path,unsafe=True)
             with self.assertRaisesRegex(ValueError,'unsafe archive member'):packaging.verify_archive(path)
             self.assertFalse((Path(folder)/'outside.txt').exists())
+
+    def test_font_assets_are_licensed_and_tampering_blocks_packaging(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder)/'root';destination=Path(folder)/'package';destination.mkdir()
+            shutil.copytree(packaging.ROOT/'assets/fonts',root/'assets/fonts')
+            metadata=packaging.font_notices(destination,root)
+            self.assertEqual(metadata['default_latin'],'Cascadia Mono')
+            self.assertEqual((destination/'Cascadia-LICENSE.txt').read_bytes(),(root/'assets/fonts/LICENSE-Cascadia.txt').read_bytes())
+            self.assertEqual((destination/'FONT-SOURCE.json').read_bytes(),(root/'assets/fonts/SOURCE.json').read_bytes())
+            font=root/'assets/fonts/CascadiaMono-Regular.ttf'
+            font.write_bytes(font.read_bytes()+b'tampered')
+            with self.assertRaisesRegex(ValueError,'font asset identity mismatch'):
+                packaging.font_notices(destination,root)
+
+    def test_declared_fonts_require_provenance_and_license_while_old_archives_remain_valid(self):
+        with tempfile.TemporaryDirectory() as folder:
+            old=Path(folder)/'old.zip';self.fixture(old)
+            self.assertTrue(packaging.verify_archive(old)['ok'])
+            new=Path(folder)/'new.zip'
+            with zipfile.ZipFile(old) as source,zipfile.ZipFile(new,'w') as archive:
+                for name in source.namelist():
+                    data=source.read(name)
+                    if name=='manifest.json':
+                        manifest=json.loads(data);manifest['fonts']={'default_latin':'Cascadia Mono'};data=json.dumps(manifest).encode()
+                    archive.writestr(name,data)
+            with self.assertRaisesRegex(ValueError,'font license/provenance incomplete'):
+                packaging.verify_archive(new)
 
     def test_new_package_requires_native_console_companions_and_licenses(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -80,7 +108,7 @@ class ArchiveVerification(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder)/'repo';out=Path(folder)/'package';out.mkdir()
             for name in ['src','vendor/egui_term/src','vendor/egui-winit/src','assets/fonts','assets/icons','assets/branding','assets/windows/conpty/x64']:(root/name).mkdir(parents=True,exist_ok=True)
-            for name in ['CHANGELOG.md','CHANGELOG.en.md','build.rs','Cargo.toml','Cargo.lock','vendor/egui_term/Cargo.toml','vendor/egui-winit/Cargo.toml','vendor/egui_glow/Cargo.toml','vendor/winit/Cargo.toml','vendor/winit/build.rs']:
+            for name in ['CHANGELOG.md','CHANGELOG.en.md','build.rs','Cargo.toml','Cargo.lock','vendor/egui_term/Cargo.toml','vendor/alacritty_terminal/Cargo.toml','vendor/vte/Cargo.toml','vendor/egui-winit/Cargo.toml','vendor/egui_glow/Cargo.toml','vendor/winit/Cargo.toml','vendor/winit/build.rs']:
                 p=root/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(b'fixture')
             native=root/'assets/windows/conpty';files={}
             for name in ['x64/conpty.dll','x64/OpenConsole.exe','LICENSE.txt']:

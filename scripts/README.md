@@ -88,7 +88,7 @@ Codex 原生状态／总览与模式图标（仅 Windows）：构建 `cargo buil
 
 侧栏拖动及失败未读截图（仅 Windows，PowerShell／Git Bash）：`cargo build --offline --locked --release --example sidebar_drag_probe`，再运行 `target/release/examples/sidebar_drag_probe.exe output/<unique-sidebar-drag-probe>`。正式侧栏和浮窗组件、标准 B 图标、固定示例目录；生成展开／收起的未读、已读、拖动卡片和松手排序共八张原生 PNG 及 result.json。只向探针自身 egui 发送合成输入，不启动 PTY、Agent 或模型，不读用户配置、不注入系统鼠标。核对进程退出码、抓取点、卡片让位与红点清除，截图完成不替代视觉检查。
 
-Qoder CN 启动／合成状态截图（仅 Windows，PowerShell／Git Bash）：`cargo build --offline --locked --release --bins --example qoder_cn_probe`；`target/release/examples/qoder_cn_probe.exe output/<unique-qoder-fixture> fixture` 生成七种状态图；省略 fixture 时仅启动已安装的 Qoder CN 并截图，不输入提示或确认信任。默认模式使用当前目录；请在已有可信目录执行。result.json 分别记录 synthetic、hook_connected、事件名称及未发送模型请求，必须核对退出码和实际画面。
+Qoder CN 启动／合成状态截图（仅 Windows，PowerShell／Git Bash）：`cargo build --offline --locked --release --bins --example qoder_cn_probe`；`target/release/examples/qoder_cn_probe.exe output/<unique-qoder-fixture> fixture` 生成十一种状态图；省略 fixture 时仅启动已安装的 Qoder CN 并截图，不输入提示或确认信任。默认模式使用当前目录；请在已有可信目录执行。result.json 分别记录 synthetic、hook_connected、事件名称及未发送模型请求，必须核对退出码和实际画面。
 
 package 另将图标来源清单和可获得的原始许可复制到 ZIP 的 agent-icons/，并附带双语 THIRD_PARTY_NOTICES；品牌资产按来源分别声明，不统一套用 Lobe MIT。Windows／POSIX 的统一入口和参数不变。
 
@@ -97,3 +97,15 @@ package 另将图标来源清单和可获得的原始许可复制到 ZIP 的 age
 0.4.8 预览 README 截图：Release 构建 `readme_capture` 后分别运行 `target/release/examples/readme_capture.exe output/readme-zh` 和 `target/release/examples/readme_capture.exe output/readme-en en`，每次使用全新目录；英文模式同时切换控件、名称及终端合成文本。`island_probe` 一次生成六种 Agent 的中英文浮窗；检查退出码、result.json 和四张实际 PNG 后原样复制到 assets/readme 并更新 SOURCE.json。不是模型验收。
 
 原生浮窗提示核查（Windows）：`cargo build --offline --locked --release --example island_hint_probe` 后运行 `target/release/examples/island_hint_probe.exe output/<unique-hint-probe>`。探针只向自己的 egui 窗口输入合成悬停，在 100%／142%／200% 缩放检查完整中英文提示超出胶囊、长名称换行、归属窗口、无激活、鼠标穿透和离开隐藏；生成原生提示 PNG、hook 进行中状态截图与 JSON，不启动 Agent／模型、不操作用户窗口。位置纯函数另覆盖负坐标显示器与工作区边缘。截图需人工检查，合成 hook 状态不等于真实模型请求。
+
+0.4.9：qoder_cn_probe fixture 扩展为 11 张状态图，覆盖自动审批、真实问题、手动等待、工具失败后恢复与迟到通知。island_hint_probe 使用实际 egui 提示视口截图，检查爱心／ZWJ 彩色 emoji、窗口归属、无激活、穿透及离开隐藏。`cargo build --offline --locked --release --example typography_probe` 后运行 `target/release/examples/typography_probe.exe output/<unique-typography-probe>`，用真实 PowerShell ConPTY 固定样例检查 100%／103%／110%／150%／200% 下的中英文、彩色 emoji 与灰色输入区黑色宽字符光标；不启动 Agent／模型或读取用户 profile。terminal_interaction 分别验证普通与私有光标查询，以及中文宽字符的背景／光标／反色字形顺序。原生图片逐张验收，不能仅以回归计数证明观感。
+
+Qoder 已信任目录输入核查：`target/release/examples/qoder_cn_probe.exe output/<unique-qoder-input> input`。仅输入固定未提交标记、100%／103%／110% 缩放及一次 Ctrl+C 后重新输入，生成四张原生图与可见性记录；绝不发送 Enter 或确认信任，不能冒充真实任务完成验收。
+
+字体对比：`typography_probe output/<unique-font-check> compare` 打开交互窗口，分别切换三种英文／中文字体及缩放；不保存选择、不改用户工作区。自动截图用第二参数 `hack`／`consolas`／`cascadia`，第三参数可选 `yahei`／`dengxian`（默认微软雅黑 UI），仍捕获五档比例。候选系统字体须已安装；缺少时不能把回退字形冒充该字体。正式 App 仍使用 appearance.rs 默认字体和 0.4.8 原生参数。
+
+0.4.9-preview.3 默认内嵌 Cascadia Mono 四种静态字形，中文用系统 Microsoft YaHei UI；不重新启用 preview.1 的 GDI classic 拟合。package 核对 assets/fonts/SOURCE.json 的全部字节与哈希，并复制原始 Cascadia OFL 和字体来源；verify-package 保留旧包兼容，新包声明 fonts 元数据时要求完整来源与许可。Windows／POSIX 入口和参数不变。
+
+Qoder 尺寸诊断：构建 qoder_cn_probe 后运行 `target/release/examples/qoder_cn_probe.exe output/<unique-qoder-trace> trace <isolated-directory>`。只启动一次 CLI，在 103% 下程序化调整四次窗口并记录最多 128 项行列／布局元数据和四张截图；不输入提示、不接受信任。目录信任页或鉴权页与真实模型任务分开记录。
+
+Windows 瞬时错绘核查：`cargo build --offline --locked --release --example render_update_probe`，随后运行 `target/release/examples/render_update_probe.exe output/<unique-render-update> 1.03 48`。可选参数为缩放（0.5–2.5）与 8–512 次截图比较；该探针检查单窗口固定表格；多窗口和悬停提示由 island_hint_probe 单独核查。两个本地 PowerShell 固定样例分别提供文件表格与变换字号的字形区域，不启动 Agent／模型、不读取用户 profile。比较固定表格的逐帧像素和可见网格哈希，保存基线、阶段图、首个异常和 JSON；超时或任何像素／网格差异均失败。根窗口大小按所选缩放创建，大比例可能超过屏幕，截图来自自身 GPU 帧缓冲区。正式 App 不增加轮询或空闲重绘。

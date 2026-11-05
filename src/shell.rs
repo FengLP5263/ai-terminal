@@ -267,6 +267,7 @@ fn notice(name: &str, agent: Agent, invocation: &str, exit_code: Option<i32>) {
         tool_name: None,
         tool_use_id: None,
         notification_type: None,
+        permission_mode: None,
         source: Some(
             match agent {
                 Agent::Codex => "codex",

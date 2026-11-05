@@ -206,7 +206,7 @@ fn qoder_cn_hook_shapes_drive_states_without_forwarding_conversation_content() {
             "Qoder payloads need not supply a turn ID"
         );
         assert!(!serde_json::to_string(&event).unwrap().contains("PRIVATE_"));
-        assert!(status.apply(&event, false));
+        assert!(status.apply_qoder(&event, false));
         assert_eq!(status.activity, expected, "{event_name}");
         if matches!(expected, Activity::Completed | Activity::Failed) {
             assert!(status.unread);
@@ -214,5 +214,67 @@ fn qoder_cn_hook_shapes_drive_states_without_forwarding_conversation_content() {
             assert!(!status.unread);
             assert_eq!(status.activity, expected);
         }
+    }
+}
+
+#[test]
+fn qoder_permission_metadata_is_safe_and_keeps_automatic_checks_working() {
+    use ai_terminal::{
+        bridge::Bridge,
+        status::{Activity, Status},
+    };
+    use std::{
+        io::Write,
+        process::{Command, Stdio},
+        sync::Arc,
+        time::Duration,
+    };
+    let bridge = Bridge::start(Arc::new(|| {})).unwrap();
+    for (mode, normalized, expected) in [
+        ("auto", Some("auto"), Activity::Working),
+        (
+            "bypassPermissions",
+            Some("bypass_permissions"),
+            Activity::Working,
+        ),
+        ("dontAsk", Some("dont_ask"), Activity::Working),
+        ("default", Some("default"), Activity::Waiting),
+        ("PRIVATE_UNKNOWN_MODE", None, Activity::Waiting),
+    ] {
+        let payload = serde_json::json!({"hook_event_name":"Notification","session_id":"permission-fixture","notification_type":"permission_prompt","permission_mode":mode,
+            "message":"PRIVATE_MESSAGE", "details":{"toolName":"Bash","toolUseId":"tool-id","input":{"command":"PRIVATE_COMMAND"},"message":"PRIVATE_REASON"}});
+        let mut child = Command::new(env!("CARGO_BIN_EXE_ai-terminal-hook"))
+            .env("AI_TERMINAL_ENDPOINT", &bridge.endpoint)
+            .env("AI_TERMINAL_TOKEN", &bridge.token)
+            .env("AI_TERMINAL_SESSION", "local")
+            .env("AI_TERMINAL_GENERATION", "fixture")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .spawn()
+            .unwrap();
+        child
+            .stdin
+            .take()
+            .unwrap()
+            .write_all(payload.to_string().as_bytes())
+            .unwrap();
+        let output = child.wait_with_output().unwrap();
+        assert!(output.status.success());
+        assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), "{}");
+        let event = bridge
+            .receiver
+            .recv_timeout(Duration::from_secs(3))
+            .unwrap();
+        assert_eq!(event.permission_mode.as_deref(), normalized);
+        assert_eq!(event.tool_use_id.as_deref(), Some("tool-id"));
+        assert_eq!(event.tool_name.as_deref(), Some("Bash"));
+        assert!(!serde_json::to_string(&event).unwrap().contains("PRIVATE_"));
+        let mut status = Status::default();
+        let mut start = event.clone();
+        start.name = "UserPromptSubmit".into();
+        start.notification_type = None;
+        status.apply_qoder(&start, false);
+        status.apply_qoder(&event, false);
+        assert_eq!(status.activity, expected, "mode {mode}");
     }
 }

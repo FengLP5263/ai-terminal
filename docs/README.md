@@ -17,6 +17,8 @@
 - [数据与资产](../.agents/architecture/data-and-assets.md) · [外部集成](../.agents/architecture/integrations.md)
 - [程序图标](../assets/branding/README.md) · [图标设计候选](../design/icon-concepts/README.md) · [第三方声明](../THIRD_PARTY_NOTICES.md)
 
+- [0.4.9 渲染复现与验收](rendering-0.4.9.md)
+
 ## 历史记录
 
 - [Windows 10 兼容性修复与待验证项](windows10-compatibility.md)
