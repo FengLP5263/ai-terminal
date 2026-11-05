@@ -1,5 +1,5 @@
 mod notification;
-pub use notification::CodexProgramStatus;
+pub use notification::{CodexProgramStatus, ProgramApp, ProgramEvent};
 pub mod settings;
 
 use crate::types::Size;
@@ -309,7 +309,7 @@ impl TerminalBackend {
     }
 
     /// Drain a bounded, ordered lifecycle queue for this invocation only.
-    pub fn take_codex_program_statuses(&self, notice: &str) -> Vec<CodexProgramStatus> {
+    pub fn take_program_events(&self, notice: &str) -> Vec<ProgramEvent> {
         let epoch = notice
             .strip_prefix(CODEX_PROGRAM_EVENT)
             .and_then(|s| s.strip_prefix(';'))
@@ -320,6 +320,15 @@ impl TerminalBackend {
             return Vec::new();
         }
         self.codex_program.lock().unwrap().drain()
+    }
+
+    /// Compatibility accessor for callers observing Codex only.
+    pub fn take_codex_program_statuses(&self, notice: &str) -> Vec<CodexProgramStatus> {
+        self.take_program_events(notice)
+            .into_iter()
+            .filter(|e| e.app != Some(ProgramApp::Kimi))
+            .map(|e| e.state)
+            .collect()
     }
 
     /// Accept each notice once, only for the currently running Codex invocation.

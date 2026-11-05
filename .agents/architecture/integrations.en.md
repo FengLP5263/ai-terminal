@@ -7,9 +7,9 @@
 | Codex CLI | Uses current/persistent PATH and user installation. CLI owns authentication, trust and hook schema; the manager injects only session-scoped options. Recheck parsing, `/hooks`, and lifecycle after upgrades. |
 | Claude Code | Uses current/persistent PATH and user installation. CLI owns authentication, models, plugins and permissions; `--settings` is session-scoped. Model requests require explicit authorization. |
 | Qoder CN CLI | Public qodercn/qoderclicn entries, native/npm installs. CLI owns login, models and directory trust; settings are session-scoped and explicit user settings win. Verify synthetic state separately from real startup, without automatic trust approval or model prompts. |
-| Kimi Code CLI | Public `kimi` entry | CLI owns models, login and configuration; task events not integrated in this release | Identity/launch only; no user/project config changes |
-| ZCode CLI | Public `zcode` entry; tested with community zcode-app-cli | Distribution and CLI own their configuration/authentication | Same; distinguish official and community test results |
-| TRAE CLI | Public `traecli` entry | CLI owns models, login and configuration; task events not integrated in this release | Identity/launch only; no user/project config changes |
+| Kimi Code CLI | Public `kimi` entry. CLI owns models, login and configuration. Stable 0.4.7 has identity only; 0.4.8 preview adds task events as described below. |
+| ZCode CLI | Public `zcode` entry; tested with community zcode-app-cli. The distribution owns configuration/authentication. Distinguish community/official results and preview limitations below. |
+| TRAE CLI | Public `traecli` entry. CLI owns models, login and configuration. Stable 0.4.7 has identity only; 0.4.8 preview adds session hooks as described below. |
 | PowerShell | Ordinary Windows shell. The manager owns its session process tree, not the user's profile; do not infer AI status. |
 | Git Bash | Optional Git for Windows installation. Load system/user startup configuration before adding session-scoped directory notifications and Agent entries; do not edit user files. When absent, explicitly offer available PowerShell/CMD. WSL and other Bash distributions are not substituted. |
 | User working directory | The user and that project's rules own its contents. Opening it does not authorize modifying its code. |
@@ -58,3 +58,11 @@ Recognize the installed public entries `kimi`, `zcode` and `traecli`. Session sh
 Installed versions checked for this release are Kimi Code 2.5.0, TRAE CLI 0.213.1 public, and the community zcode-app-cli 3.17.2-44 with runtime 0.17.1. The latter is an independent community terminal frontend, not Z.ai's official standalone CLI distribution; its startup check does not establish compatibility of other ZCode builds. Product-icon provenance is independent of the installed CLI distribution and is recorded per file in assets/icons/SOURCE.json.
 
 Native shell_switch_probe modes `kimi`, `zcode`, `traecli` launch the selected installed entry in a fresh manager workspace, capture startup, and focus the empty terminal and cancel only their own CLI with Esc/Ctrl+C before checking the return-to-shell capture. They never submit a model prompt or accept directory/hook trust. Real startup, synthetic lifecycle and paid model rounds remain separate evidence.
+
+## 0.4.8 preview integration
+
+Kimi Code 2.5.0 uses its pi-tui OSC 7501 `app=kimi-code`. The managed entry enables process-local `PI_PROGRAM_STATUS`, respecting explicit disablement. TRAE CLI 0.213.1 uses its own `-c` TOML hook overrides and CLI trust review; actual events and native startup are verified separately. Community ZCode uses the settings path from its public [Host integration v1](https://github.com/kingsword09/zcode-cli/blob/main/docs/HOST_INTEGRATION.md), never a private vendor entry. Runtime notes describe configuration protection for whole-file replacement and missing events. The community frontend is not represented as the official ZCode CLI.
+
+All three avoid screen-text parsing, automatic login and trust approval. Real model tasks still require user acceptance.
+
+0.4.8-preview.2: community ZCode lacks a public model-failure/interruption end event attributable to the current TUI turn. Following user acceptance feedback, 0.4.8 displays received hook states directly: start events show Working, retaining that state until a later event arrives. Internal turn.failed, notification text and debug logs are not stable integration protocols. An explicit completion hook is required for completed status; abnormal process exit can still report failure. The current enterprise TRAE CLI requires an Enterprise flagship account and PAT; personal subscriptions and third-party API keys do not replace that login.

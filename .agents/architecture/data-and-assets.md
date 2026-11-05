@@ -70,3 +70,5 @@ Qoder CN 使用 Lobe Icons 的 640 像素 Qoder 图标，来源、MIT 许可和 
 Kimi Code 使用官方仓库文档所用的 316×316 PNG，ZCode 使用官方仓库 README 所用的 1024×1024 PNG，均固定提交并保留原始字节；各仓库 MIT／Apache-2.0 原文分别保存在 LICENSE-kimi-code／LICENSE-zcode，仓库许可不授予商标权。TRAE 来自官方 CLI 文档站的 2400×2400 PNG，仅裁去外围留白并离线缩至 640×640，原始哈希和变换登记在 SOURCE.json；官方来源没有单独标明该品牌资产的开源许可，不能标为 Lobe/MIT。所有品牌图标仅用于识别集成，不新增运行时网络请求。ZIP 的 agent-icons/ 保存来源清单和已有原始许可，另附双语第三方说明。
 
 0.4.7 的 README 支持表使用 assets/readme/agent-*.png：由 examples/agent_icons_capture.rs 原生调用正式头像绘制器，在深色底衬上生成六枚图标，保证浅色／深色文档页面的可读性。PNG 原样复制，逐文件版本、尺寸、SHA-256 与来源保存在 assets/readme/SOURCE.json；不含用户数据或真实模型会话。
+
+0.4.8 预览的 README 主图分别保存中文 workspace.png／floating.png 和英文 workspace.en.png／floating.en.png。四张图均由 Release 原生组件生成，使用合成内容与示例目录，原样复制并逐文件记录版本、语言、尺寸与 SHA-256；英文名称及终端样例也使用英文。ZCode 基础设置快照仅在受管调用的忽略 runtime 目录生成，不含 provider／凭据、自定义命令或会话正文，不改会话持久化格式。

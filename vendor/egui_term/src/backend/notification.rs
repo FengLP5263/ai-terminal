@@ -29,11 +29,31 @@ pub enum CodexProgramStatus {
     Clear,
 }
 
+/// Recognized root-program identity. Child records never enter the queue.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ProgramApp {
+    Codex,
+    Kimi,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ProgramEvent {
+    pub app: Option<ProgramApp>,
+    pub state: CodexProgramStatus,
+}
+impl From<CodexProgramStatus> for ProgramEvent {
+    fn from(state: CodexProgramStatus) -> Self {
+        Self {
+            app: (state != CodexProgramStatus::Clear).then_some(ProgramApp::Codex),
+            state,
+        }
+    }
+}
+
 #[derive(Default)]
 pub(super) struct ProgramQueue {
     epoch: u64,
-    last: Option<CodexProgramStatus>,
-    values: VecDeque<CodexProgramStatus>,
+    last: Option<ProgramEvent>,
+    values: VecDeque<ProgramEvent>,
 }
 impl ProgramQueue {
     pub fn reset(&mut self, epoch: u64) {
@@ -41,7 +61,7 @@ impl ProgramQueue {
         self.last = None;
         self.values.clear();
     }
-    fn push(&mut self, epoch: u64, state: CodexProgramStatus) -> bool {
+    fn push(&mut self, epoch: u64, state: ProgramEvent) -> bool {
         if epoch != self.epoch || self.last == Some(state) {
             return false;
         }
@@ -53,7 +73,7 @@ impl ProgramQueue {
         self.values.push_back(state);
         wake
     }
-    pub fn drain(&mut self) -> Vec<CodexProgramStatus> {
+    pub fn drain(&mut self) -> Vec<ProgramEvent> {
         self.values.drain(..).collect()
     }
 }
@@ -65,21 +85,53 @@ pub(super) struct Control {
     pub program: Arc<Mutex<ProgramQueue>>,
 }
 
-fn program_status(params: &[&[u8]]) -> Option<CodexProgramStatus> {
-    if params.len() != 2 || params[0] != b"7501" {
+fn program_status(params: &[&[u8]]) -> Option<ProgramEvent> {
+    if params.len() != 2 || params[0] != b"7501" || params[1].len() > 4096 {
         return None;
     }
-    Some(match params[1] {
-        b"state=idle:app=codex" => CodexProgramStatus::Idle,
-        b"state=working:app=codex" => CodexProgramStatus::Working,
-        b"state=blocked:app=codex:kind=permission" => CodexProgramStatus::Permission,
-        b"state=blocked:app=codex:kind=question" => CodexProgramStatus::Question,
-        b"state=blocked:app=codex:kind=auth" => CodexProgramStatus::Auth,
-        b"state=done:app=codex" => CodexProgramStatus::Done,
-        b"state=error:app=codex" => CodexProgramStatus::Error,
-        b"state=clear" => CodexProgramStatus::Clear,
+    let mut state = None;
+    let mut app = None;
+    let mut kind = None;
+    let mut seen = std::collections::HashSet::new();
+    for pair in params[1].split(|b| *b == b':') {
+        let split = pair.iter().position(|b| *b == b'=')?;
+        let (key, value) = (&pair[..split], &pair[split + 1..]);
+        if !seen.insert(key) {
+            return None;
+        }
+        match key {
+            b"state" => state = Some(value),
+            b"app" => {
+                app = Some(match value {
+                    b"codex" => ProgramApp::Codex,
+                    b"kimi-code" => ProgramApp::Kimi,
+                    _ => return None,
+                })
+            }
+            b"kind" => kind = Some(value),
+            // Root has no id. Ignore all subagent/hierarchical records.
+            b"id" => return None,
+            // Deliberately discard optional encoded display text.
+            b"title" | b"msg" => {}
+            _ => return None,
+        }
+    }
+    use CodexProgramStatus as S;
+    let state = match (state?, kind) {
+        (b"idle", None) => S::Idle,
+        (b"working", None) => S::Working,
+        (b"done", None) => S::Done,
+        (b"error", None) => S::Error,
+        (b"clear", None) => S::Clear,
+        (b"blocked", Some(b"permission")) => S::Permission,
+        (b"blocked", Some(b"question")) => S::Question,
+        (b"blocked", Some(b"auth")) => S::Auth,
         _ => return None,
-    })
+    };
+    if app.is_none() && state != S::Clear {
+        return None;
+    }
+    Some(ProgramEvent { app, state })
 }
 
 pub struct ObservedPty<P: EventedPty> {
@@ -285,7 +337,13 @@ mod tests {
             "one pending wake, not one message per state"
         );
         assert_eq!(
-            program.lock().unwrap().drain(),
+            program
+                .lock()
+                .unwrap()
+                .drain()
+                .into_iter()
+                .map(|e| e.state)
+                .collect::<Vec<_>>(),
             [
                 CodexProgramStatus::Working,
                 CodexProgramStatus::Question,
@@ -300,7 +358,10 @@ mod tests {
         }
         let states = program.lock().unwrap().drain();
         assert_eq!(states.len(), 32);
-        assert_eq!(states.last(), Some(&CodexProgramStatus::Done));
+        assert_eq!(
+            states.last().map(|e| e.state),
+            Some(CodexProgramStatus::Done)
+        );
         assert!(rx.try_recv().is_ok());
         assert!(rx.try_recv().is_err());
         collector.epoch.store(2, Ordering::Release);
@@ -309,7 +370,16 @@ mod tests {
         assert!(program.lock().unwrap().drain().is_empty());
         collector.observed_epoch = 2;
         parser.advance(&mut collector, b"\x1b]7501;state=idle:app=codex\x1b\\");
-        assert_eq!(program.lock().unwrap().drain(), [CodexProgramStatus::Idle]);
+        assert_eq!(
+            program
+                .lock()
+                .unwrap()
+                .drain()
+                .into_iter()
+                .map(|e| e.state)
+                .collect::<Vec<_>>(),
+            [CodexProgramStatus::Idle]
+        );
     }
     #[test]
     fn native_protocol_rejects_text_unknown_apps_and_unrecognized_states() {
@@ -328,8 +398,38 @@ mod tests {
         }
         assert_eq!(
             program_status(&[b"7501", b"state=clear"]),
-            Some(CodexProgramStatus::Clear)
+            Some(CodexProgramStatus::Clear.into())
         );
+    }
+    #[test]
+    fn kimi_metadata_is_discarded_and_children_cannot_override_root() {
+        let event = program_status(&[
+            b"7501",
+            b"msg=cHJpdmF0ZQ==:kind=auth:app=kimi-code:state=blocked",
+        ])
+        .unwrap();
+        assert_eq!(event.app, Some(ProgramApp::Kimi));
+        assert_eq!(event.state, CodexProgramStatus::Auth);
+        for wire in [
+            b"state=done:app=kimi-code:id=child".as_slice(),
+            b"state=done:app=kimi-code:id=",
+            b"state=done:app=kimi-code:app=codex",
+            b"?",
+            b"state=done:msg=cHJpdmF0ZQ==",
+        ] {
+            assert!(program_status(&[b"7501", wire]).is_none());
+        }
+        let mut q = ProgramQueue::default();
+        q.reset(1);
+        q.push(1, CodexProgramStatus::Idle.into());
+        q.push(
+            1,
+            ProgramEvent {
+                app: Some(ProgramApp::Kimi),
+                state: CodexProgramStatus::Idle,
+            },
+        );
+        assert_eq!(q.drain().len(), 2, "dedup includes app identity");
     }
     #[test]
     fn recognizes_only_codex_attention_osc_across_split_chunks() {

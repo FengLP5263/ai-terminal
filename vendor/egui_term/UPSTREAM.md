@@ -83,3 +83,5 @@ Native Codex lifecycle: observe only recognized OSC 7501 state/app/kind values, 
 Unreleased: native glyph atlas keys exclude foreground/background colors; white alpha masks are tinted by mesh vertex colors. Atlas overflow retires only the oldest page and defers texture release to a later frame instead of clearing the whole atlas.
 
 Unreleased retirement fix: run old-page cleanup before the glyph-cache hit return. Repeated cache hits in later frames now release retired textures; same-frame shapes retain valid handles. Native regressions verify both the texture free delta and same-frame shape references without adding polling or idle repaint.
+
+0.4.8 preview: OSC 7501 observations retain explicit Codex/Kimi root identity alongside state, accept known optional display fields without storing them, and reject child IDs, duplicate/unknown fields and unrecognized apps. Deduplication includes app identity; the same bounded 32-event queue, epoch filtering and coalesced ROOT wakeup remain. The Codex-only drain accessor remains available. Native hidden-ConPTY regression covers Kimi identity, discarded message metadata and child filtering.

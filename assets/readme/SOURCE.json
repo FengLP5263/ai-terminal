@@ -1,24 +1,28 @@
 {
   "description": "Native Release captures with fixed synthetic content and production avatar badges; per-file versions identify newer captures. No private data or real model requests.",
-  "version": "0.4.4",
+  "version": "0.4.8",
   "profile": "release",
   "model_requests": false,
   "user_profiles": false,
   "files": {
     "workspace.png": {
-      "sha256": "aeaa77051821918dc05cd2bf03b868f29797fc45487a094eb17ebb5b413a1bcf",
-      "bytes": 129203,
+      "sha256": "7715385b7b6ede23d82d7199fe52d9d75305581aad4aa384eb83dc8d3f9362e1",
+      "bytes": 135214,
       "width": 1680,
       "height": 1020,
       "source": "examples/readme_capture.rs",
+      "version": "0.4.8",
+      "language": "zh-CN",
       "unmodified_native_capture": true
     },
     "floating.png": {
-      "sha256": "a9409134af7eb5bda1c6c5e7b3ae1cf13b5c1ded99804af2e1a995a077abbfd1",
-      "bytes": 13114,
+      "sha256": "d260bfa51bd84658899af0530d1c67468c900e2192f840b077964a885fdd1ae7",
+      "bytes": 15778,
       "width": 732,
       "height": 72,
       "source": "examples/island_probe.rs",
+      "version": "0.4.8",
+      "language": "zh-CN",
       "unmodified_native_capture": true
     },
     "agent-codex.png": {
@@ -80,6 +84,26 @@
       "version": "0.4.7",
       "unmodified_native_capture": true,
       "original_asset_provenance": "assets/icons/SOURCE.json"
+    },
+    "workspace.en.png": {
+      "sha256": "de0515f415bdb470a814dd9d23a53b1539c830b1901132d8b653ceb46ee7c4fe",
+      "bytes": 146755,
+      "width": 1680,
+      "height": 1020,
+      "source": "examples/readme_capture.rs en",
+      "version": "0.4.8",
+      "language": "en",
+      "unmodified_native_capture": true
+    },
+    "floating.en.png": {
+      "sha256": "385031b8e381e0798af273ec5ebc8d826e096b395723a7d975734ebac616662f",
+      "bytes": 15797,
+      "width": 732,
+      "height": 72,
+      "source": "examples/island_probe.rs",
+      "version": "0.4.8",
+      "language": "en",
+      "unmodified_native_capture": true
     }
   }
 }

@@ -45,7 +45,7 @@ pub struct Status {
     pub session_id: Option<String>,
     pub turn_id: Option<String>,
     pub last_event: Option<String>,
-    pub codex_native: bool,
+    pub native_lifecycle: bool,
     waiting_tool: Option<String>,
 }
 
@@ -54,7 +54,7 @@ impl Status {
     pub fn apply(&mut self, event: &HookEvent, viewing: bool) -> bool {
         // Once the foreground TUI reports native lifecycle, delayed legacy
         // hooks must not overwrite a newer state or another selected chat.
-        if self.codex_native {
+        if self.native_lifecycle {
             return false;
         }
         if event.session_id.is_empty() {
@@ -166,7 +166,7 @@ impl Status {
 
     /// The managed Codex TUI emitted a user-facing attention notification.
     pub fn codex_attention(&mut self, question: bool) {
-        if self.codex_native {
+        if self.native_lifecycle {
             return;
         }
         // A late approval notice must not revive an already ended turn. A plan
@@ -191,11 +191,11 @@ impl Status {
 
     pub fn codex_program(&mut self, state: egui_term::CodexProgramStatus, viewing: bool) {
         use egui_term::CodexProgramStatus as Native;
-        if state == Native::Clear && !self.codex_native {
+        if state == Native::Clear && !self.native_lifecycle {
             return;
         }
-        self.codex_native = true;
-        self.last_event = Some("CodexOSC7501".into());
+        self.native_lifecycle = true;
+        self.last_event = Some("OSC7501".into());
         self.waiting_tool = None;
         self.turn_id = None;
         self.activity = match state {
@@ -244,7 +244,7 @@ mod tests {
         use egui_term::CodexProgramStatus as Native;
         let mut status = Status::default();
         status.codex_program(Native::Clear, false);
-        assert!(!status.codex_native);
+        assert!(!status.native_lifecycle);
         assert_eq!(status.activity, Activity::Unknown);
         status.codex_program(Native::Working, false);
         status.codex_program(Native::Clear, false);

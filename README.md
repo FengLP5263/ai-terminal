@@ -32,7 +32,7 @@ AI 任务可能运行很久。打开多个窗口后，来回确认哪个会话�
 
 ![AI Terminal 浮窗示意](assets/readme/floating.png)
 
-> 截图使用 0.4.4 的真实界面、合成会话内容、示例目录和模拟状态，不包含真实用户名、工作目录或私人对话。点击图片可查看原始分辨率。
+> 截图使用 0.4.8 的真实界面、合成会话内容、示例目录和模拟状态，不包含真实用户名、工作目录或私人对话。点击图片可查看原始分辨率。
 
 ## 为多会话而设计
 
@@ -53,11 +53,17 @@ AI 任务可能运行很久。打开多个窗口后，来回确认哪个会话�
 | <img src="assets/readme/agent-codex.png" width="32" height="32" alt="Codex CLI"> | [Codex CLI](https://github.com/openai/codex) | `codex` | 支持 | 原生生命周期；旧版兼容 hook |
 | <img src="assets/readme/agent-claude.png" width="32" height="32" alt="Claude Code"> | [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview) | `claude` | 支持 | 会话级 hook |
 | <img src="assets/readme/agent-qoder-cn.png" width="32" height="32" alt="Qoder CN CLI"> | [Qoder CN CLI](https://docs.qoder.cn/en/cli/installation) | `qodercn` / `qoderclicn` | 支持 | 会话级 hook |
-| <img src="assets/readme/agent-kimi.png" width="32" height="32" alt="Kimi Code CLI"> | [Kimi Code CLI](https://www.kimi.com/code/docs/) | `kimi` | 支持 | 本版未接入；等待任务通知 |
-| <img src="assets/readme/agent-zcode.png" width="32" height="32" alt="ZCode"> | [ZCode](https://zcode.z.ai/) | `zcode` | 支持 | 本版未接入；等待任务通知 |
-| <img src="assets/readme/agent-trae.png" width="32" height="32" alt="TRAE CLI"> | [TRAE CLI](https://docs.trae.cn/cli_about-trae-code-cli-2) | `traecli` | 支持 | 本版未接入；等待任务通知 |
+| <img src="assets/readme/agent-kimi.png" width="32" height="32" alt="Kimi Code CLI"> | [Kimi Code CLI](https://www.kimi.com/code/docs/) | `kimi` | 支持 | 原生生命周期（Kimi Code 2.5.0） |
+| <img src="assets/readme/agent-zcode.png" width="32" height="32" alt="ZCode"> | [ZCode](https://zcode.z.ai/) | `zcode` | 支持 | 会话级 hook：开始／工具／完成；有配置边界，见下文 |
+| <img src="assets/readme/agent-trae.png" width="32" height="32" alt="TRAE CLI"> | [TRAE CLI](https://docs.trae.cn/cli_about-trae-code-cli-2) | `traecli` | 支持 | 会话级 hook；需在 CLI 内审查信任 |
 
-头像识别与任务状态是两项不同能力。未接入任务通知的 CLI 不会被输出静默或进程存在判定为正在工作或已完成；请在 CLI 内查看任务进度。其他程序也能在真实终端中运行。
+状态只来自明确生命周期、hook 与进程退出；未收到事件时保持“等待任务通知”，不根据终端文字或静默猜测完成。新增集成从 0.4.8 提供，启动核查、合成事件与真实模型回合分开记录；0.4.7 的三款新增 CLI 仍仅识别头像与启停。
+
+- Kimi：受管 `kimi` 入口为本次进程启用原生 OSC 7501，区分工作、授权／问题／登录等待、完成与失败；忽略子 Agent 记录和消息正文。显式 `PI_PROGRAM_STATUS=0` 保持关闭。
+- TRAE：当前企业版 CLI 需要 TRAE 企业旗舰版账号及其 PAT，个人订阅或第三方模型 API Key 不能替代。参见[官方 CLI 说明](https://docs.trae.cn/cli_about-trae-code-cli-2)。本次 `-c` 参数提供生命周期 hook，不改用户／项目配置；启动后在 `/hooks` 中审查信任。显式后续配置仍由 CLI 解释，远端服务不承诺本机 hook 可用。
+- ZCode：仅针对社区 zcode-app-cli 3.17.2-44／运行时 0.17.1。支持开始、工具、问题工具与完成；状态直接跟随已收到的 hook：开始／工具执行显示进行中，问题交互显示需要处理，Stop 显示完成。当前接口缺少部分授权等待、任务失败及中断事件；没有后续通知时保留上次状态，明确失败或非正常退出才显示失败。通过 `ZCODE_CLI_SETTINGS_FILE` 选择本次进程的基础设置快照，仅允许无凭据的基础选项；已有 hook、非空自定义列表、MCP／插件定义、未知设置或显式该环境变量时保留原配置并跳过接入。不会打开 provider／凭据文件。快照内的设置修改仅对本次调用有效；原配置有自定义内容时，状态连接说明会提示该边界。
+
+已有 CLI 需退出后重新启动，才能应用本次会话集成。登录、目录与 hook 信任由你在 Agent 内确认。
 
 ZCode 本次实测的是社区发行 [zcode-app-cli](https://github.com/kingsword09/zcode-cli) 3.17.2-44（运行时 0.17.1），不作为 Z.ai 官方独立 CLI 验收。管理器转发已安装的公开 `zcode` 入口，不捆绑或自动安装任何 Agent。图标复用正式界面组件，以深色底衬保证在 README 的浅色／深色页面中均可辨识；品牌来源见[第三方说明](THIRD_PARTY_NOTICES.md)。
 
@@ -104,7 +110,7 @@ codex
 
 ### 为什么 Agent 没有显示状态？
 
-状态依赖 CLI 明确的生命周期通知。Codex 默认使用原生状态并保留共享 agents 总览；旧版可显式运行 `codex --no-daemon` 使用兼容 hook。Claude Code 和 Qoder CN 通过会话级 hook 接入。Kimi Code、ZCode 与 TRAE CLI 在本版仅识别头像和启动／退出，尚未接入会话级任务通知，状态保持“等待任务通知”。管理器不替你信任 hook，也不修改用户或项目的 hook 配置。
+状态依赖 CLI 明确的生命周期通知。Codex 默认使用原生状态并保留共享 agents 总览；旧版可显式运行 `codex --no-daemon` 使用兼容 hook。Claude Code 和 Qoder CN 通过会话级 hook 接入。稳定版 0.4.7 的 Kimi Code、ZCode 与 TRAE CLI 仅识别头像和启停；0.4.8 的接入范围见上方表格。未接收到通知时显示“等待任务通知”，ZCode 收到开始事件后显示“进行中”，后续随 hook 更新。管理器不替你信任 hook，也不修改用户或项目的 hook 配置。
 
 ### 重启后可以继续之前的对话吗？
 
@@ -148,6 +154,6 @@ rustup component add rustfmt clippy
 
 Agent 品牌图标的来源与许可按文件分别记录，详见[第三方说明](THIRD_PARTY_NOTICES.md)；ZIP 的 agent-icons/ 附带来源清单和可获得的原始许可。
 
-## 0.4.7 更新
+## 0.4.8 更新
 
-新增 Kimi Code、ZCode 和 TRAE CLI 的头像与启停识别、首次桌面快捷方式；改进彩色动画 TUI 的字形缓存并修复旧图集释放。支持范围和六种 Agent 图标见上方表格。完整功能、升级说明和验证范围见[中英文更新日志](CHANGELOG.md)；每次发行的 ZIP 均附带两份日志。
+接入 Kimi Code 原生生命周期及 ZCode／TRAE CLI 的会话级任务 hook；修复浮窗悬停提示裁切，ZCode 状态直接跟随 hook。更新中英文工作区与浮窗主图。支持范围和六种 Agent 图标见上方表格。完整功能、升级说明和验证范围见[中英文更新日志](CHANGELOG.md)；每次发行的 ZIP 均附带两份日志。
