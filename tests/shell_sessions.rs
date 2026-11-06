@@ -122,6 +122,81 @@ fn cwd_metadata_rejects_old_generations_and_invalid_paths() {
 }
 
 mod support;
+
+#[test]
+fn delegating_cli_entry_reaches_the_public_alias_without_reentering_session_shims() {
+    use std::{os::windows::process::CommandExt, process::Command};
+    let root = tempfile::tempdir().unwrap();
+    let bin = root.path().join("session entries");
+    let public = root.path().join("public entries");
+    std::fs::create_dir_all(&bin).unwrap();
+    std::fs::create_dir_all(&public).unwrap();
+    let helper = Path::new(env!("CARGO_BIN_EXE_ai-terminal-hook"));
+    for name in ["qodercn.exe", "qoderclicn.exe"] {
+        std::fs::copy(helper, bin.join(name)).unwrap();
+    }
+    std::fs::copy(support::fixture(), public.join("cli-fixture.exe")).unwrap();
+    let dispatcher = public.join("qodercn.cmd");
+    // Bound the old recursion to one reentry, never create an unbounded process tree.
+    std::fs::write(
+        &dispatcher,
+        b"@echo off\r\nif defined AI_TERMINAL_FIXTURE_DISPATCH_ACTIVE (\r\n echo DISPATCH_RECURSION\r\n exit /b 86\r\n)\r\nset AI_TERMINAL_FIXTURE_DISPATCH_ACTIVE=1\r\nqoderclicn %*\r\nexit /b %ERRORLEVEL%\r\n",
+    )
+    .unwrap();
+    std::fs::write(
+        public.join("qoderclicn.cmd"),
+        b"@echo off\r\n\"%~dp0cli-fixture.exe\" \"%~dp0args.txt\" %*\r\nexit /b 23\r\n",
+    )
+    .unwrap();
+    let bridge = Bridge::start(Arc::new(|| {})).unwrap();
+    let path = std::env::join_paths([bin.clone(), public.clone()].into_iter().chain(
+        std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default()),
+    ))
+    .unwrap();
+    let output = Command::new(bin.join("qodercn.exe"))
+        .args(["--settings=custom-settings.json", "literal 中文 space"])
+        .env("PATH", path)
+        .env("AI_TERMINAL_SHIM_DIR", &bin)
+        .env("AI_TERMINAL_HELPER", helper)
+        .env("AI_TERMINAL_REAL_QODER_CN", dispatcher)
+        .env("AI_TERMINAL_SESSION_RUNTIME", root.path().join("runtime"))
+        .env("AI_TERMINAL_ENDPOINT", &bridge.endpoint)
+        .env("AI_TERMINAL_TOKEN", &bridge.token)
+        .env("AI_TERMINAL_SESSION", "bounded-dispatch")
+        .env("AI_TERMINAL_GENERATION", "bounded-generation")
+        .env_remove("AI_TERMINAL_INVOCATION")
+        .env_remove("AI_TERMINAL_FIXTURE_INTERACTIVE")
+        .env_remove("AI_TERMINAL_FIXTURE_DISPATCH_ACTIVE")
+        .creation_flags(0x0800_0000)
+        .output()
+        .unwrap();
+    assert_eq!(
+        output.status.code(),
+        Some(23),
+        "{} {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let args: Vec<String> =
+        serde_json::from_str(&std::fs::read_to_string(public.join("args.txt")).unwrap()).unwrap();
+    assert_eq!(
+        args,
+        ["--settings=custom-settings.json", "literal 中文 space"]
+    );
+    let began = bridge
+        .receiver
+        .recv_timeout(Duration::from_secs(3))
+        .unwrap();
+    let ended = bridge
+        .receiver
+        .recv_timeout(Duration::from_secs(3))
+        .unwrap();
+    assert_eq!(began.name, "ShellAgentStarted");
+    assert_eq!(ended.name, "ShellAgentEnded");
+    assert_eq!(ended.invocation, began.invocation);
+    assert_eq!(ended.exit_code, Some(23));
+    assert!(bridge.receiver.try_recv().is_err());
+}
 fn agent_roundtrip(kind: Agent) {
     if launch::executable(kind).is_none() {
         eprintln!(

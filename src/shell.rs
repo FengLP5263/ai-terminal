@@ -378,6 +378,22 @@ fn keep_launcher_alive() {
     }
 }
 
+/// Public dispatchers may resolve another alias of themselves. Only the user's
+/// interactive shell needs our entries; CLI children must see the real PATH.
+fn cli_child_path(
+    path: &std::ffi::OsStr,
+    shim_dir: &Path,
+) -> Result<OsString, std::env::JoinPathsError> {
+    std::env::join_paths(std::env::split_paths(path).filter(|directory| {
+        !directory
+            .components()
+            .map(|part| part.as_os_str().to_ascii_uppercase())
+            .eq(shim_dir
+                .components()
+                .map(|part| part.as_os_str().to_ascii_uppercase()))
+    }))
+}
+
 pub fn run_agent(agent: Agent, args: Vec<OsString>) -> i32 {
     let result = (|| -> Result<i32, String> {
         let root = PathBuf::from(std::env::var_os("AI_TERMINAL_SHIM_DIR").ok_or("缺少会话信息")?);
@@ -395,9 +411,16 @@ pub fn run_agent(agent: Agent, args: Vec<OsString>) -> i32 {
             .filter(|p| p.is_file() && crate::discovery::stale_npm_target(p).is_none())
             .map(Ok)
             .unwrap_or_else(|| CliSearch::current().excluding(&root).resolve(agent))?;
+        let mut command = std::process::Command::new(binary);
+        if let Some(path) = std::env::var_os("PATH") {
+            command.env(
+                "PATH",
+                cli_child_path(&path, &root).map_err(|error| error.to_string())?,
+            );
+        }
         // Agent tools and nested agents must not replace the foreground session identity.
         if std::env::var_os("AI_TERMINAL_INVOCATION").is_some_and(|v| !v.is_empty()) {
-            return std::process::Command::new(binary)
+            return command
                 .args(args)
                 .status()
                 .map(|s| s.code().unwrap_or(1))
@@ -429,7 +452,7 @@ pub fn run_agent(agent: Agent, args: Vec<OsString>) -> i32 {
             crate::integration::environment(agent, &runtime.join(&invocation), &helper);
         keep_launcher_alive();
         notice("ShellAgentStarted", agent, &invocation, None);
-        let status = std::process::Command::new(binary)
+        let status = command
             .envs(child_environment)
             .args(injected)
             .args(args)
@@ -458,6 +481,29 @@ pub fn run_agent(agent: Agent, args: Vec<OsString>) -> i32 {
 #[cfg(test)]
 mod nested_shell_tests {
     use super::*;
+    #[test]
+    #[cfg(windows)]
+    fn cli_path_preserves_public_entries_and_removes_only_the_own_session_directory() {
+        let own = Path::new(r"C:\runtime\session\bin");
+        let path = std::env::join_paths([
+            r"C:\tools",
+            "C:/RUNTIME/session/bin/",
+            r"C:\runtime\session\bin-extra",
+            r"C:\工作 tools",
+            r"C:\runtime\session\bin",
+        ])
+        .unwrap();
+        let result = cli_child_path(&path, own).unwrap();
+        assert_eq!(
+            std::env::split_paths(&result).collect::<Vec<_>>(),
+            [
+                PathBuf::from(r"C:\tools"),
+                PathBuf::from(r"C:\runtime\session\bin-extra"),
+                PathBuf::from(r"C:\工作 tools"),
+            ]
+        );
+    }
+
     #[test]
     fn interactive_entries_are_distinct_from_commands_and_scripts() {
         for (agent, args, expected) in [
