@@ -109,3 +109,20 @@ Qoder 已信任目录输入核查：`target/release/examples/qoder_cn_probe.exe 
 Qoder 尺寸诊断：构建 qoder_cn_probe 后运行 `target/release/examples/qoder_cn_probe.exe output/<unique-qoder-trace> trace <isolated-directory>`。只启动一次 CLI，在 103% 下程序化调整四次窗口并记录最多 128 项行列／布局元数据和四张截图；不输入提示、不接受信任。目录信任页或鉴权页与真实模型任务分开记录。
 
 Windows 瞬时错绘核查：`cargo build --offline --locked --release --example render_update_probe`，随后运行 `target/release/examples/render_update_probe.exe output/<unique-render-update> 1.03 48`。可选参数为缩放（0.5–2.5）与 8–512 次截图比较；该探针检查单窗口固定表格；多窗口和悬停提示由 island_hint_probe 单独核查。两个本地 PowerShell 固定样例分别提供文件表格与变换字号的字形区域，不启动 Agent／模型、不读取用户 profile。比较固定表格的逐帧像素和可见网格哈希，保存基线、阶段图、首个异常和 JSON；超时或任何像素／网格差异均失败。根窗口大小按所选缩放创建，大比例可能超过屏幕，截图来自自身 GPU 帧缓冲区。正式 App 不增加轮询或空闲重绘。
+
+## Windows 安装版（0.4.10 预览）
+
+```powershell
+.\scripts\windows\project.ps1 installer -AllowDirty
+.\scripts\windows\project.ps1 installer -Path output/packages/<package>.zip -Acceptance -AcceptanceId <unique-id> -AllowDirty
+.\scripts\windows\project.ps1 verify-installer -Path output/installers/<build>/<setup>.json
+.\scripts\windows\project.ps1 installer-smoke -Path output/installers/<new>/<setup>.json -Previous output/installers/<old>/<setup>.json
+```
+
+POSIX 对应动作与参数相同；`verify-installer` 可跨平台只读运行，其他安装动作仅支持 Windows／Git Bash。`installer` 不带 `-Path` 时先调用既有 ZIP 构建。正式包拒绝脏源码／脏 ZIP；本地预览显式 `-AllowDirty`。`-Acceptance` 使用独立的验收身份，两个版本配合同一个 `-AcceptanceId`（6–64 个小写字母／数字／连字符）。原生验收拒绝普通安装包，首次安装、升级、占用阻止与卸载只处理该测试自己的文件和注册表；额外文件与会话数据保留。
+
+构建依赖固定 NSIS 3.13 官方 ZIP：从 [NSIS 官方下载](https://nsis.sourceforge.io/Download) 获取 `nsis-3.13.zip`，完整解压到忽略的 `.tools/nsis/`（编译器位于 `.tools/nsis/nsis-3.13/makensis.exe`），或以 `AI_TERMINAL_NSIS` 指定同一解压树的编译器。构建前核对 `scripts/installer/TOOLCHAIN.json` 的归档和完整文件树 SHA-256；不自动下载或安装工具，不执行用户 NSIS 配置。原始许可见 `scripts/installer/NSIS-LICENSE.txt`，源代码地址记录在 TOOLCHAIN.json。编译工具留在开发设备，用户无需安装它。
+
+安装版生成 EXE、`.sha256` 和 `.json`；EXE 校验不等于签名或实际安装验收。源清单记录 ZIP／安装脚本／编译器身份及预览状态，不包含个人路径。程序与测试边界见 [安装与字体说明](../docs/installation.md)。
+
+字体原生截图：未指定字体时使用正式默认 JetBrains Mono。构建 `typography_probe` 后，以 `cascadia`、`hack`、`consolas`、`courier_new`、`jetbrains_mono` 作为第二参数，分别捕获 100%／103%／110%／150%／200%。第四参数可用 `settings-zh`／`settings-en`（第三参数使用 `default`）捕获正式设置控件。缺失字体明确失败，不冒充回退字体。截图需目视验收，样例仅含本地固定文本。

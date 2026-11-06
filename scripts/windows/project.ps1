@@ -14,6 +14,9 @@ ai-terminal 本地开发、验证与打包的 Windows 权威入口。
 # 本地制品与校验
     .\scripts\windows\project.ps1 smoke -Release                                   # 检查已构建的原生优化版
     .\scripts\windows\project.ps1 package                                          # 构建并校验本地 ZIP
+    .\scripts\windows\project.ps1 installer -AllowDirty                            # 构建 ZIP 与当前用户安装版
+    .\scripts\windows\project.ps1 installer -Acceptance -AllowDirty                # 独立注册表／快捷方式的安装验收包
+    .\scripts\windows\project.ps1 installer-smoke -Path output/installers/test/setup.json # 仅运行验收包
     .\scripts\windows\project.ps1 verify-package -Path output/packages/demo.zip    # 校验指定 ZIP，不执行包内程序
 
 .EXAMPLE
@@ -21,7 +24,7 @@ ai-terminal 本地开发、验证与打包的 Windows 权威入口。
     .\scripts\windows\project.ps1 verify-claude -AllowModelRequest                 # 明确授权一次可能计费的真实模型核查
 
 .PARAMETER Action
-governance（默认）、format-check、check、test、ci、build、run、release、smoke、measure-idle、package、verify-package、verify-claude。
+governance（默认）、format-check、check、test、ci、build、run、release、smoke、measure-idle、package、verify-package、installer、verify-installer、installer-smoke、verify-claude。
 
 .PARAMETER Release
 smoke 和 measure-idle 使用 release 目录；否则使用 debug。
@@ -31,6 +34,15 @@ verify-package 的 ZIP；相对路径以仓库根目录为准。
 
 .PARAMETER AllowDirty
 仅本地 package 验收允许脏工作区，manifest 明确记录。
+
+.PARAMETER Acceptance
+installer 使用独立的验收身份；不覆盖普通安装的注册表和快捷方式。
+
+.PARAMETER AcceptanceId
+可选验收身份，用于旧／新版本安装升级核查；仅与 Acceptance 一起使用。
+
+.PARAMETER Previous
+installer-smoke 的旧版本验收 JSON，必须与当前包有相同验收身份。
 
 .PARAMETER AllowModelRequest
 显式允许 verify-claude 调用现有模型服务，禁用工具、预算上限 0.15 美元。
@@ -46,8 +58,9 @@ verify-package 的 ZIP；相对路径以仓库根目录为准。
 命令失败返回非零；真实模型调用、远端发布和清理用户数据不包含在默认检查内。
 #>
 param(
-    [ValidateSet('governance','format-check','check','test','ci','build','run','release','smoke','measure-idle','package','verify-package','verify-claude')][string]$Action='governance',
+    [ValidateSet('governance','format-check','check','test','ci','build','run','release','smoke','measure-idle','package','verify-package','installer','verify-installer','installer-smoke','verify-claude')][string]$Action='governance',
     [switch]$Release,[string]$Path,[switch]$AllowDirty,[switch]$AllowModelRequest,
+    [switch]$Acceptance,[string]$AcceptanceId,[string]$Previous,
     [ValidateSet('debug','release')][string]$Profile='release',[ValidatePattern('^[A-Za-z0-9-]+$')][string]$Label='native'
 )
 $ErrorActionPreference='Stop'
@@ -81,6 +94,9 @@ try {
         'measure-idle' {& (Join-Path $taskRoot 'scripts\measure-idle.ps1') -Release:$Release -Label $Label}
         'package' {$taskArguments=@('scripts/package.py','build');if($AllowDirty){$taskArguments+='--allow-dirty'};Invoke-ProjectPython -Parameters $taskArguments}
         'verify-package' {if(-not $Path){throw '-Path is required.'};Invoke-ProjectPython -Parameters @('scripts/package.py','verify',$Path)}
+        'installer' {$taskArguments=@('scripts/installer.py','build');if($Path){$taskArguments+=@('--path',$Path)};if($AllowDirty){$taskArguments+='--allow-dirty'};if($Acceptance){$taskArguments+='--acceptance'};if($AcceptanceId){$taskArguments+=@('--acceptance-id',$AcceptanceId)};Invoke-ProjectPython -Parameters $taskArguments}
+        'verify-installer' {if(-not $Path){throw '-Path is required.'};Invoke-ProjectPython -Parameters @('scripts/installer.py','verify',$Path)}
+        'installer-smoke' {if(-not $Path){throw '-Path is required.'};$taskArguments=@('scripts/installer.py','smoke',$Path);if($Previous){$taskArguments+=@('--previous',$Previous)};Invoke-ProjectPython -Parameters $taskArguments}
         'verify-claude' {if(-not $AllowModelRequest){throw 'Use -AllowModelRequest only after explicit user authorization.'};Invoke-ProjectPython -Parameters @('scripts/verify-claude.py','--profile',$Profile,'--allow-model-request')}
     }
 } finally {Pop-Location}

@@ -1,0 +1,11 @@
+{
+  "name": "NSIS",
+  "version": "3.13",
+  "url": "https://downloads.sourceforge.net/project/nsis/NSIS%203/3.13/nsis-3.13.zip",
+  "source_url": "https://downloads.sourceforge.net/project/nsis/NSIS%203/3.13/nsis-3.13-src.tar.bz2",
+  "archive_sha256": "ba63dffc4410ee89193e1cb5a41989991bd77c61068da17e3156d136b7b0b3d8",
+  "tree_sha256": "5399cdc9b316a13443a1656ac153fb55a79db21196caa3e255f48d0f5c61de9b",
+  "license_file": "NSIS-LICENSE.txt",
+  "license_sha256": "388357c1215ff403c5ebde3a5ecd273e68f8b79a579996775245d1ee65442aba",
+  "scope": "Official compiler ZIP, extracted unchanged; all files are hashed. Toolchain stays outside source and is not installed for end users."
+}

@@ -75,7 +75,7 @@ pub fn paint_emoji(
     size: f32,
     fallback_color: Color32,
 ) {
-    let font = crate::appearance::terminal_font(size);
+    let font = crate::appearance::current_terminal_font(painter.ctx(), size);
     let mut index = 0;
     for cluster in galley.job.text.graphemes(true) {
         let start = index;

@@ -22,6 +22,7 @@ The authenticated bridge listens on a dynamic `127.0.0.1` port. It limits frames
 | `AI_TERMINAL_SHELL_INVOCATION`, `AI_TERMINAL_REAL_*` | Current nested-shell invocation and resolved executable paths, scoped to this child environment. |
 | `TERM`, `COLORTERM`, `NO_COLOR`, `FORCE_COLOR`, `CLICOLOR_FORCE` | Normalize this process's interactive terminal color capability. |
 | `CLAUDECODE` | Prevent inheritance of the parent Claude nested-session marker. |
+| `AI_TERMINAL_NSIS` | Optional pinned NSIS compiler path for building Setup; no runtime effect. |
 | `RC`, `CARGO_HOME`, `RUSTUP_HOME`, `AI_TERMINAL_PYTHON` | Optional resource compiler, Rust environment, and Python overrides; `.tools/env.ps1` is ignored. |
 
 The manager does not implement a separate model connection or API-key template. It uses existing CLI authentication/settings. It does not alter user/system environment or Warp. Windows system font paths are currently fixed in source; non-default drives and other font environments are not verified.
@@ -145,3 +146,6 @@ Community zcode-app-cli's public `ZCODE_CLI_SETTINGS_FILE` replaces the whole ba
 0.4.9-preview.5 separates native controlled reproduction from real Agents: repeated per-mesh uploads to the same region produced one stretched-text frame in 48 fixed-table captures; the corresponding whole-frame upload run had no pixel changes. The user-visible transient flicker that recovers after scrolling still requires real-session acceptance; this is not a model/CLI protocol change.
 
 Stable 0.4.9 acceptance: the user tested preview.5, reported no issues and authorized normal publication. Retain selected Cascadia Mono/Microsoft YaHei UI, the fixed session-data root and existing windows. See [0.4.9 rendering checks](../../docs/rendering-0.4.9.en.md) for controlled reproduction, 656 captured frames and acceptance boundaries.
+
+
+0.4.10 preview: Settings defaults to JetBrains Mono and offers Cascadia Mono, Hack, Consolas and Courier New, with family names only for terminal text only. Changes immediately update fonts/cell metrics while preserving each ConPTY, identity and task state. Existing saved font choices are preserved; missing/unknown preference IDs default safely; unavailable system fonts are disabled and identified. Installed programs default to `%LOCALAPPDATA%/Programs/AI Terminal`; data remains at `%LOCALAPPDATA%/ai-terminal`. Busy files reject upgrade/uninstall without terminating programs. `.ai-terminal-installed` delegates desktop shortcuts to Setup. Native smoke captures after six fixed fixture readiness markers; this text inspection exists only in the isolated test, never in production task state.

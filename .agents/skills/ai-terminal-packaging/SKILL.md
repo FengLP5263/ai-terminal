@@ -39,3 +39,6 @@ package 会调用 Cargo release 构建，生成独立版本目录和 ZIP，记�
 0.4.9 的 alacritty_terminal／vte 本地协议补丁也纳入 Cargo 清单与 Rust 源文件摘要，原始 Apache-2.0／MIT 许可通过依赖清单收集。打包回归必须证明修改这两个 crate 的生产源码会改变 source_sha256。
 
 0.4.9-preview.3 默认内嵌 Cascadia Mono 四种静态字形，中文用系统 Microsoft YaHei UI；不重新启用 preview.1 的 GDI classic 拟合。package 核对 assets/fonts/SOURCE.json 的全部字节与哈希，并复制原始 Cascadia OFL 和字体来源；verify-package 保留旧包兼容，新包声明 fonts 元数据时要求完整来源与许可。Windows／POSIX 入口和参数不变。
+
+
+0.4.10 安装版入口为 `project.ps1 installer`，可用 -Path 指向已校验 ZIP；没有 Path 时先构建 ZIP。脏源码／制品仅本地显式 -AllowDirty；生成 EXE、.sha256、.json，记录 ZIP、脚本和完整 NSIS 工具链身份。`verify-installer -Path <json>` 可跨平台只读校验 EXE，不能冒充实际安装或签名验证。-Acceptance／-AcceptanceId 仅用于独立验收身份；原生 smoke 不能运行普通包。系统字体不新增交付字体文件，选项目录保存在 FONT-SOURCE.json；默认家族为 JetBrains Mono，并与运行时及 manifest 保持一致。新动作同步 Windows／POSIX 入口、双语脚本说明及安装文档，不自动提交或发布。
