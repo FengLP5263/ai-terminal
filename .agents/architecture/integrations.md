@@ -79,3 +79,5 @@ Kimi Code 2.5.0 使用自身 pi-tui 的 OSC 7501 `app=kimi-code`；仅受管入�
 0.4.8-preview.2：社区 ZCode 缺少公开、可归属当前 TUI 回合的模型失败／中断结束事件。0.4.8 按用户验收意见直接显示已收到的 hook 状态，开始后显示进行中，未收到后续通知时保留该状态；内部 turn.failed、通知正文与调试日志均不作为稳定集成协议。明确完成 hook 才显示完成，非正常进程退出仍可显示失败。TRAE 当前企业 CLI 的认证前提是企业旗舰版账号及 PAT，个人订阅和第三方 API Key 不替代该登录。
 
 0.4.9 预览的 Qoder 元数据仅新增白名单 permission_mode，并从 Notification.details 提取有长度上限的 toolName／toolUseId；input、message 与未知模式当场丢弃。已核对 CN 1.1.83 的公开安装代码和官方 hook／权限文档；合成 helper 事件、真实 CLI 启动与用户模型任务验收分别记录。
+
+0.4.11 预览：调用真实 Agent 前，仅从其子进程 PATH 排除本会话 shim 目录，避免公共分发器查询其他别名时再次进入管理器包装器。外层交互 Shell 保留入口；用户 PATH、CLI 文件和配置不变，hook 继续使用绝对 helper 路径。

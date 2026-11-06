@@ -193,3 +193,5 @@ TRAE 以本次 `-c hooks.<event>=…` 接入开始、工具、Notification、Sto
 
 
 0.4.10 预览：设置默认 JetBrains Mono，可选 Cascadia Mono、Hack、Consolas、Courier New，选项仅显示字体名称，仅影响终端正文。选项立即刷新字体／单元格度量，所有运行会话保留原 ConPTY、身份和状态；已保存的字体选择保持不变；旧设置缺失／未知字体 ID 回退默认，系统字体缺失时禁用选择并提示回退。安装版默认 `%LOCALAPPDATA%/Programs/AI Terminal`，数据仍为 `%LOCALAPPDATA%/ai-terminal`。升级／卸载不结束现有程序，文件占用时拒绝修改；`.ai-terminal-installed` 将桌面快捷方式管理交给安装器。原生 smoke 在六个固定样例的就绪标记后截图，此正文检查仅存在隔离测试中，不参与生产任务状态。
+
+0.4.11 预览：`run_agent` 在原调用与嵌套调用中都从子进程 PATH 过滤自己的会话入口，按 Windows 路径分量比较大小写、分隔符和末尾斜杠；不删除前缀相似的其他目录，不改父进程或持久 PATH。这样 qodercn 公共包装器查找 qoderclicn 时会到达真实安装，避免多层批处理及 Ctrl+C 终止确认堆积。

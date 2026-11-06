@@ -4,6 +4,18 @@
 
 Record user-visible additions, improvements, fixes, and compatibility changes for each release; omit categories that do not apply. Review both languages together, use the same version entry in GitHub Releases, and ship both files in the ZIP. Historical summaries follow existing GitHub release notes and UTC publication dates; development versions without a separate release do not receive invented release dates.
 
+## [0.4.11] - 2026-11-06
+
+### Fixed
+
+- Fix recursive launch when a public dispatcher such as Qoder resolves another alias through PATH and reenters the session shim. Exclude only this session's entry directory from CLI-child PATH, preserving the outer interactive shell, public launchers, original arguments, exit codes and a single lifecycle pair.
+- Preserve user PATH, CLI installations and configuration. Hooks keep their existing absolute paths; running sessions are not terminated and trust is not accepted automatically.
+
+### Verification scope
+
+- A bounded regression reproduces recursion in old code and reaches the public alias after the fix. PATH coverage includes case, slashes, CJK/spaces and similar directories; both regressions run in normal test/ci. Governance, formatting, Clippy, 207 Rust and 20 Python tests pass.
+- Both real qodercn/qoderclicn --version entries return 1.1.83, and native six-PTY smoke passes. These checks are separate from real model-turn acceptance; no model requests.
+
 ## [0.4.10] - 2026-11-06
 
 ### Added
