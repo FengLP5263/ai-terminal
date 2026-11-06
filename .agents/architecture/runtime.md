@@ -28,6 +28,7 @@ Cargo.toml 声明最低 Rust 1.92；使用 stable 工具链，制品记录实际
 | CLAUDECODE | 子会话避免继承父 Claude 的嵌套标记 |
 | RC | 可选 Windows SDK 资源编译器路径，仅构建时读取；默认从 PATH／SDK 查找 |
 | CARGO_HOME、RUSTUP_HOME | 可选本机 Rust 安装位置，由忽略的 .tools/env.ps1 提供 |
+| AI_TERMINAL_NSIS | 可选固定 NSIS 编译器路径，仅构建安装版时读取；不影响产品运行 |
 | AI_TERMINAL_PYTHON | 可选脚本 Python 可执行文件路径 |
 
 不在仓库创建 API Key 模板：管理器没有独立模型接入，沿用 CLI 的既有认证和模型设置。
@@ -189,3 +190,6 @@ TRAE 以本次 `-c hooks.<event>=…` 接入开始、工具、Notification、Sto
 0.4.9-preview.5 的原生受控复现与真实 Agent 分开：旧的逐网格同区域上传在 48 次固定表格截图中有一帧文字拉扯，新的整帧上传对应 48 次无像素变化。滚动后可恢复的用户闪烁仍需在真实会话中验收；不把此修复写成模型／CLI 协议变更。
 
 0.4.9 正式发行验收：用户实际测试 preview.5 后确认无问题并授权正常发行；保留已选定的 Cascadia Mono／微软雅黑 UI、固定会话数据根目录和旧窗口。受控渲染复现、656 帧像素核查与验收边界见 [0.4.9 渲染核查](../../docs/rendering-0.4.9.md)。
+
+
+0.4.10 预览：设置默认 JetBrains Mono，可选 Cascadia Mono、Hack、Consolas、Courier New，选项仅显示字体名称，仅影响终端正文。选项立即刷新字体／单元格度量，所有运行会话保留原 ConPTY、身份和状态；已保存的字体选择保持不变；旧设置缺失／未知字体 ID 回退默认，系统字体缺失时禁用选择并提示回退。安装版默认 `%LOCALAPPDATA%/Programs/AI Terminal`，数据仍为 `%LOCALAPPDATA%/ai-terminal`。升级／卸载不结束现有程序，文件占用时拒绝修改；`.ai-terminal-installed` 将桌面快捷方式管理交给安装器。原生 smoke 在六个固定样例的就绪标记后截图，此正文检查仅存在隔离测试中，不参与生产任务状态。

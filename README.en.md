@@ -44,6 +44,7 @@ Enable the floating bar to see session avatars and status above other windows. C
 | **Always-on-top bar** | Show only session avatars and status, up to 10 at a time. Drag the avatar area to see more, and click an avatar to return to its session. |
 | **Your workspace** | Drag to reorder, rename or color sessions, collapse the sidebar, and scale the entire interface with Ctrl + mouse wheel. |
 | **Familiar terminal behavior** | Use Chinese text, ANSI colors, and system color emoji; pass clipboard images to Codex, Claude Code or Qoder CN CLI for the CLI to handle. |
+| **Terminal fonts** | Default to JetBrains Mono and switch instantly to Cascadia Mono, Hack or two available Windows fonts in Settings while sessions stay connected and saved choices are preserved. |
 | **Chinese and English** | Follow the system language or choose Simplified Chinese or English in settings. |
 
 ## Supported Agents
@@ -94,11 +95,11 @@ Install and configure [Codex CLI](https://github.com/openai/codex), [Claude Code
 
 ### 3. Make it yours
 
-Use the gear at the top left to set the language and floating bar. Hover over a session avatar for details and click it to switch sessions. Drag the floating bar to reposition it, and turn it off in settings. Hold <kbd>Ctrl</kbd> and scroll to scale the entire interface.
+Use the gear at the top left to set the language, terminal font and floating bar. Hover over a session avatar for details and click it to switch sessions. Drag the floating bar to reposition it, and turn it off in settings. Hold <kbd>Ctrl</kbd> and scroll to scale the entire interface.
 
 Interactively launching `powershell`, `cmd` or `bash` through a managed entry updates the avatar to the current shell; `exit` restores each level. Codex/Claude/Qoder CN/Kimi Code/ZCode/TRAE CLI take avatar priority while active, then return to the current shell. One-off scripts and tool commands inside Agents do not change shell identity.
 
-Version 0.4.9 defaults to embedded **Cascadia Mono** with system **Microsoft YaHei UI** for CJK, retaining original native rendering. Regular, bold, italic and bold-italic ship with the app, with no separate Latin font installation. See [third-party notices](THIRD_PARTY_NOTICES.en.md) for provenance and licensing.
+Version 0.4.10 defaults to embedded **JetBrains Mono** with system **Microsoft YaHei UI** for CJK, preserving saved font choices. Settings also offers Cascadia Mono, Hack and available Windows fonts. Original native rendering is retained, and regular, bold, italic and bold-italic styles of embedded families ship with the app. See [third-party notices](THIRD_PARTY_NOTICES.en.md) for provenance and licensing.
 
 ## Frequently asked questions
 
@@ -159,3 +160,7 @@ Agent brand-icon provenance and licenses are recorded per file; see [third-party
 ## 0.4.9 update
 
 Fix false Qoder automatic-permission status, TUI cursor queries and wide-character block cursors, color emoji in floating hints, and intermittent overlapping/flashing text. Default to Cascadia Mono plus Microsoft YaHei UI, retaining natural rendering and existing session directories. See the [changelog](CHANGELOG.en.md) for scope and [0.4.9 rendering checks](docs/rendering-0.4.9.en.md) for controlled reproduction images and user acceptance. Release ZIPs include both changelogs and third-party licenses.
+
+## Installer and font settings
+
+Version 0.4.10 adds a per-user installer and five terminal fonts, defaulting to JetBrains Mono while retaining the portable ZIP. Public downloads follow actual release assets. See [installation, upgrades and font selection](docs/installation.en.md).

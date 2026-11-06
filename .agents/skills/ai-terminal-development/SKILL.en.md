@@ -19,3 +19,6 @@ Preserve source layout, the independent helper, font provenance, and session-sco
 All visible debug windows, floating windows, and example EXEs use the selected B icon in `assets/branding`, not framework defaults or early icons. Check both window icon and EXE resources; the hook helper has no GUI icon.
 
 Pinned native console assets live in assets/windows/conpty. build.rs stages conpty.dll/OpenConsole.exe in Cargo's actual output directories; the two ai-terminal EXEs alone are incomplete. Native frame changes target only owned windows, never system personalization. Bound literal-target checks to standard npm launchers, preserve opaque custom wrappers, and do not run health probes or retry CLIs after nonzero exits.
+
+
+For 0.4.10, the font catalog and Settings share FontChoice; changes must preserve running terminals. Embedded fonts retain original bytes, while system fonts are read only from Windows Fonts, never installed/copied. Installer sources live in scripts/installer independently of the Rust GUI/helper. Configure the pinned compiler under ignored tooling or AI_TERMINAL_NSIS; see scripts/README.en.md.

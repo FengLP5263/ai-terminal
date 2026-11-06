@@ -20,3 +20,7 @@ vendor/alacritty_terminal/UPSTREAM*.md text eol=lf
 vendor/vte/UPSTREAM*.md text eol=lf
 vendor/alacritty_terminal/tests/ref/**/*.recording binary
 assets/fonts/LICENSE-Cascadia.txt -text -whitespace
+
+# Preserve the original installer-toolchain license bytes.
+scripts/installer/NSIS-LICENSE.txt -text -whitespace
+assets/fonts/LICENSE-JetBrainsMono.txt -text -whitespace

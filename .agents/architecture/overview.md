@@ -18,7 +18,7 @@ Alacritty 0.26；默认 glow/OpenGL，可选 wgpu/DX12 用于本机对照。依�
 | src/platform.rs | Windows Job Object、主进程内存观测 |
 | vendor/egui_term | Alacritty/ConPTY、输入、字形与 viewport 渲染；Windows 原生文字、组合 emoji 和有界 atlas |
 | vendor/egui-winit | 与 eframe 相同的 0.35.0；仅保留无文本剪贴板的粘贴请求 |
-| assets/fonts、assets/icons、assets/branding | 固定来源的 Cascadia Mono 默认字体及 Hack 对比字体、Agent 图标，以及原创 B 方案程序图标和来源校验 |
+| assets/fonts、assets/icons、assets/branding | 固定来源的 JetBrains Mono 默认字体及 Cascadia Mono、Hack 可选字体、Agent 图标，以及原创 B 方案程序图标和来源校验 |
 | examples/terminal_probe.rs、workspace_probe.rs | 开发核查：真实 TUI 或本地 ANSI 样例、受控输入、GPU 截图后退出 |
 | examples/bash_probe.rs | 真实 Git Bash 与隔离 HOME，启动配置、目录通知、Agent 入口和原生截图核查；不请求模型 |
 | examples/shell_switch_probe.rs | 正式 App 控件的嵌套 Shell 头像与逐层返回截图；隔离会话，仅向自身窗口输入，不启动 Agent／模型 |
@@ -57,3 +57,6 @@ Windows 预览包通过 GitHub Releases 分发；尚无自动发布服务、云 
 0.4.9-preview.4：App 的主 UI 与后台 logic 仅消费 ROOT viewport；浮窗和悬停提示的布局／最小化状态不改变主终端。TerminalView 只从真实可见、未标记废弃且有有效屏幕矩形的布局提交 ConPTY 尺寸，测量帧不影响运行网格。
 
 0.4.9-preview.5：Windows 的 egui_glow 按本次绘制的可见网格批量上传顶点／重定位索引，再保持原顺序提交纹理、裁剪和回调。CPU／GPU 容量复用至最大可见帧，不复制终端历史，不增加生产重绘。独立 render_update_probe 用固定表格与变化字形区域检查瞬时错绘。
+
+
+0.4.10 预览：`font_choice.rs` 定义稳定字体 ID，设置将选择保存至 `UiSettings.terminal_font`。appearance 为正式界面、终端与探针统一应用字体；UI emoji 使用当前终端的原生字体实例，避免反复重建图集。NSIS 仅负责当前用户的安装／卸载，独立于运行时与 Agent 集成；ZIP 保留。

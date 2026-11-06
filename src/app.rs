@@ -325,6 +325,8 @@ pub struct App {
     idle_benchmark: bool,
     gpu_info: serde_json::Value,
     smoke_setup: bool,
+    smoke_ready_at: Option<Instant>,
+    smoke_capture_received: bool,
     startup_pending: bool,
     screenshot_requested: bool,
 }
@@ -363,6 +365,8 @@ impl App {
             }
         }
         let mut preferences = workspace.ui.normalize();
+        let actual_font =
+            ai_terminal::appearance::set_terminal_font(&cc.egui_ctx, preferences.terminal_font);
         let shortcut_attempted = ai_terminal::shortcut::ensure_first_run(
             &mut preferences,
             smoke || idle_benchmark || error.is_some(),
@@ -419,7 +423,7 @@ impl App {
             closing: None,
             shutdown_saved: false,
             theme: TerminalTheme::default(),
-            font: ai_terminal::appearance::terminal_font(14.0),
+            font: ai_terminal::appearance::terminal_font_for(actual_font, 14.0),
             preferences,
             settings_open: false,
             floating_session_count: None,
@@ -434,6 +438,8 @@ impl App {
             idle_benchmark,
             gpu_info: renderer_info(cc),
             smoke_setup: false,
+            smoke_ready_at: None,
+            smoke_capture_received: false,
             startup_pending: !smoke && !idle_benchmark,
             screenshot_requested: false,
         }
@@ -1136,8 +1142,14 @@ impl App {
         self.activate(id, ctx);
     }
     fn dialogs(&mut self, ctx: &egui::Context) {
+        let previous_font = self.preferences.terminal_font;
         if ai_terminal::settings::show(ctx, &mut self.settings_open, &mut self.preferences) {
             i18n::apply(ctx, self.preferences.language);
+            if previous_font != self.preferences.terminal_font {
+                let actual =
+                    ai_terminal::appearance::set_terminal_font(ctx, self.preferences.terminal_font);
+                self.font = ai_terminal::appearance::terminal_font_for(actual, 14.0);
+            }
             self.preferences_changed(ctx);
             ctx.request_repaint();
         }
@@ -1282,7 +1294,7 @@ impl App {
                 self.active = Some(self.sessions[index].spec.id.clone());
                 self.start_session(index, ctx);
                 if let Some(backend) = &mut self.sessions[index].backend {
-                    backend.process_command(BackendCommand::Write("Write-Output 'ai-terminal · 原生终端已连接'; Write-Output 'UTF-8 / ANSI / 多会话'; Write-Output '后台任务完成后，左侧会话会显示绿点。'\r".as_bytes().to_vec()));
+                    backend.process_command(BackendCommand::Write("Write-Output 'ai-terminal · 原生终端已连接'; Write-Output 'UTF-8 / ANSI / 多会话'; Write-Output '后台任务完成后，左侧会话会显示绿点。'; Write-Output ('SMOKE_' + 'READY')\r".as_bytes().to_vec()));
                 }
             }
             if let Some(bridge) = &self.bridge {
@@ -1340,7 +1352,26 @@ impl App {
             }
             ctx.request_repaint_after(Duration::from_secs(5));
         }
-        if self.started.elapsed() > Duration::from_secs(5) && !self.screenshot_requested {
+        // A fixed five-second capture can precede the last PowerShell startup.
+        // Only this isolated fixture inspects its own marker; production status never does.
+        if self.smoke_ready_at.is_none()
+            && self.sessions.len() == 6
+            && self.sessions.iter_mut().all(|session| {
+                session.backend.as_mut().is_some_and(|backend| {
+                    backend
+                        .plain_text()
+                        .lines()
+                        .any(|line| line.trim() == "SMOKE_READY")
+                })
+            })
+        {
+            self.smoke_ready_at = Some(Instant::now());
+        }
+        if self
+            .smoke_ready_at
+            .is_some_and(|ready| ready.elapsed() > Duration::from_millis(650))
+            && !self.screenshot_requested
+        {
             self.screenshot_requested = true;
             ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::default()));
             ctx.request_repaint_after(Duration::from_millis(200));
@@ -1355,6 +1386,7 @@ impl App {
             })
         });
         if let Some(image) = screenshot {
+            self.smoke_capture_received = true;
             let _ = std::fs::create_dir_all(&self.directory);
             if let Ok(file) = std::fs::File::create(self.directory.join("smoke.png")) {
                 let mut encoder = png::Encoder::new(
@@ -1370,9 +1402,16 @@ impl App {
                 }
             }
         }
-        if self.started.elapsed() > Duration::from_secs(7) {
+        let timed_out = self.started.elapsed() > Duration::from_secs(25);
+        let captured_ready = self.smoke_capture_received
+            && self
+                .smoke_ready_at
+                .is_some_and(|ready| ready.elapsed() > Duration::from_millis(1300));
+        if timed_out || captured_ready {
             let sessions:Vec<_>=self.sessions.iter_mut().map(|s|serde_json::json!({"name":s.spec.name,"activity":format!("{:?}",s.status.activity),"unread":s.status.unread,"pty_pid":s.backend.as_ref().map(|b|b.pty_id()),"terminal_text":s.backend.as_mut().map(|b|b.plain_text())})).collect();
-            let pass = self.sessions.len() == 6
+            let pass = !timed_out
+                && captured_ready
+                && self.sessions.len() == 6
                 && self.sessions[0].status.unread
                 && self.sessions[0].status.activity == Activity::Completed
                 && self.sessions[1].status.activity == Activity::Waiting
@@ -1381,7 +1420,7 @@ impl App {
                     .iter()
                     .all(|s| s.status.activity == Activity::Working)
                 && self.sessions.iter().all(|s| s.backend.is_some());
-            let report = serde_json::json!({"ok":pass,"fixture_events":true,"gpu":self.gpu_info,"sessions":sessions,"manager_resident_bytes":crate::platform::resident_bytes(),"frames":self.frames,"ui_cpu_micros":self.ui_micros,"elapsed_ms":self.started.elapsed().as_millis()});
+            let report = serde_json::json!({"ok":pass,"fixture_events":true,"capture_after_fixture_ready":captured_ready,"timed_out":timed_out,"gpu":self.gpu_info,"sessions":sessions,"manager_resident_bytes":crate::platform::resident_bytes(),"frames":self.frames,"ui_cpu_micros":self.ui_micros,"elapsed_ms":self.started.elapsed().as_millis()});
             let _ = std::fs::create_dir_all(&self.directory);
             let _ = std::fs::write(
                 self.directory.join("smoke.json"),
@@ -1389,6 +1428,8 @@ impl App {
             );
             self.allow_exit = true;
             ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+        } else {
+            ctx.request_repaint_after(Duration::from_millis(100));
         }
     }
 }
@@ -1522,6 +1563,103 @@ fn renderer_info(cc: &eframe::CreationContext<'_>) -> serde_json::Value {
 #[cfg(all(test, windows))]
 mod tests {
     use super::*;
+    #[test]
+    fn font_dropdown_keeps_the_live_pty_and_restores_the_saved_choice() {
+        use ai_terminal::font_choice::FontChoice;
+        fn frame(app: &mut App, ctx: &egui::Context, events: Vec<egui::Event>) -> egui::FullOutput {
+            ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1000.0, 760.0),
+                    )),
+                    events,
+                    ..Default::default()
+                },
+                |ui| {
+                    app.terminal(ui);
+                    app.dialogs(ctx);
+                },
+            )
+        }
+        fn position(output: &egui::FullOutput, text: &str) -> egui::Pos2 {
+            fn find(shape: &egui::Shape, text: &str) -> Option<egui::Pos2> {
+                match shape {
+                    egui::Shape::Text(t) if t.galley.job.text == text => {
+                        Some(t.pos + t.galley.size() / 2.0)
+                    }
+                    egui::Shape::Vec(shapes) => shapes.iter().find_map(|shape| find(shape, text)),
+                    _ => None,
+                }
+            }
+            output
+                .shapes
+                .iter()
+                .find_map(|shape| find(&shape.shape, text))
+                .expect("font control is visible")
+        }
+        fn click(app: &mut App, ctx: &egui::Context, pos: egui::Pos2) {
+            for pressed in [true, false] {
+                let _ = frame(
+                    app,
+                    ctx,
+                    vec![
+                        egui::Event::PointerMoved(pos),
+                        egui::Event::PointerButton {
+                            pos,
+                            button: egui::PointerButton::Primary,
+                            pressed,
+                            modifiers: egui::Modifiers::NONE,
+                        },
+                    ],
+                );
+            }
+        }
+        let root = tempfile::tempdir().unwrap();
+        let data = root.path().join("data");
+        let ctx = egui::Context::default();
+        let creation = eframe::CreationContext::_new_kittest(ctx.clone());
+        let mut app = App::new(&creation, data.clone(), false, false);
+        use_built_helper(&mut app);
+        app.startup_pending = false;
+        app.preferences.language = ai_terminal::i18n::Language::En;
+        i18n::apply(&ctx, app.preferences.language);
+        app.sessions.push(Session::new(SessionSpec {
+            id: "kept".into(),
+            name: "Example ❤️".into(),
+            directory: root.path().into(),
+            agent: Agent::Cmd,
+            agent_session_id: None,
+            color: None,
+        }));
+        app.active = Some("kept".into());
+        app.start_session(0, &ctx);
+        let pid = app.sessions[0].backend.as_ref().unwrap().pty_id();
+        app.settings_open = true;
+        let _ = frame(&mut app, &ctx, vec![]);
+        let output = frame(&mut app, &ctx, vec![]);
+        click(&mut app, &ctx, position(&output, "JetBrains Mono"));
+        let output = frame(&mut app, &ctx, vec![]);
+        click(&mut app, &ctx, position(&output, "Hack"));
+        let _ = frame(&mut app, &ctx, vec![]);
+        assert_eq!(app.preferences.terminal_font, FontChoice::Hack);
+        assert_eq!(app.sessions[0].backend.as_ref().unwrap().pty_id(), pid);
+        assert_eq!(app.sessions[0].spec.id, "kept");
+        assert_eq!(app.sessions[0].spec.name, "Example ❤️");
+        app.preferences_save_at = Some(Instant::now());
+        app.background_tick(&ctx);
+        assert_eq!(
+            model::load(&data.join("sessions.json"))
+                .unwrap()
+                .ui
+                .terminal_font,
+            FontChoice::Hack
+        );
+        let restored = App::new(&creation, data, false, false);
+        assert_eq!(restored.preferences.terminal_font, FontChoice::Hack);
+        assert_eq!(restored.sessions[0].spec.id, "kept");
+    }
+
     #[test]
     fn secondary_viewports_cannot_relayout_the_main_terminal() {
         let root = tempfile::tempdir().unwrap();

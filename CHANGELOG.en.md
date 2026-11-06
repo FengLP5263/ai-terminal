@@ -4,6 +4,27 @@
 
 Record user-visible additions, improvements, fixes, and compatibility changes for each release; omit categories that do not apply. Review both languages together, use the same version entry in GitHub Releases, and ship both files in the ZIP. Historical summaries follow existing GitHub release notes and UTC publication dates; development versions without a separate release do not receive invented release dates.
 
+## [0.4.10] - 2026-11-06
+
+### Added
+
+- Add a per-user Windows Setup alongside the portable ZIP, with installation directory selection, Start menu entries, an optional desktop shortcut and uninstallation.
+- Select five terminal fonts in Settings: JetBrains Mono (default), Cascadia Mono, Hack, and installed Consolas or Courier New. Options show only family names. Apply and save immediately; unavailable system fonts are identified and fall back to the default. Existing saved font choices are preserved.
+
+### Changed
+
+- Font changes preserve terminal and Agent processes. Chinese and emoji keep their system fonts; the four embedded styles and original native rendering parameters are retained.
+- Installed builds continue using `%LOCALAPPDATA%/ai-terminal` for sessions/settings. Upgrades reuse the registered installation directory, with an explicit directory override taking priority. Uninstall deletes managed program files and preserves data and unrelated user files. Upgrade/uninstall checks busy files without terminating sessions automatically.
+- Pin the NSIS toolchain source, version and digest, retain its original license, and use isolated registry keys, shortcuts and data directories for acceptance.
+- Native smoke waits for all six fixed fixtures before capturing instead of counting an early blank screenshot as passing evidence.
+
+### Compatibility and validation
+
+- Pass governance, formatting, Clippy, 205 Rust and 20 Python regressions. The stable build runs isolated smoke with six real PowerShell PTYs and synthetic task events, without model requests.
+- Inspect native captures of all five fonts at 100%/103%/110%/150%/200%. The user accepted font selection and the JetBrains Mono default. Existing sessions, working directories and explicitly saved font choices are preserved.
+- Isolated installer acceptance covers fresh install, upgrade from 0.4.9, rejection of upgrade/uninstall while running, installed six-PTY smoke, uninstall preserving data/unrelated files, and registry cleanup. Page-by-page wizard interaction and cross-device upgrades still need practical acceptance.
+- Automatic update checking and code signing are not integrated; existing Agent login, trust and permission boundaries remain.
+
 ## [0.4.9] - 2026-11-05
 
 ### Fixed

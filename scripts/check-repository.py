@@ -19,7 +19,7 @@ import package as project_package
 
 ROOT=Path(__file__).resolve().parent.parent
 NATIVE_EXECUTABLE='assets/windows/conpty/x64/OpenConsole.exe'
-REQUIRED=['AGENTS.md','CLAUDE.md','README.md','CHANGELOG.md','Cargo.toml','Cargo.lock','build.rs','rust-toolchain.toml','.gitignore','.gitattributes','THIRD_PARTY_NOTICES.md','scripts/README.md','scripts/windows/project.ps1','scripts/posix/project.sh','scripts/package.py']
+REQUIRED=['AGENTS.md','CLAUDE.md','README.md','CHANGELOG.md','Cargo.toml','Cargo.lock','build.rs','rust-toolchain.toml','.gitignore','.gitattributes','THIRD_PARTY_NOTICES.md','scripts/README.md','scripts/windows/project.ps1','scripts/posix/project.sh','scripts/package.py','scripts/installer.py','scripts/installer/setup.nsi','scripts/installer/TOOLCHAIN.json','scripts/installer/NSIS-LICENSE.txt']
 REQUIRED += ['.agents/architecture/'+name+'.md' for name in ['overview','runtime','data-and-assets','integrations']]
 REQUIRED += ['.agents/skills/ai-terminal-'+name+'/SKILL.md' for name in ['development','testing','packaging','git-workflow']]
 
@@ -37,7 +37,7 @@ def check():
     blocked={'target','output','.tools','.runtime','runtime','.local','reference','.git','__pycache__'}
     secret=re.compile(r'(?:sk-(?:proj-)?[A-Za-z0-9_-]{30,}|-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----)')
     personal=re.compile(r'[A-Za-z]:[\\/]Users[\\/](?!Public(?:[\\/]|$)|<|\$|%)[A-Za-z0-9_.-]+[\\/]')
-    text_suffix={'.rs','.md','.toml','.json','.py','.ps1','.sh','.yml','.yaml','.txt'}
+    text_suffix={'.rs','.md','.toml','.json','.py','.ps1','.sh','.yml','.yaml','.txt','.nsi','.nsh'}
     for name in paths:
         path=ROOT/name
         if not path.is_file():continue
@@ -60,6 +60,8 @@ def check():
                     if not target or '://' in target or target.startswith(('/', '${', '%')):continue
                     if not (path.parent/target).exists():errors.append('broken document link: '+name+' -> '+target)
     source=json.loads((ROOT/'assets/fonts/SOURCE.json').read_text(encoding='utf-8'))
+    installer_toolchain=json.loads((ROOT/'scripts/installer/TOOLCHAIN.json').read_text(encoding='utf-8'))
+    if hashlib.sha256((ROOT/'scripts/installer/NSIS-LICENSE.txt').read_bytes()).hexdigest()!=installer_toolchain['license_sha256']:errors.append('installer license identity mismatch')
     for name,expected in source['files'].items():
         data=(ROOT/'assets/fonts'/name).read_bytes()
         if len(data)!=expected['bytes'] or hashlib.sha256(data).hexdigest()!=expected['sha256']:errors.append('font identity mismatch: '+name)

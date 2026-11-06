@@ -18,8 +18,9 @@ runtime/ 保存会话级 hook 配置；桥 token 只在进程环境和短消息�
 
 ## 资产与来源
 
-- assets/fonts/CascadiaMono-*.ttf：默认英文／数字字体，微软官方 v2407.24 的四种原始静态字形，SIL OFL 1.1；归档、固定提交、逐文件哈希与原始许可见 SOURCE.json、LICENSE-Cascadia.txt。
-- assets/fonts/Hack-*.ttf：官方 v3.003，来源、大小和 SHA-256 在 SOURCE.json，原许可证 LICENSE.md。
+- assets/fonts/CascadiaMono-*.ttf：可选英文／数字字体，微软官方 v2407.24 的四种原始静态字形，SIL OFL 1.1；归档、固定提交、逐文件哈希与原始许可见 SOURCE.json、LICENSE-Cascadia.txt。
+- assets/fonts/Hack-*.ttf：官方 v3.003，可选 0.4.8 字体；来源、大小和 SHA-256 在 SOURCE.json，原许可证 LICENSE.md。
+- assets/fonts/JetBrainsMono-*.ttf：官方 v2.304 的四种原始静态字形，默认英文字体；SOURCE.json 固定提交、归档和逐文件 SHA-256，原始 SIL OFL 1.1 在 LICENSE-JetBrainsMono.txt。
 - assets/branding：项目原创 B「会话叠窗」图标，SVG 与用户选定源字节相同，PNG／ICO 为固定导出；SOURCE.json 记录大小和 SHA-256，治理检查逐项核对。
 - assets/icons：OpenAI／Claude／Qoder 来自 Lobe Icons（MIT）；Kimi Code／ZCode 使用各自官方仓库的产品图标，TRAE 使用官方 CLI 文档站的图标。SOURCE.json 逐文件记录来源、许可声明、原始尺寸、变换、大小与 SHA-256，不跨来源套用许可证。
 - Windows 中文／UI／emoji 字体：读取系统字体（含 Segoe UI Emoji），不复制到 Git 或交付包。
@@ -81,3 +82,6 @@ Kimi Code 使用官方仓库文档所用的 316×316 PNG，ZCode 使用官方仓
 0.4.9-preview.5：egui_glow 的 CPU 暂存仅保留当前可见绘制的顶点、索引和范围；容量按最大帧复用，不持久化终端正文。新 mesh_batch.rs 与其 vendor 来源记录继续计入制品源码身份。
 
 发布源码中的上游终端录制保留为二进制差异，两个新增 vendor 快照禁止 Git 换行转换；Cascadia 原始许可保留全部字节及原始空白。项目自有源码继续执行正常格式与空白检查。
+
+
+0.4.10 预览：`ui.terminal_font` 使用 `jetbrains_mono`（默认）、`cascadia_mono`、`hack`、`consolas`、`courier_new` 稳定 ID。三个内置家族复用已固定的四种字形；新增系统字体不分发字节，SOURCE.json 记录选择目录与来源边界。NSIS 编译工具及原始许可固定在 scripts/installer 的来源记录；程序安装文件带独立身份标记，卸载只删除生成清单中的文件和空目录，不递归删除程序目录，不接触数据目录。EXE／摘要／JSON 输出与隔离安装证据均在忽略的 output/。

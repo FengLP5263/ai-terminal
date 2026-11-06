@@ -57,6 +57,41 @@
       "url": "https://raw.githubusercontent.com/microsoft/cascadia-code/v2407.24/LICENSE",
       "bytes": 4489,
       "sha256": "51882cd3cdba4e16f220f44ddb08a635c38c44ea6e0975db2574f4be6f958238"
+    },
+    "JetBrainsMono-Regular.ttf": {
+      "family": "JetBrains Mono",
+      "url": "https://github.com/JetBrains/JetBrainsMono/releases/download/v2.304/JetBrainsMono-2.304.zip",
+      "archive_path": "fonts/ttf/JetBrainsMono-Regular.ttf",
+      "bytes": 273900,
+      "sha256": "a0bf60ef0f83c5ed4d7a75d45838548b1f6873372dfac88f71804491898d138f"
+    },
+    "JetBrainsMono-Bold.ttf": {
+      "family": "JetBrains Mono",
+      "url": "https://github.com/JetBrains/JetBrainsMono/releases/download/v2.304/JetBrainsMono-2.304.zip",
+      "archive_path": "fonts/ttf/JetBrainsMono-Bold.ttf",
+      "bytes": 277828,
+      "sha256": "5590990c82e097397517f275f430af4546e1c45cff408bde4255dad142479dcb"
+    },
+    "JetBrainsMono-Italic.ttf": {
+      "family": "JetBrains Mono",
+      "url": "https://github.com/JetBrains/JetBrainsMono/releases/download/v2.304/JetBrainsMono-2.304.zip",
+      "archive_path": "fonts/ttf/JetBrainsMono-Italic.ttf",
+      "bytes": 276840,
+      "sha256": "9d0a1f7a708e6af183f1193b7e81d40da294f5c67682c085d8401c60aac8ded4"
+    },
+    "JetBrainsMono-BoldItalic.ttf": {
+      "family": "JetBrains Mono",
+      "url": "https://github.com/JetBrains/JetBrainsMono/releases/download/v2.304/JetBrainsMono-2.304.zip",
+      "archive_path": "fonts/ttf/JetBrainsMono-BoldItalic.ttf",
+      "bytes": 279832,
+      "sha256": "4039d5ce0ed225bf9c8b2c8c6436290ae2f356b7e90d70fa666227238324aa3b"
+    },
+    "LICENSE-JetBrainsMono.txt": {
+      "family": "JetBrains Mono",
+      "url": "https://github.com/JetBrains/JetBrainsMono/releases/download/v2.304/JetBrainsMono-2.304.zip",
+      "archive_path": "OFL.txt",
+      "bytes": 4399,
+      "sha256": "30f0c136e3c88e422d0791acd97238870f9054a9729bc34cf2ff0d4ed8cac4ad"
     }
   },
   "families": {
@@ -74,5 +109,46 @@
       "license_file": "LICENSE-Cascadia.txt"
     }
   },
-  "default_family": "Cascadia Mono"
+  "default_family": "JetBrains Mono",
+  "terminal_choices": [
+    {
+      "id": "jetbrains_mono",
+      "family": "JetBrains Mono",
+      "source": "embedded",
+      "version": "2.304",
+      "default": true
+    },
+    {
+      "id": "cascadia_mono",
+      "family": "Cascadia Mono",
+      "source": "embedded",
+      "baseline": "0.4.9"
+    },
+    {
+      "id": "hack",
+      "family": "Hack",
+      "source": "embedded",
+      "baseline": "0.4.8"
+    },
+    {
+      "id": "consolas",
+      "family": "Consolas",
+      "source": "Windows installed font; not redistributed"
+    },
+    {
+      "id": "courier_new",
+      "family": "Courier New",
+      "source": "Windows installed font; not redistributed"
+    }
+  ],
+  "jetbrains_mono": {
+    "version": "2.304",
+    "commit": "cd5227bd1f61dff3bbd6c814ceaf7ffd95e947d9",
+    "archive_url": "https://github.com/JetBrains/JetBrainsMono/releases/download/v2.304/JetBrainsMono-2.304.zip",
+    "archive_sha256": "6f6376c6ed2960ea8a963cd7387ec9d76e3f629125bc33d1fdcd7eb7012f7bbf",
+    "archive_bytes": 5622857,
+    "license": "SIL OFL 1.1",
+    "license_file": "LICENSE-JetBrainsMono.txt",
+    "transforms": "None: original static TTF faces and license bytes."
+  }
 }

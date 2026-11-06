@@ -1,6 +1,58 @@
+use crate::font_choice::FontChoice;
 use egui::{Color32, FontData, FontDefinitions, FontFamily, FontId};
 use egui_term::{FontSettings, TerminalFont};
 use std::sync::{Arc, OnceLock};
+
+const FACE_NAMES: [&str; 4] = [
+    "terminal-regular",
+    "terminal-bold",
+    "terminal-italic",
+    "terminal-bold-italic",
+];
+static CASCADIA: [&[u8]; 4] = [
+    include_bytes!("../assets/fonts/CascadiaMono-Regular.ttf"),
+    include_bytes!("../assets/fonts/CascadiaMono-Bold.ttf"),
+    include_bytes!("../assets/fonts/CascadiaMono-Italic.ttf"),
+    include_bytes!("../assets/fonts/CascadiaMono-BoldItalic.ttf"),
+];
+static HACK: [&[u8]; 4] = [
+    include_bytes!("../assets/fonts/Hack-Regular.ttf"),
+    include_bytes!("../assets/fonts/Hack-Bold.ttf"),
+    include_bytes!("../assets/fonts/Hack-Italic.ttf"),
+    include_bytes!("../assets/fonts/Hack-BoldItalic.ttf"),
+];
+static JETBRAINS: [&[u8]; 4] = [
+    include_bytes!("../assets/fonts/JetBrainsMono-Regular.ttf"),
+    include_bytes!("../assets/fonts/JetBrainsMono-Bold.ttf"),
+    include_bytes!("../assets/fonts/JetBrainsMono-Italic.ttf"),
+    include_bytes!("../assets/fonts/JetBrainsMono-BoldItalic.ttf"),
+];
+
+fn system_font_directory() -> std::path::PathBuf {
+    std::env::var_os("WINDIR")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| std::path::PathBuf::from("C:/Windows"))
+        .join("Fonts")
+}
+
+/// Inspect only known system faces, once. No disk scans or font copies into the package.
+pub fn font_available(choice: FontChoice) -> bool {
+    static AVAILABLE: OnceLock<[bool; 5]> = OnceLock::new();
+    let available = AVAILABLE.get_or_init(|| {
+        FontChoice::ALL.map(|font| {
+            font.system_faces().is_none_or(|files| {
+                cfg!(windows)
+                    && files
+                        .iter()
+                        .all(|file| system_font_directory().join(file).is_file())
+            })
+        })
+    });
+    available[FontChoice::ALL
+        .iter()
+        .position(|font| *font == choice)
+        .unwrap()]
+}
 
 pub const TERMINAL_BG: Color32 = Color32::BLACK;
 pub const SIDEBAR_BG: Color32 = Color32::from_gray(18);
@@ -24,27 +76,30 @@ pub fn setup(ctx: &egui::Context) {
         .text_styles
         .insert(egui::TextStyle::Body, FontId::proportional(14.0));
     ctx.set_style_of(egui::Theme::Dark, style);
+    set_terminal_font(ctx, FontChoice::default());
+}
+
+/// Change the shared font definitions only on a preference change, never per frame.
+pub fn set_terminal_font(ctx: &egui::Context, requested: FontChoice) -> FontChoice {
+    let choice = if font_available(requested) {
+        requested
+    } else {
+        FontChoice::default()
+    };
     let mut fonts = FontDefinitions::default();
-    let faces: [(&str, &[u8]); 4] = [
-        (
-            "terminal-regular",
-            include_bytes!("../assets/fonts/CascadiaMono-Regular.ttf"),
-        ),
-        (
-            "terminal-bold",
-            include_bytes!("../assets/fonts/CascadiaMono-Bold.ttf"),
-        ),
-        (
-            "terminal-italic",
-            include_bytes!("../assets/fonts/CascadiaMono-Italic.ttf"),
-        ),
-        (
-            "terminal-bold-italic",
-            include_bytes!("../assets/fonts/CascadiaMono-BoldItalic.ttf"),
-        ),
-    ];
-    for (name, bytes) in faces {
-        let mut face = FontData::from_static(bytes);
+    let embedded = match choice {
+        FontChoice::Hack => &HACK,
+        FontChoice::JetBrainsMono => &JETBRAINS,
+        _ => &CASCADIA,
+    };
+    for (index, name) in FACE_NAMES.into_iter().enumerate() {
+        let mut face = match choice.system_faces() {
+            Some(files) => match std::fs::read(system_font_directory().join(files[index])) {
+                Ok(bytes) => FontData::from_owned(bytes),
+                Err(_) => return set_terminal_font(ctx, FontChoice::default()),
+            },
+            None => FontData::from_static(embedded[index]),
+        };
         face.tweak.hinting = Some(true);
         face.tweak.subpixel_binning = Some(false);
         face.tweak.hinting_target =
@@ -55,11 +110,8 @@ pub fn setup(ctx: &egui::Context) {
             });
         fonts.font_data.insert(name.into(), Arc::new(face));
     }
-    for (name, path) in [
-        ("ui-latin", "C:/Windows/Fonts/segoeui.ttf"),
-        ("ui-cjk", "C:/Windows/Fonts/msyh.ttc"),
-    ] {
-        if let Ok(bytes) = std::fs::read(path) {
+    for (name, path) in [("ui-latin", "segoeui.ttf"), ("ui-cjk", "msyh.ttc")] {
+        if let Ok(bytes) = std::fs::read(system_font_directory().join(path)) {
             fonts
                 .font_data
                 .insert(name.into(), Arc::new(FontData::from_owned(bytes)));
@@ -102,10 +154,7 @@ pub fn setup(ctx: &egui::Context) {
             .push("ui-cjk".into());
     }
     // Use the system emoji face for complete shaped clusters in UI labels/editors.
-    let system_fonts = std::env::var_os("WINDIR")
-        .map(std::path::PathBuf::from)
-        .unwrap_or_else(|| std::path::PathBuf::from("C:/Windows"))
-        .join("Fonts");
+    let system_fonts = system_font_directory();
     if let Ok(bytes) = std::fs::read(system_fonts.join("seguiemj.ttf")) {
         fonts
             .font_data
@@ -122,15 +171,34 @@ pub fn setup(ctx: &egui::Context) {
             .insert(2, "ui-emoji".into());
     }
     ctx.set_fonts(fonts);
+    ctx.data_mut(|data| data.insert_temp(egui::Id::new("terminal-font-choice"), choice));
+    choice
 }
 
 pub fn terminal_font(size: f32) -> TerminalFont {
-    static FACES: [&[u8]; 4] = [
-        include_bytes!("../assets/fonts/CascadiaMono-Regular.ttf"),
-        include_bytes!("../assets/fonts/CascadiaMono-Bold.ttf"),
-        include_bytes!("../assets/fonts/CascadiaMono-Italic.ttf"),
-        include_bytes!("../assets/fonts/CascadiaMono-BoldItalic.ttf"),
-    ];
+    terminal_font_for(FontChoice::default(), size)
+}
+
+/// UI emoji and the terminal must share a native family, keeping one bounded atlas.
+pub fn current_terminal_font(ctx: &egui::Context, size: f32) -> TerminalFont {
+    let choice = ctx
+        .data(|data| data.get_temp::<FontChoice>(egui::Id::new("terminal-font-choice")))
+        .unwrap_or_default();
+    terminal_font_for(choice, size)
+}
+
+pub fn terminal_font_for(choice: FontChoice, size: f32) -> TerminalFont {
+    let choice = if font_available(choice) {
+        choice
+    } else {
+        FontChoice::default()
+    };
+    let faces: &'static [&'static [u8]] = match choice {
+        FontChoice::CascadiaMono => &CASCADIA,
+        FontChoice::Hack => &HACK,
+        FontChoice::JetBrainsMono => &JETBRAINS,
+        _ => &[],
+    };
     TerminalFont::new(FontSettings {
         font_type: FontId::new(size, FontFamily::Name("terminal-regular".into())),
     })
@@ -139,7 +207,7 @@ pub fn terminal_font(size: f32) -> TerminalFont {
         FontId::new(size, FontFamily::Name("terminal-italic".into())),
         FontId::new(size, FontFamily::Name("terminal-bold-italic".into())),
     )
-    .with_native_font("Cascadia Mono", &FACES)
+    .with_native_font(choice.family(), faces)
 }
 
 /// The approved B artwork is embedded; startup performs no asset-file I/O.

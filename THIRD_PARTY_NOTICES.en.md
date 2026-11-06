@@ -7,8 +7,8 @@
 | Local egui_term snapshot | MIT | `vendor/egui_term/LICENSE` and `UPSTREAM.md`; fixed upstream revision. |
 | Alacritty terminal | Apache-2.0 | Pinned in `Cargo.lock`; upstream https://github.com/alacritty/alacritty. |
 | egui / eframe | MIT OR Apache-2.0 | Pinned in `Cargo.lock`; upstream https://github.com/emilk/egui. |
-| Four Cascadia Mono v2407.24 faces (default) | SIL Open Font License 1.1 | Microsoft official release archive; `assets/fonts/LICENSE-Cascadia.txt`, `SOURCE.json`. |
-| Four Hack v3.003 faces (comparison fixture) | Original files govern (MIT / Bitstream Vera terms) | `assets/fonts/LICENSE.md`, `SOURCE.json`. |
+| Four Cascadia Mono v2407.24 faces (optional) | SIL Open Font License 1.1 | Microsoft official release archive; `assets/fonts/LICENSE-Cascadia.txt`, `SOURCE.json`. |
+| Four Hack v3.003 faces (optional) | Original files govern (MIT / Bitstream Vera terms) | `assets/fonts/LICENSE.md`, `SOURCE.json`. |
 | Other Rust dependencies | Their Cargo metadata and original files govern | Package inventory records versions, declarations, and available license text. |
 
 Windows system fonts are read at runtime and not bundled. The project's LICENSE applies to project code and does not replace third-party licenses. Local packaging produces `dependencies.json`, collects available LICENSE/COPYING/NOTICE files, and records missing texts. This notice records provenance and collection scope; it does not claim a complete legal review of all dependencies, runtimes, or distribution methods.
@@ -28,3 +28,7 @@ Brand icons identify integrations only. Names and marks belong to their respecti
 
 - egui_glow 0.35.0: local OpenGL buffer-reuse patch, MIT OR Apache-2.0. See `vendor/egui_glow/UPSTREAM.md` and its included licenses; the artifact dependency inventory records this patch.
 - Microsoft.Windows.Console.ConPTY 1.25.260930003: MIT, Microsoft's official x64 native console runtime. See [provenance and checks](assets/windows/conpty/SOURCE.json) and the [original license](assets/windows/conpty/LICENSE.txt). Packages contain conpty.dll, OpenConsole.exe and license/provenance copies; this dependency is recorded separately in manifest.json under native_console.
+
+## JetBrains Mono
+
+The optional terminal font comes from [JetBrains official v2.304](https://github.com/JetBrains/JetBrainsMono/releases/tag/v2.304) under SIL OFL 1.1. Four static styles and the license retain their original bytes; `assets/fonts/SOURCE.json` records provenance/SHA-256. Source license: [LICENSE-JetBrainsMono.txt](assets/fonts/LICENSE-JetBrainsMono.txt). The ZIP includes `JetBrainsMono-LICENSE.txt`; system fonts are not copied or redistributed.
