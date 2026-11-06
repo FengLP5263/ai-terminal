@@ -1,5 +1,11 @@
 //! Fixed native text/cursor screenshots; no Agent, user configuration or model.
-use ai_terminal::appearance;
+use ai_terminal::{
+    appearance,
+    font_choice::FontChoice,
+    i18n::{self, Language},
+    model::UiSettings,
+    settings,
+};
 use egui_term::{BackendSettings, TerminalBackend, TerminalView};
 use std::{
     path::PathBuf,
@@ -7,7 +13,20 @@ use std::{
     time::{Duration, Instant},
 };
 const SCALES: [f32; 5] = [1.0, 1.03, 1.1, 1.5, 2.0];
-const LATIN: [&str; 3] = ["Hack", "Consolas", "Cascadia Mono"];
+const LATIN: [&str; 5] = [
+    "Hack",
+    "Consolas",
+    "Cascadia Mono",
+    "Courier New",
+    "JetBrains Mono",
+];
+const CHOICES: [FontChoice; 5] = [
+    FontChoice::Hack,
+    FontChoice::Consolas,
+    FontChoice::CascadiaMono,
+    FontChoice::CourierNew,
+    FontChoice::JetBrainsMono,
+];
 const CJK: [&str; 3] = ["Microsoft YaHei UI", "Microsoft YaHei", "DengXian"];
 struct Probe {
     renderer: egui_term::TextRendererSession,
@@ -21,6 +40,9 @@ struct Probe {
     interactive: bool,
     latin: usize,
     cjk: usize,
+    applied_latin: usize,
+    settings_visible: bool,
+    preferences: UiSettings,
 }
 impl eframe::App for Probe {
     #[cfg(feature = "renderer-glow")]
@@ -56,7 +78,9 @@ impl eframe::App for Probe {
                     .selected_text(LATIN[self.latin])
                     .show_ui(ui, |ui| {
                         for (i, name) in LATIN.iter().enumerate() {
-                            ui.selectable_value(&mut self.latin, i, *name);
+                            ui.add_enabled_ui(appearance::font_available(CHOICES[i]), |ui| {
+                                ui.selectable_value(&mut self.latin, i, *name);
+                            });
                         }
                     });
                 ui.label("中文 / CJK");
@@ -81,25 +105,26 @@ impl eframe::App for Probe {
                 SCALES[self.stage] * 100.0
             ));
         }
-        let font = appearance::terminal_font(14.0);
-        let font = if self.latin == 0 {
-            static HACK: [&[u8]; 4] = [
-                include_bytes!("../assets/fonts/Hack-Regular.ttf"),
-                include_bytes!("../assets/fonts/Hack-Bold.ttf"),
-                include_bytes!("../assets/fonts/Hack-Italic.ttf"),
-                include_bytes!("../assets/fonts/Hack-BoldItalic.ttf"),
-            ];
-            font.with_native_font("Hack", &HACK)
-        } else if self.latin == 1 {
-            font.with_native_font(LATIN[self.latin], &[])
-        } else {
-            font
-        };
+        if self.applied_latin != self.latin {
+            appearance::set_terminal_font(ui.ctx(), CHOICES[self.latin]);
+            self.applied_latin = self.latin;
+        }
+        let font = appearance::terminal_font_for(CHOICES[self.latin], 14.0);
         let font = font.with_native_cjk_font(CJK[self.cjk]);
         let view = TerminalView::new(ui, &mut self.terminal)
             .set_focus(!self.interactive)
             .set_font(font);
         ui.add(view);
+        if self.settings_visible {
+            let previous = self.preferences.terminal_font;
+            settings::show(ui.ctx(), &mut self.settings_visible, &mut self.preferences);
+            if previous != self.preferences.terminal_font {
+                self.latin = CHOICES
+                    .iter()
+                    .position(|choice| *choice == self.preferences.terminal_font)
+                    .unwrap();
+            }
+        }
         if self.interactive {
             return;
         }
@@ -160,7 +185,21 @@ fn main() -> eframe::Result {
     let latin = match mode.as_str() {
         "hack" => 0,
         "consolas" => 1,
-        _ => 2,
+        "cascadia" | "cascadia_mono" => 2,
+        "courier_new" => 3,
+        "jetbrains_mono" => 4,
+        _ => 4,
+    };
+    assert!(
+        appearance::font_available(CHOICES[latin]),
+        "requested font is not installed"
+    );
+    let settings_mode = std::env::args().nth(4).unwrap_or_default();
+    let settings_visible = settings_mode.starts_with("settings-");
+    let language = if settings_mode == "settings-zh" {
+        Language::ZhCn
+    } else {
+        Language::En
     };
     let cjk = match std::env::args().nth(3).as_deref() {
         Some("yahei") => 1,
@@ -184,6 +223,8 @@ fn main() -> eframe::Result {
         },
         Box::new(move |cc| {
             appearance::setup(&cc.egui_ctx);
+            appearance::set_terminal_font(&cc.egui_ctx, CHOICES[latin]);
+            i18n::apply(&cc.egui_ctx, language);
             let (tx, _) = mpsc::channel();
             let terminal=TerminalBackend::new(996,cc.egui_ctx.clone(),tx,BackendSettings {
             shell:"powershell.exe".into(),
@@ -203,6 +244,13 @@ fn main() -> eframe::Result {
                 interactive,
                 latin,
                 cjk,
+                applied_latin: latin,
+                settings_visible,
+                preferences: UiSettings {
+                    terminal_font: CHOICES[latin],
+                    language,
+                    ..Default::default()
+                },
             }))
         }),
     )

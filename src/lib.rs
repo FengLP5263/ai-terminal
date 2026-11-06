@@ -4,6 +4,7 @@ pub mod chrome;
 pub mod connection_ui;
 pub mod dialogs;
 pub mod discovery;
+pub mod font_choice;
 pub mod launch;
 pub mod model;
 pub mod native_console;

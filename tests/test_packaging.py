@@ -67,9 +67,11 @@ class ArchiveVerification(unittest.TestCase):
             root=Path(folder)/'root';destination=Path(folder)/'package';destination.mkdir()
             shutil.copytree(packaging.ROOT/'assets/fonts',root/'assets/fonts')
             metadata=packaging.font_notices(destination,root)
-            self.assertEqual(metadata['default_latin'],'Cascadia Mono')
+            self.assertEqual(metadata['default_latin'],'JetBrains Mono')
             self.assertEqual((destination/'Cascadia-LICENSE.txt').read_bytes(),(root/'assets/fonts/LICENSE-Cascadia.txt').read_bytes())
             self.assertEqual((destination/'FONT-SOURCE.json').read_bytes(),(root/'assets/fonts/SOURCE.json').read_bytes())
+            self.assertIn('JetBrainsMono-LICENSE.txt',metadata['licenses'])
+            self.assertEqual((destination/'JetBrainsMono-LICENSE.txt').read_bytes(),(root/'assets/fonts/LICENSE-JetBrainsMono.txt').read_bytes())
             font=root/'assets/fonts/CascadiaMono-Regular.ttf'
             font.write_bytes(font.read_bytes()+b'tampered')
             with self.assertRaisesRegex(ValueError,'font asset identity mismatch'):
@@ -88,6 +90,21 @@ class ArchiveVerification(unittest.TestCase):
                     archive.writestr(name,data)
             with self.assertRaisesRegex(ValueError,'font license/provenance incomplete'):
                 packaging.verify_archive(new)
+
+    def test_each_declared_font_license_is_required_in_the_archive(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path=Path(folder)/'fonts.zip';self.fixture(path)
+            with zipfile.ZipFile(path) as archive:
+                files={name:archive.read(name) for name in archive.namelist() if name!='manifest.json'}
+            files['Cascadia-LICENSE.txt']=b'original license fixture'
+            files['FONT-SOURCE.json']=b'{}'
+            manifest={'version':'test','fonts':{'licenses':['Cascadia-LICENSE.txt','JetBrainsMono-LICENSE.txt']},
+                      'files':{name:{'bytes':len(data),'sha256':hashlib.sha256(data).hexdigest()} for name,data in files.items()}}
+            with zipfile.ZipFile(path,'w') as archive:
+                for name,data in files.items():archive.writestr(name,data)
+                archive.writestr('manifest.json',json.dumps(manifest))
+            with self.assertRaisesRegex(ValueError,'declared font license missing'):
+                packaging.verify_archive(path)
 
     def test_new_package_requires_native_console_companions_and_licenses(self):
         with tempfile.TemporaryDirectory() as folder:

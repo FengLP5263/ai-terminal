@@ -4,6 +4,14 @@ use std::path::Path;
 
 pub const FILE_NAME: &str = "ai-terminal.lnk";
 
+/// Installed builds leave shortcut ownership to their installer.
+pub fn managed_installation(directory: &Path) -> bool {
+    let marker = directory.join(".ai-terminal-installed");
+    std::fs::metadata(&marker).is_ok_and(|metadata| metadata.len() <= 256)
+        && std::fs::read_to_string(marker)
+            .is_ok_and(|text| text.starts_with("ai-terminal-install-v1\r\n"))
+}
+
 /// Only the installed app's default data directory may touch the user's Desktop.
 /// Portable and test runs (`--data-dir`, smoke) stay isolated.
 pub fn should_attempt(ui: &UiSettings, skip: bool, data_dir: &Path) -> bool {
@@ -13,6 +21,13 @@ pub fn should_attempt(ui: &UiSettings, skip: bool, data_dir: &Path) -> bool {
 /// Records the attempt before touching the Desktop so a transient failure is
 /// not retried on every launch.
 pub fn ensure_first_run(ui: &mut UiSettings, skip: bool, data_dir: &Path) -> bool {
+    if std::env::current_exe()
+        .ok()
+        .and_then(|exe| exe.parent().map(managed_installation))
+        .unwrap_or(false)
+    {
+        return false;
+    }
     if !should_attempt(ui, skip, data_dir) {
         return false;
     }

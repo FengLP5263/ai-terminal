@@ -79,3 +79,6 @@ Qoder input 探针必须等待已知空输入框占位文本和稳定的未提�
 尺寸回归覆盖 terminal_interaction 的测量／未知视口，以及 App 的副窗口隔离（真实 ConPTY）。`qoder_cn_probe ... trace <isolated-directory>` 仅启动一次 CLI、103% 下四次程序化尺寸与最多 128 项布局记录；不发送提示或确认信任。鉴权／信任页截图不能证明真实模型回合通过，防御性布局回归也不能冒充用户重复页面现象已完整复现。
 
 Windows 闪烁核查：构建并运行 render_update_probe（完整命令见 scripts/README.md），用两个无 profile 的本地 PowerShell 固定样例比较表格像素与可见网格哈希；另一块区域变换字号，浮窗和悬停提示由 island_hint_probe 单独核查。覆盖 100%／103%／110%／200% 和较长的 103% 运行，记录探针进程内存、退出码与自身 PTY 回收。result.ok 或进程退出失败均不得通过；受控像素复现与用户真实 Agent 验收分别记录，不调用模型。
+
+
+0.4.10 默认 JetBrains Mono；新工作区、缺少／未知字体 ID 的设置使用默认，已有选择保持不变。typography_probe 未指定字体时使用正式默认。字体回归通过正式设置下拉选择 Hack，验证原 ConPTY PID、会话身份、保存和重载；typography_probe 新增 courier_new／jetbrains_mono，并用第四参数 settings-zh／settings-en 截图正式设置控件（第三参数 default）。五款字体分别检查 100%／103%／110%／150%／200%，缺失字体不能当作通过。安装验收只运行 -Acceptance 包，以相同 -AcceptanceId 配对旧／新版本；`project.ps1 installer-smoke -Path <new.json> -Previous <old.json>` 使用唯一 output 路径、HKCU 测试键和快捷方式，验证安装、占用拒绝、升级、包内就绪后六 PTY 截图、卸载及用户文件保留。不得对普通安装执行自动卸载。

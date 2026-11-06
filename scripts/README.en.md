@@ -97,3 +97,20 @@ Font comparison: `typography_probe output/<unique-font-check> compare` opens an 
 Qoder sizing diagnostics: after building qoder_cn_probe, run `target/release/examples/qoder_cn_probe.exe output/<unique-qoder-trace> trace <isolated-directory>`. Start the CLI once, programmatically resize through four window sizes at 103%, and record at most 128 geometry samples plus four screenshots. No prompt or trust approval is sent. Trust/authentication pages are distinct from real model tasks.
 
 Windows transient-render check: build with `cargo build --offline --locked --release --example render_update_probe`, then run `target/release/examples/render_update_probe.exe output/<unique-render-update> 1.03 48`. Optional arguments select zoom (0.5–2.5) and 8–512 screenshot comparisons. This probe checks a fixed table in one window; island_hint_probe separately checks the multiple-window hover path. Two local PowerShell fixtures supply a fixed file table and a changing-size glyph region; no Agent/model or user profile is used. Compare fixed-region pixels and visible-grid hashes, saving baseline/stage/first-failure images and JSON; timeout or any pixel/grid difference fails. Root size follows the chosen zoom, so large scales may exceed the display; captures come from its own GPU framebuffer. Production gains no polling or idle repaint.
+
+## Windows installer (0.4.10 preview)
+
+```powershell
+.\scripts\windows\project.ps1 installer -AllowDirty
+.\scripts\windows\project.ps1 installer -Path output/packages/<package>.zip -Acceptance -AcceptanceId <unique-id> -AllowDirty
+.\scripts\windows\project.ps1 verify-installer -Path output/installers/<build>/<setup>.json
+.\scripts\windows\project.ps1 installer-smoke -Path output/installers/<new>/<setup>.json -Previous output/installers/<old>/<setup>.json
+```
+
+POSIX provides matching actions/arguments. `verify-installer` is portable and read-only; other installer actions require Windows/Git Bash. Without `-Path`, `installer` builds the existing ZIP first. Stable builds reject dirty source/payloads; local previews use explicit `-AllowDirty`. `-Acceptance` uses an isolated identity; pair two versions with the same `-AcceptanceId` (6–64 lowercase letters, digits or hyphens). Native acceptance refuses production installers and owns only its test files/registry while checking fresh install, upgrade, busy-file rejection and uninstall. Unrelated files and session data are retained.
+
+Builds require the pinned official NSIS 3.13 ZIP. Obtain `nsis-3.13.zip` from the [official NSIS download](https://nsis.sourceforge.io/Download), extract it completely under ignored `.tools/nsis/` (compiler: `.tools/nsis/nsis-3.13/makensis.exe`), or point `AI_TERMINAL_NSIS` at the compiler from that same tree. Verify the archive and complete file-tree SHA-256 recorded in `scripts/installer/TOOLCHAIN.json`. Builds do not download/install tools or execute user NSIS configuration. Original licenses remain in `scripts/installer/NSIS-LICENSE.txt`; TOOLCHAIN.json records the source-code URL. End users do not need the compiler.
+
+Outputs are an EXE, `.sha256` and `.json`. Digest verification does not establish signing or successful installation. Records identify the ZIP, installer scripts, compiler and preview state without personal paths. See [installation and font selection](../docs/installation.en.md).
+
+Native font captures: use the production default JetBrains Mono when no font is specified. Build `typography_probe`, then use `cascadia`, `hack`, `consolas`, `courier_new` or `jetbrains_mono` as its second argument to capture 100%/103%/110%/150%/200%. A fourth argument `settings-zh`/`settings-en` (third argument `default`) captures the real settings controls. Missing fonts fail explicitly rather than presenting a fallback as the requested family. Inspect the actual screenshots; fixtures contain only fixed local text.

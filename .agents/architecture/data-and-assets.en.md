@@ -12,7 +12,9 @@
 
 ## Assets and provenance
 
-- `assets/fonts/Hack-*.ttf`: official v3.003; `SOURCE.json` records source, size, and SHA-256, with `LICENSE.md`.
+- `assets/fonts/CascadiaMono-*.ttf`: optional Latin/digit family from official Microsoft v2407.24, four original static styles under SIL OFL 1.1. Archive/revision/file hashes and the original license are in `SOURCE.json` and `LICENSE-Cascadia.txt`.
+- `assets/fonts/Hack-*.ttf`: official v3.003, the optional 0.4.8 family; `SOURCE.json` records source, size, and SHA-256, with `LICENSE.md`.
+- `assets/fonts/JetBrainsMono-*.ttf`: four original static styles from official v2.304, the default Latin family. `SOURCE.json` pins the commit, archive and file SHA-256; `LICENSE-JetBrainsMono.txt` preserves SIL OFL 1.1.
 - `assets/branding`: original B “stacked sessions” icon; SVG matches the selected candidate, PNG/ICO are fixed exports with identities in `SOURCE.json`.
 - `assets/icons`: OpenAI/Claude/Qoder come from Lobe Icons (MIT); Kimi Code/ZCode use their official repositories' product icons, and TRAE uses its official CLI documentation site icon. `SOURCE.json` records provenance, license declarations, original dimensions, transforms, size and SHA-256 per file; licenses do not apply across sources.
 - Windows Chinese/UI/emoji fonts, including Segoe UI Emoji, are system fonts, not copied into Git or packages.
@@ -61,3 +63,6 @@ The 0.4.8 preview README main images use Chinese workspace.png/floating.png and 
 0.4.9-preview.5: egui_glow CPU staging holds only visible paint vertices, indices and draw ranges, reusing peak-frame capacity without persisting terminal content. The new mesh_batch.rs and vendor provenance remain part of packaged source identity.
 
 Published upstream terminal recordings use binary diffs, and Git EOL conversion is disabled for the two new vendor snapshots. Preserve all original Cascadia-license bytes and whitespace. Project-authored source retains normal formatting and whitespace checks.
+
+
+0.4.10 preview: `ui.terminal_font` uses stable IDs `jetbrains_mono` (default), `cascadia_mono`, `hack`, `consolas` and `courier_new`. All three embedded families reuse the pinned four styles; system font bytes are not redistributed, and SOURCE.json records catalog/provenance boundaries. scripts/installer pins the NSIS compiler source and original license. Installed programs carry an ownership marker; uninstall deletes only generated listed files and empty directories, never recursively removes the application directory or touches session data. EXE/checksum/JSON outputs and isolated installation evidence stay under ignored output/.

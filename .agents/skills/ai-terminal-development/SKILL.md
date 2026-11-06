@@ -26,3 +26,6 @@ Git Bash 加载系统／用户登录配置后再追加会话集成，保留提�
 所有可见调试窗口、浮窗和调试示例 EXE 均使用 assets/branding 中用户选定的 B 图标；不要使用框架默认或早期图标。更新探针时验证窗口图标与 EXE 资源，保留 hook helper 不带 GUI 图标。
 
 原生控制台固定资产见 assets/windows/conpty。build.rs 自动为 Cargo 实际输出目录准备 conpty.dll／OpenConsole.exe；不要用单独两个 ai-terminal EXE 代表完整开发制品。修改原生标题栏只针对自身窗口，不修改系统主题。标准 npm 启动器可做有界字面目标检查，自定义包装器保持不透明，不运行 CLI 健康探测或在非零退出后自动重试。
+
+
+0.4.10 的字体目录与设置共用 FontChoice；改动不能重启运行终端。内置字体保持来源字节，系统字体仅从 Windows Fonts 读取，不安装或复制。安装版源在 scripts/installer，独立于 Rust GUI／helper；编译工具通过忽略目录或 AI_TERMINAL_NSIS 配置，固定身份后才运行。命令见 scripts/README.md。

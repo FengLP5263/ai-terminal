@@ -7,8 +7,8 @@
 | egui_term 本地快照 | MIT | vendor/egui_term/LICENSE、UPSTREAM.md，固定上游 revision |
 | Alacritty terminal | Apache-2.0 | Cargo.lock 锁定；上游 https://github.com/alacritty/alacritty |
 | egui / eframe | MIT OR Apache-2.0 | Cargo.lock 锁定；上游 https://github.com/emilk/egui |
-| Cascadia Mono v2407.24 四种字形（默认） | SIL Open Font License 1.1 | 微软官方发布包；assets/fonts/LICENSE-Cascadia.txt、SOURCE.json |
-| Hack v3.003 四种字形（对比样例） | 以原文件为准（MIT／Bitstream Vera 条款） | assets/fonts/LICENSE.md、SOURCE.json |
+| Cascadia Mono v2407.24 四种字形（可选） | SIL Open Font License 1.1 | 微软官方发布包；assets/fonts/LICENSE-Cascadia.txt、SOURCE.json |
+| Hack v3.003 四种字形（可选） | 以原文件为准（MIT／Bitstream Vera 条款） | assets/fonts/LICENSE.md、SOURCE.json |
 | 其他 Rust 依赖 | 以各 Cargo 元数据和原文件为准 | package 清单记录版本、声明与可找到的许可证 |
 
 Windows 系统字体只在运行时读取，不随包复制。项目 LICENSE 适用于本项目代码，不替代第三方许可。
@@ -31,3 +31,7 @@ Windows 系统字体只在运行时读取，不随包复制。项目 LICENSE 适
 - egui_glow 0.35.0：本地 OpenGL 缓冲区复用补丁，MIT OR Apache-2.0。见 vendor/egui_glow/UPSTREAM.zh.md 及随附许可证；制品依赖清单记录该补丁。
 
 - Microsoft.Windows.Console.ConPTY 1.25.260930003：MIT，微软官方 x64 原生控制台组件。见 [来源与校验记录](assets/windows/conpty/SOURCE.json) 和[原始许可证](assets/windows/conpty/LICENSE.txt)。发行包包含 conpty.dll、OpenConsole.exe 及许可／来源副本；该依赖单独记录在 manifest.json 的 native_console 中。
+
+## JetBrains Mono
+
+可选终端字体来自 [JetBrains 官方 v2.304](https://github.com/JetBrains/JetBrainsMono/releases/tag/v2.304)，采用 SIL OFL 1.1。四种静态字形与许可保留原始字节，来源和 SHA-256 见 `assets/fonts/SOURCE.json`。源码许可原文为 [LICENSE-JetBrainsMono.txt](assets/fonts/LICENSE-JetBrainsMono.txt)，发行 ZIP 随附 `JetBrainsMono-LICENSE.txt`；系统字体不复制或分发。

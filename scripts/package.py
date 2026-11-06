@@ -87,6 +87,7 @@ def verify_archive(path):
             raise ValueError('program/helper/license incomplete')
         if manifest.get('format_version',1)>=2 and not NATIVE_REQUIRED.issubset(expected):raise ValueError('native console runtime/license incomplete')
         if 'fonts' in manifest and not {'Cascadia-LICENSE.txt','FONT-SOURCE.json'}.issubset(expected):raise ValueError('font license/provenance incomplete')
+        if any(name not in expected for name in manifest.get('fonts',{}).get('licenses',[])):raise ValueError('declared font license missing')
         for name,record in manifest['files'].items():
             data=archive.read(name)
             if len(data)!=record['bytes'] or hashlib.sha256(data).hexdigest()!=record['sha256']:raise ValueError('checksum mismatch: '+name)
@@ -150,7 +151,12 @@ def font_notices(folder,root=ROOT):
         if len(data)!=expected['bytes'] or hashlib.sha256(data).hexdigest()!=expected['sha256']:raise ValueError('font asset identity mismatch: '+name)
     shutil.copy2(source/'SOURCE.json',folder/'FONT-SOURCE.json')
     shutil.copy2(source/'LICENSE-Cascadia.txt',folder/'Cascadia-LICENSE.txt')
-    return {'default_latin':record['default_family'],'cjk':'Microsoft YaHei UI (system)','source_record':'FONT-SOURCE.json','licenses':['Hack-LICENSE.txt','Cascadia-LICENSE.txt']}
+    result={'default_latin':record['default_family'],'cjk':'Microsoft YaHei UI (system)','source_record':'FONT-SOURCE.json','licenses':['Hack-LICENSE.txt','Cascadia-LICENSE.txt']}
+    if 'LICENSE-JetBrainsMono.txt' in record['files']:
+        shutil.copy2(source/'LICENSE-JetBrainsMono.txt',folder/'JetBrainsMono-LICENSE.txt')
+        result['licenses'].append('JetBrainsMono-LICENSE.txt')
+    if 'terminal_choices' in record:result['terminal_choices']=record['terminal_choices']
+    return result
 
 def build(allow_dirty=False):
     if os.name!='nt':raise ValueError('native Windows packaging is unsupported on this OS; use Windows project.ps1, or verify an existing ZIP here')
@@ -195,6 +201,7 @@ def build(allow_dirty=False):
     result=verify_archive(archive)
     archive.with_suffix('.sha256').write_text(result['sha256']+'  '+archive.name+'\n',encoding='ascii')
     print(json.dumps(result,ensure_ascii=False,indent=2));print('Artifact:',archive)
+    return archive
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__,formatter_class=argparse.RawDescriptionHelpFormatter)

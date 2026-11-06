@@ -15,7 +15,7 @@ The current version is in `Cargo.toml`; the initial baseline was 0.1.2. Windows 
 | `src/discovery.rs`, `launch.rs`, `shell.rs` | Public CLI/shell entry points, session-scoped integration, directory updates, Agent lifecycle metadata. |
 | `src/model.rs`, `platform.rs` | Atomic session metadata persistence; Windows Job Objects and manager memory observation. |
 | `vendor/egui_term`, `vendor/egui-winit` | Alacritty/ConPTY and native text/input rendering; pinned egui-winit 0.35.0 paste patch. |
-| `assets/fonts`, `assets/icons`, `assets/branding` | Pinned default Cascadia Mono and comparison Hack fonts, Agent icons, and the selected original B application icon. |
+| `assets/fonts`, `assets/icons`, `assets/branding` | Pinned default JetBrains Mono and optional Cascadia Mono/Hack fonts, Agent icons, and the selected original B application icon. |
 | `examples/terminal_probe.rs`, `workspace_probe.rs` | Real TUI or local ANSI probes, controlled input, GPU screenshots and exit. |
 | `examples/bash_probe.rs` | Real Git Bash and isolated HOME: startup configuration, directory notifications, Agent entries and native screenshots; no model request. |
 | `examples/shell_switch_probe.rs` | Production App screenshots of nested-shell avatars and per-level return; isolated sessions, input only into its own window, no Agent/model startup. |
@@ -45,3 +45,6 @@ Known limits: all physical IME combinations, all image clipboard sources, sustai
 0.4.9-preview.4: main App UI and background logic consume only the ROOT viewport; floating/hint geometry and minimized state cannot relayout the main terminal. TerminalView submits ConPTY size only for real visible layouts with a valid screen rectangle and no discard already requested; measurement passes leave the running grid unchanged.
 
 0.4.9-preview.5: Windows egui_glow batches visible paint geometry and rebases indices before drawing, preserving texture, clipping and callback order. CPU/GPU capacity follows the largest visible frame; terminal history is not copied and production repaint behavior is unchanged. The independent render_update_probe checks transient corruption using a fixed table and a changing glyph region.
+
+
+0.4.10 preview: `font_choice.rs` defines stable font IDs persisted in `UiSettings.terminal_font`. appearance applies the same definitions to the app, terminals and probes; UI emoji use the current terminal native font to avoid repeated atlas recreation. NSIS owns per-user installation/uninstallation independently of runtime and Agent integrations; ZIP remains available.
