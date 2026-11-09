@@ -72,3 +72,7 @@ Published upstream terminal recordings use binary diffs, and Git EOL conversion 
 0.4.12 Git adds only the boolean `ui.git_panel_open` preference, defaulting to collapsed for older records. Branch, path, line totals and commit metadata remain in the current in-memory snapshot. Untracked text is read temporarily to count lines; no contents, diffs, history cache or Git credentials are saved. Session data roots and user repositories are unchanged.
 
 0.4.12-preview.3: `assets/fonts/Codicons.ttf`, original CSS glyph mapping and license come from Microsoft's official Codicons 0.0.45 npm package. SOURCE.json records original bytes, archive digest and the U+EC6F branch symbol. This is a UI icon font, neither a terminal-font option nor a system installation. Production appearance and probes share its definition; the helper never loads it. ZIP packaging copies Codicons-LICENSE.txt and validates it as a declared font license.
+
+Commit inspection is not persisted: retain only current and expanded details in memory, display at most 500 files and keep the six-second/2 MiB per-command bounds. Only an explicit copy click writes the full commit ID; the clipboard is never read automatically. Copy/file icons reuse the original Codicons U+EBCC/U+EA7B glyphs without new assets.
+
+0.6.0-preview.2: Changes and commit files share git_ui/files.rs. File-type icons all use the existing original Codicons font; SOURCE.json lists Markdown, code, JSON, configuration, script, media, PDF, archive and binary glyphs in use. No font or bitmap assets were added.

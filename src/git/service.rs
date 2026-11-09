@@ -1,4 +1,7 @@
-use super::{GitError, MAX_COMMITS, PAGE, Snapshot, command::Runner, watch::Watcher};
+use super::{
+    GitError, Inspection, MAX_COMMITS, PAGE, Snapshot, command::Runner, commit::Inspector,
+    watch::Watcher,
+};
 use std::{
     collections::HashSet,
     path::{Path, PathBuf},
@@ -7,7 +10,7 @@ use std::{
         atomic::{AtomicBool, AtomicU64, Ordering},
         mpsc::{self, SyncSender},
     },
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 #[derive(Clone)]
@@ -50,6 +53,8 @@ impl Shared {
 
 /// One active repository, one coalesced request/result slot, event-driven updates.
 pub struct GitClient {
+    inspector: Inspector,
+    pub inspection: Option<Inspection>,
     shared: Arc<Shared>,
     directory: Option<PathBuf>,
     pub snapshot: Option<Arc<Snapshot>>,
@@ -58,9 +63,11 @@ pub struct GitClient {
     pub not_repository: bool,
     pub watching: bool,
     pub limit: usize,
+    last_refresh: Option<Instant>,
 }
 impl GitClient {
     pub fn new(ctx: egui::Context) -> Self {
+        let inspector = Inspector::new(ctx.clone());
         let (tx, rx) = mpsc::sync_channel(1);
         let shared = Arc::new(Shared {
             request: Mutex::new(None),
@@ -81,9 +88,16 @@ impl GitClient {
                     if worker.stop.load(Ordering::Acquire) {
                         break;
                     }
-                    // A burst gets one read, without an idle timer or periodic repaint.
-                    std::thread::sleep(Duration::from_millis(250));
-                    while rx.try_recv().is_ok() {}
+                    // Wait for a quiet burst, bounded to one second under sustained edits.
+                    // The outer recv blocks indefinitely when idle; this is not polling.
+                    let burst = Instant::now();
+                    while burst.elapsed() < Duration::from_secs(1) {
+                        let wait = Duration::from_millis(250)
+                            .min(Duration::from_secs(1).saturating_sub(burst.elapsed()));
+                        if rx.recv_timeout(wait).is_err() {
+                            break;
+                        }
+                    }
                     if worker.stop.load(Ordering::Acquire) {
                         break;
                     }
@@ -182,6 +196,8 @@ impl GitClient {
             })
             .expect("Git worker thread");
         Self {
+            inspector,
+            inspection: None,
             shared,
             directory: None,
             snapshot: None,
@@ -190,6 +206,7 @@ impl GitClient {
             not_repository: false,
             watching: false,
             limit: PAGE,
+            last_refresh: None,
         }
     }
     pub fn set_directory(&mut self, directory: Option<&Path>) -> bool {
@@ -197,6 +214,8 @@ impl GitClient {
             return false;
         }
         self.directory = directory.map(Path::to_owned);
+        self.inspector.clear();
+        self.inspection = None;
         self.snapshot = None;
         self.error = None;
         self.not_repository = false;
@@ -205,6 +224,7 @@ impl GitClient {
         true
     }
     pub fn refresh(&mut self) {
+        self.last_refresh = Some(Instant::now());
         let id = self.shared.generation.fetch_add(1, Ordering::AcqRel) + 1;
         self.loading = self.directory.is_some();
         *self.shared.request.lock().unwrap() = self.directory.clone().map(|directory| Request {
@@ -215,13 +235,53 @@ impl GitClient {
         self.shared.manual.store(true, Ordering::Release);
         let _ = self.shared.signal.try_send(());
     }
+    /// Prompts, focus and opening a panel are fallback opportunities, not change signals.
+    /// Healthy filesystem monitoring already keeps the snapshot current.
+    pub fn refresh_if_needed(&mut self) -> bool {
+        if self.directory.is_none()
+            || self.loading
+            || (self.watching && self.error.is_none())
+            || self
+                .last_refresh
+                .is_some_and(|last| last.elapsed() < Duration::from_secs(2))
+        {
+            return false;
+        }
+        self.refresh();
+        true
+    }
     pub fn more(&mut self) {
         if self.limit < MAX_COMMITS {
             self.limit = (self.limit + PAGE).min(MAX_COMMITS);
             self.refresh();
         }
     }
+    pub fn inspect(&mut self, id: &str) {
+        let Some(snapshot) = &self.snapshot else {
+            return;
+        };
+        if !snapshot.commits.iter().any(|c| c.id == id)
+            || self
+                .inspection
+                .as_ref()
+                .is_some_and(|i| i.id == id && i.error.is_none())
+        {
+            return;
+        }
+        self.inspector.inspect(&snapshot.root, id);
+        self.inspection = Some(Inspection {
+            id: id.into(),
+            data: None,
+            error: None,
+            loading: true,
+        });
+    }
     pub fn poll(&mut self) -> bool {
+        let mut updated = false;
+        if let Some(inspection) = self.inspector.poll() {
+            self.inspection = Some(inspection);
+            updated = true;
+        }
         let response = self.shared.response.lock().unwrap().take();
         if let Some((id, result, watching)) = response {
             if id != self.shared.generation.load(Ordering::Acquire) {
@@ -231,6 +291,14 @@ impl GitClient {
             self.watching = watching;
             match result {
                 Ok(snapshot) => {
+                    if self.inspection.as_ref().is_some_and(|i| {
+                        !snapshot
+                            .as_ref()
+                            .is_some_and(|s| s.commits.iter().any(|c| c.id == i.id))
+                    }) {
+                        self.inspector.clear();
+                        self.inspection = None;
+                    }
                     self.not_repository = snapshot.is_none();
                     self.snapshot = snapshot.map(Arc::new);
                     self.error = None;
@@ -239,7 +307,7 @@ impl GitClient {
             }
             return true;
         }
-        false
+        updated
     }
 }
 impl Drop for GitClient {

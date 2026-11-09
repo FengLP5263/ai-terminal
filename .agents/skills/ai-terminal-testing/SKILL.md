@@ -50,7 +50,7 @@ Windows 10／11 分别运行 composer_probe、titlebar_probe 和 discovery_probe
 
 preview.4 的 island_move_probe 会保持原生移动状态跨越实际 DPI 边界，同时检查主窗口与浮窗，记录建议／实际矩形的差值、DPI 递归深度、拖动期间不额外修正尺寸、松手后恢复及重复跨屏尺寸稳定。该测试仍不注入系统鼠标，不等同于真实鼠标模态拖动；旧 preview.3 仅在跨屏前分别发送进入／退出通知的证据不能代替它。
 
-公开 README 截图用 Release 的 readme_capture 与 island_probe 分开生成；命令见 scripts/README.md。readme_capture 的参数为 `<output> [zh|en] [history]`，分别捕获中英文“更改”和“提交历史”；复用正式侧栏／顶部摘要／Git 面板／终端／浮窗组件，只用固定合成文本、示例目录及模拟 Git／任务状态，不查询用户仓库、不读取用户 profile、不启动 Agent 或模型。核对正常退出、自身 PTY 回收、原生 PNG 和隐私后原样复制，更新 assets/readme/SOURCE.json；不能用公开展示样例代替真实 Git 或 Agent 验收。
+公开 README 截图用 Release 的 readme_capture 与 island_probe 分开生成；命令见 scripts/README.md。readme_capture 的参数为 `<output> [zh|en] [history]`，分别捕获中英文“更改”和“提交历史”；历史模式仅用自身 egui 合成点击展开固定样例提交；复用正式侧栏／顶部摘要／Git 面板／终端／浮窗组件，只用固定合成文本、示例目录及模拟 Git／任务状态，不查询用户仓库、不读取用户 profile、不启动 Agent 或模型。核对正常退出、自身 PTY 回收、原生 PNG 和隐私后原样复制，更新 assets/readme/SOURCE.json；不能用公开展示样例代替真实 Git 或 Agent 验收。
 
 原生 Codex 状态／agents 验收使用 agents_status_probe，命令见 scripts/README.md。codex 模式只发送左箭头和 Esc，核对真实入口、总览、返回及原生 idle 通知；不发送提示词、不接受 hook／项目信任、不停止共享后台。badges 模式只用合成文本截图核对 100%／146%／200% 下相邻模式图标。队列、旧代次、隐藏 ConPTY、未读及旧 hook 覆盖另由离线回归验证；启动／导航截图不能冒充真实模型回合。
 
@@ -88,3 +88,7 @@ Windows 闪烁核查：构建并运行 render_update_probe（完整命令见 scr
 会话配色原生核查：`cargo build --offline --locked --release --example session_color_probe`，随后运行 `target/release/examples/session_color_probe.exe output/<unique-session-colors>`。使用正式侧栏和色盘，在 100%／103%／200% 截取选中、悬停、无颜色和收起状态，不启动 PTY／Agent、不注入系统输入。sidebar_interaction 验证全部色块与清除不切换会话、单排菜单以及悬停／选中底色一致且无独立描边；旧颜色 ID 往返另由 model 回归覆盖。
 
 Git 面板核查：`cargo build --offline --locked --release --example git_probe` 后运行 `target/release/examples/git_probe.exe output/<unique-git-probe>`。探针创建自身独立样例仓库并使用正式 Git 后台、摘要、面板和真实 PowerShell ConPTY，截取 100%／103%／114%／200% 中英文更改、历史和收起状态，核对单行标题栏、Codicons 图标及 JetBrains Mono／Hack 字体继承，检查同一 PTY PID；不操作用户仓库、不调用 Agent／模型。git_repository 覆盖真实本地 Git 的净变化、二进制／大文件、新仓库／游离 HEAD、分支历史、分页、目录通知、忽略文件及输出限额；git_panel 核查正式控件，App 回归检查面板开合后终端身份和偏好保存。
+
+Git 历史详情：git_probe 扩展为 12 张图，向自身 egui 注入合成点击以展开真实隔离提交的文件，并捕获中英文悬停卡片；不注入系统输入、不改剪贴板。git_panel 检查完整 ID 的 CopyText 输出、指针移入提示卡片、复制不触发展开、长摘要单行缩略及展开／收起。git_repository 覆盖根／空／合并提交、二进制、中文与重命名、正文、外部程序禁用、重复读取复用及旧目录结果取消；原生截图与自身 PTY 回收另行核对。
+
+preview.2：git_panel 比较更改与展开文件的分类字形，并在 100%／114%／200% 核对图标左缘与提交说明一致、读取状态不移动列表。git_repository 检查重复提示符／焦点式请求复用快照、手动刷新仍有效、监控失效补查限频，以及 Git 日志／锁文件不触发完整重读但真实文件和分支变化仍更新。git_probe 的真实提交样例包含多种文件类型，仍生成 12 张原生 PNG。

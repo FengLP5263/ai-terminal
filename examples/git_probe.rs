@@ -15,7 +15,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-const STATES: [(f32, bool, bool, Language, FontChoice); 10] = [
+const STATES: [(f32, bool, bool, Language, FontChoice); 12] = [
     (1.0, false, true, Language::ZhCn, FontChoice::JetBrainsMono),
     (1.0, true, true, Language::ZhCn, FontChoice::JetBrainsMono),
     (1.03, false, true, Language::ZhCn, FontChoice::JetBrainsMono),
@@ -26,6 +26,8 @@ const STATES: [(f32, bool, bool, Language, FontChoice); 10] = [
     (1.0, true, true, Language::En, FontChoice::JetBrainsMono),
     (1.0, false, true, Language::En, FontChoice::Hack),
     (1.0, false, false, Language::ZhCn, FontChoice::JetBrainsMono),
+    (1.0, true, true, Language::ZhCn, FontChoice::JetBrainsMono),
+    (1.0, true, true, Language::En, FontChoice::JetBrainsMono),
 ];
 struct Probe {
     renderer: egui_term::TextRendererSession,
@@ -41,6 +43,8 @@ struct Probe {
     pid: u32,
     records: Vec<serde_json::Value>,
     font_choice: FontChoice,
+    interaction: u8,
+    clicked_at: Instant,
 }
 impl eframe::App for Probe {
     #[cfg(feature = "renderer-glow")]
@@ -64,11 +68,56 @@ impl eframe::App for Probe {
         );
         ctx.request_repaint_after(Duration::from_millis(80));
     }
-    fn raw_input_hook(&mut self, _: &egui::Context, input: &mut egui::RawInput) {
+    fn raw_input_hook(&mut self, ctx: &egui::Context, input: &mut egui::RawInput) {
         input.focused = true;
         input
             .events
             .retain(|e| matches!(e, egui::Event::Screenshot { .. }));
+        if self.stage >= STATES.len() || !STATES[self.stage].1 || self.frames < 4 {
+            input.events.push(egui::Event::PointerGone);
+            return;
+        }
+        let Some(commit) = self
+            .client
+            .snapshot
+            .as_ref()
+            .and_then(|s| s.commits.first())
+        else {
+            return;
+        };
+        let Some(row) = ctx.read_response(egui::Id::new(("git-commit-row", &commit.id))) else {
+            return;
+        };
+        let pos = row.rect.center();
+        if self.interaction < 2 {
+            if self.interaction == 1 {
+                self.clicked_at = Instant::now();
+            }
+            input.events.push(egui::Event::PointerMoved(pos));
+            input.events.push(egui::Event::PointerButton {
+                pos,
+                button: egui::PointerButton::Primary,
+                pressed: self.interaction == 0,
+                modifiers: egui::Modifiers::NONE,
+            });
+            self.interaction += 1;
+        } else if self.stage >= 10 {
+            if self.interaction == 2
+                && self.clicked_at.elapsed() > Duration::from_millis(250)
+                && self
+                    .client
+                    .inspection
+                    .as_ref()
+                    .is_some_and(|i| i.data.is_some())
+            {
+                input
+                    .events
+                    .push(egui::Event::PointerMoved(pos + egui::vec2(1.0, 0.0)));
+                self.interaction = 3;
+            }
+        } else {
+            input.events.push(egui::Event::PointerGone);
+        }
     }
     fn ui(&mut self, ui: &mut egui::Ui, _: &mut eframe::Frame) {
         if self.stage >= STATES.len() {
@@ -76,6 +125,7 @@ impl eframe::App for Probe {
         }
         let (scale, history, mut open, language, font_choice) = STATES[self.stage];
         if self.frames == 0 {
+            self.view.reset();
             if self.font_choice != font_choice {
                 appearance::set_terminal_font(ui.ctx(), font_choice);
                 self.font_choice = font_choice;
@@ -107,6 +157,9 @@ impl eframe::App for Probe {
             });
         let actions = self.view.panel(ui, Some(&self.client), &mut open);
         assert!(!actions.close && !actions.more && !actions.refresh);
+        if let Some(id) = actions.inspect {
+            self.client.inspect(&id);
+        }
         egui::CentralPanel::default()
             .frame(
                 egui::Frame::new()
@@ -160,13 +213,14 @@ impl eframe::App for Probe {
                         .collect::<Vec<_>>(),
                 )
                 .unwrap();
-            self.records.push(serde_json::json!({"image":name,"scale":scale,"history":history,"open":open,"pty_pid":self.pid,"font":font_choice}));
+            self.records.push(serde_json::json!({"image":name,"scale":scale,"history":history,"open":open,"pty_pid":self.pid,"font":font_choice,"expanded":history,"tooltip":self.stage>=10,"commit_details":self.client.inspection.as_ref().and_then(|i| i.data.as_deref())}));
             self.stage += 1;
             if self.stage < STATES.len() {
                 ui.ctx().set_zoom_factor(STATES[self.stage].0);
             }
             self.frames = 0;
             self.pending = false;
+            self.interaction = 0;
             self.since = Instant::now();
             if self.stage == STATES.len() {
                 std::fs::write(self.output.join("result.json"),serde_json::to_vec_pretty(&serde_json::json!({"ok":true,"version":env!("CARGO_PKG_VERSION"),"real_local_git":true,"model_requests":false,"screenshots":self.records,"snapshot":self.client.snapshot.as_deref()})).unwrap()).unwrap();
@@ -178,6 +232,24 @@ impl eframe::App for Probe {
             && self.terminal.plain_text().contains("GIT_PROBE_READY")
             && let Some(snapshot) = self.client.snapshot.as_ref()
             && !self.client.loading
+            && (!history
+                || (self.interaction >= 2
+                    && self
+                        .client
+                        .inspection
+                        .as_ref()
+                        .is_some_and(|i| i.data.is_some())))
+            && (self.stage < 10
+                || self
+                    .client
+                    .snapshot
+                    .as_ref()
+                    .and_then(|s| s.commits.first())
+                    .and_then(|c| {
+                        ui.ctx()
+                            .read_response(egui::Id::new(("git-commit-row", &c.id)))
+                    })
+                    .is_some_and(|r| r.is_tooltip_open()))
         {
             assert_eq!(
                 (snapshot.added, snapshot.deleted, snapshot.total_files),
@@ -242,7 +314,30 @@ fn fixture(root: &Path) {
         "feat: add branch and line-count summary",
         "feat: show current branch commit history",
     ] {
-        run(&["commit", "--allow-empty", "-m", message]);
+        if message == "feat: show current branch commit history" {
+            std::fs::write(
+                root.join("history.md"),
+                "Commit details stay local.\nNo model requests.\n",
+            )
+            .unwrap();
+            for (path, content) in [
+                ("settings.json", "{\"enabled\":true}\n"),
+                ("build.ps1", "Write-Output 'fixture only'\n"),
+                (".gitignore", "ignored-output/\n"),
+                ("icon.svg", "<svg xmlns=\"http://www.w3.org/2000/svg\"/>\n"),
+            ] {
+                std::fs::write(root.join(path), content).unwrap();
+            }
+            run(&["add", "--all"]);
+        }
+        run(&[
+            "commit",
+            "--allow-empty",
+            "-m",
+            message,
+            "-m",
+            "Inspect author, date, full commit ID and changed files.\nOnly the isolated fixture repository is read.",
+        ]);
     }
     std::fs::write(root.join("terminal.rs"), "first\nnew\nthird\nfourth\n").unwrap();
     std::fs::write(
@@ -290,6 +385,8 @@ fn main() -> eframe::Result {
                 pid,
                 records: vec![],
                 font_choice: FontChoice::default(),
+                interaction: 0,
+                clicked_at: Instant::now(),
             }))
         }),
     )

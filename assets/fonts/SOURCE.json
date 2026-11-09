@@ -180,8 +180,20 @@
     "license_file": "LICENSE-Codicons.txt",
     "archive_sha256": "dd7c6b20535753027c399dcaea4d12a0e6aaf73de10a3a8f4abfc51d13a88362",
     "glyphs": {
-      "git-branch": "U+EC6F"
+      "git-branch": "U+EC6F",
+      "copy": "U+EBCC",
+      "file": "U+EA7B",
+      "markdown": "U+EB1D",
+      "json": "U+EB0F",
+      "file-code": "U+EAE9",
+      "file-media": "U+EAEA",
+      "file-binary": "U+EAE8",
+      "file-pdf": "U+EAEB",
+      "file-zip": "U+EAEF",
+      "settings": "U+EB52",
+      "terminal": "U+EA85",
+      "git-commit": "U+EAFC"
     },
-    "changes": "Original font, CSS mapping and license bytes; only git-branch is rendered."
+    "changes": "Original font, CSS mapping and license bytes; UI uses the listed branch, commit, copy and file-type glyphs."
   }
 }

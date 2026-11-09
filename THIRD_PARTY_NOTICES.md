@@ -38,4 +38,4 @@ Windows 系统字体只在运行时读取，不随包复制。项目 LICENSE 适
 
 ## Codicons
 
-Git 分支图标采用微软 [VS Code Codicons](https://github.com/microsoft/vscode-codicons) 官方 `@vscode/codicons` 0.0.45 包的原始字体和 `git-branch` 字形（U+EC6F），CC BY 4.0。字体、CSS 映射和许可未改动；来源及哈希见 `assets/fonts/SOURCE.json`，原许可为 `assets/fonts/LICENSE-Codicons.txt`，ZIP 随附 `Codicons-LICENSE.txt`。只作为程序内符号使用，不安装系统字体或作为终端字体选项。
+Git 分支、提交、复制和文件图标采用微软 [VS Code Codicons](https://github.com/microsoft/vscode-codicons) 官方 `@vscode/codicons` 0.0.45 包的原始字体和 `git-branch`（U+EC6F）、`copy`（U+EBCC）、`git-commit`（U+EAFC）与 `file`（U+EA7B）等分类文件字形，CC BY 4.0。字体、CSS 映射和许可未改动；来源及哈希见 `assets/fonts/SOURCE.json`，原许可为 `assets/fonts/LICENSE-Codicons.txt`，ZIP 随附 `Codicons-LICENSE.txt`。只作为程序内符号使用，不安装系统字体或作为终端字体选项。

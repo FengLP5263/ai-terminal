@@ -1,21 +1,28 @@
 //! Native read-only repository panel, shared by the app and acceptance probes.
 use crate::{
     chrome,
-    git::{Commit, GitClient, GitError, MAX_COMMITS, Snapshot},
+    git::{GitClient, GitError, MAX_COMMITS, Snapshot},
     i18n,
 };
 use egui::{Color32, RichText};
+mod files;
+mod history;
+const HISTORY_INDENT: f32 = 25.0;
 
 #[derive(Default)]
 pub struct GitView {
     history: bool,
     selected: Option<String>,
+    inspection: Option<crate::git::Inspection>,
+    expanded_details: Option<std::sync::Arc<crate::git::CommitDetails>>,
+    copied: Option<String>,
 }
 #[derive(Default)]
 pub struct Actions {
     pub refresh: bool,
     pub more: bool,
     pub close: bool,
+    pub inspect: Option<String>,
 }
 
 /// Header text uses the font selected in ai-terminal, at the inherited UI size.
@@ -248,6 +255,8 @@ impl GitView {
     }
     pub fn reset(&mut self) {
         self.selected = None;
+        self.inspection = None;
+        self.expanded_details = None;
     }
     pub fn panel(
         &mut self,
@@ -257,6 +266,12 @@ impl GitView {
     ) -> Actions {
         if !*open {
             return Actions::default();
+        }
+        self.inspection = client.and_then(|c| c.inspection.clone());
+        if let Some(data) = self.inspection.as_ref().and_then(|i| i.data.as_ref())
+            && self.selected.as_deref() == Some(data.id.as_str())
+        {
+            self.expanded_details = Some(data.clone());
         }
         let mut actions = Actions::default();
         let available = ui.available_width();
@@ -317,13 +332,18 @@ impl GitView {
                 )
                 .clicked();
                 actions.refresh = ui
-                    .add_enabled(!loading, egui::Button::new(locale.text("刷新", "Refresh")))
+                    .add_enabled(
+                        !loading,
+                        egui::Button::new(if loading {
+                            locale.text("读取中…", "Reading…")
+                        } else {
+                            locale.text("刷新", "Refresh")
+                        }),
+                    )
+                    .on_hover_text(locale.text("读取本地仓库", "Read local repository"))
                     .clicked();
             });
         });
-        if loading {
-            ui.weak(locale.text("正在读取本地仓库…", "Reading local repository…"));
-        }
         if let Some(error) = error {
             let message = match error {
                 GitError::Missing => locale
@@ -419,46 +439,7 @@ impl GitView {
                             locale.text("当前分支尚无提交。", "This branch has no commits yet."),
                         );
                     }
-                    for commit in &snapshot.commits {
-                        ui.push_id(&commit.id, |ui| {
-                            let expanded = self.selected.as_deref() == Some(commit.id.as_str());
-                            let mut text = RichText::new(display_text(&commit.subject, 400));
-                            if expanded {
-                                text = text.strong();
-                            }
-                            let response = ui
-                                .add(egui::Label::new(text).wrap().sense(egui::Sense::click()))
-                                .on_hover_cursor(egui::CursorIcon::PointingHand);
-                            if response.clicked() {
-                                self.selected = if expanded {
-                                    None
-                                } else {
-                                    Some(commit.id.clone())
-                                };
-                            }
-                            ui.horizontal_wrapped(|ui| {
-                                ui.label(
-                                    RichText::new(&commit.id[..commit.id.len().min(8)])
-                                        .monospace()
-                                        .color(chrome::COMPLETED),
-                                );
-                                ui.label(
-                                    RichText::new(display_text(&commit.author, 100))
-                                        .small()
-                                        .color(chrome::SECONDARY),
-                                );
-                                ui.label(
-                                    RichText::new(date(commit.timestamp))
-                                        .small()
-                                        .color(chrome::SECONDARY),
-                                );
-                            });
-                            if expanded {
-                                commit_details(ui, commit);
-                            }
-                            ui.separator();
-                        });
-                    }
+                    history::show(ui, self, snapshot, &mut actions);
                     if snapshot.more && limit < MAX_COMMITS {
                         actions.more = ui
                             .button(locale.text("加载更多提交", "Load more commits"))
@@ -474,40 +455,17 @@ impl GitView {
                         ui.label(locale.text("工作区干净", "Working tree clean"));
                     }
                     for file in &snapshot.files {
-                        ui.horizontal(|ui| {
-                            ui.label(
-                                RichText::new(format!("{}{}", file.index, file.worktree))
-                                    .monospace()
-                                    .color(if file.index == '?' {
-                                        chrome::COMPLETED
-                                    } else {
-                                        chrome::WAITING
-                                    }),
-                            );
-                            ui.add(
-                                egui::Label::new(file.path.replace(['\r', '\n'], " ")).truncate(),
-                            )
-                            .on_hover_text(&file.path);
-                        });
-                        ui.horizontal(|ui| {
-                            ui.add_space(25.0);
-                            if file.binary {
-                                ui.weak(locale.text("二进制", "Binary"));
-                            } else if file.omitted {
-                                ui.weak(locale.text("未统计行数", "Line counts unavailable"));
-                            } else {
-                                ui.label(
-                                    RichText::new(format!("+{}", file.added))
-                                        .small()
-                                        .color(chrome::COMPLETED),
-                                );
-                                ui.label(
-                                    RichText::new(format!("−{}", file.deleted))
-                                        .small()
-                                        .color(chrome::FAILED),
-                                );
-                            }
-                        });
+                        files::show(
+                            ui,
+                            files::FileRow {
+                                path: &file.path,
+                                status: &format!("{}{}", file.index, file.worktree),
+                                added: file.added,
+                                deleted: file.deleted,
+                                binary: file.binary,
+                                omitted: file.omitted,
+                            },
+                        );
                     }
                 }
             });
@@ -525,16 +483,6 @@ fn display_text(text: &str, limit: usize) -> String {
         result.push('…');
     }
     result
-}
-fn commit_details(ui: &mut egui::Ui, commit: &Commit) {
-    ui.add(egui::Label::new(RichText::new(&commit.id).monospace().small()).wrap());
-    if commit.parents.len() > 1 {
-        ui.weak(format!(
-            "{} · {}",
-            i18n::tr(ui.ctx(), "合并提交", "Merge commit"),
-            commit.parents.len()
-        ));
-    }
 }
 fn date(timestamp: i64) -> String {
     let days = timestamp.div_euclid(86400) + 719468;
