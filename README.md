@@ -12,7 +12,7 @@
 [![Platform](https://img.shields.io/badge/platform-Windows%20x64-0078D4)](#平台支持)
 [![License](https://img.shields.io/badge/license-MIT-5c8a66)](LICENSE)
 
-[下载使用](#快速开始) · [功能介绍](#为多会话而设计) · [支持的 Agent](#支持的-agent) · [更新日志](CHANGELOG.md) · [常见问题](#常见问题) · [参与贡献](CONTRIBUTING.md)
+[下载使用](#快速开始) · [功能介绍](#为多会话而设计) · [Git 工作区](#查看-git-更改与历史) · [支持的 Agent](#支持的-agent) · [更新日志](CHANGELOG.md) · [常见问题](#常见问题) · [参与贡献](CONTRIBUTING.md)
 
 简体中文 | [English](README.en.md)
 
@@ -32,7 +32,7 @@ AI 任务可能运行很久。打开多个窗口后，来回确认哪个会话�
 
 ![AI Terminal 浮窗示意](assets/readme/floating.png)
 
-> 截图使用 0.4.8 的真实界面、合成会话内容、示例目录和模拟状态，不包含真实用户名、工作目录或私人对话。点击图片可查看原始分辨率。
+> 截图使用 0.5.0 的真实原生组件；会话、终端文本、Git 元数据及任务状态均为展示样例，不包含真实用户数据或私人对话。点击图片可查看原始分辨率。
 
 ## 为多会话而设计
 
@@ -47,6 +47,16 @@ AI 任务可能运行很久。打开多个窗口后，来回确认哪个会话�
 | **Git 工作区** | 顶部查看当前分支及增删行数；右侧可收起面板查看文件更改和当前分支的提交历史，随终端目录更新。详见 [Git 面板](docs/git.md)。 |
 | **终端字体** | 默认 JetBrains Mono，可在设置中即时切换 Cascadia Mono、Hack 及两款可用的 Windows 字体；运行会话保持连接，已保存的选择不变。 |
 | **中英双语** | 自动跟随系统语言，也可在设置中手动选择简体中文或 English。 |
+
+## 查看 Git 更改与历史
+
+在 Git 仓库中工作时，终端顶部会与会话名称、路径一起显示当前分支及增删行数。点击分支名打开右侧 Git 面板，可在“更改”和“提交历史”之间切换；面板支持调宽和收起，终端会话继续运行。
+
+“更改”展示文件状态和相对 HEAD 的净增删，合并已暂存、未暂存及未跟踪文本；“提交历史”展示当前分支可达的提交、作者、日期和提交 ID，每次加载 50 条，最多 300 条。切换终端目录或修改仓库后自动刷新，也可点击“刷新”。
+
+![AI Terminal 的 Git 提交历史：分支、增删统计与右侧历史面板](assets/readme/git-history.png)
+
+需要已安装 Git for Windows。面板提供只读查看，暂存、提交、拉取和推送仍在终端执行。二进制、内容过滤文件和大文件的统计边界见 [Git 面板说明](docs/git.md)。
 
 ## 支持的 Agent
 
@@ -100,7 +110,7 @@ codex
 
 在受管终端里交互式启动 `powershell`、`cmd` 或 `bash` 时，头像会跟随当前 Shell；`exit` 逐层恢复。启动 Codex／Claude／Qoder CN／Kimi Code／ZCode／TRAE CLI 时优先显示 Agent 头像，退出后恢复当前 Shell。单次脚本命令和 Agent 内部的工具命令不会因此改变 Shell 头像。
 
-0.4.10 的终端默认使用内嵌 **JetBrains Mono** 与系统**微软雅黑 UI**，已有字体选择保持不变；设置中还可选择 Cascadia Mono、Hack 及可用的 Windows 字体。保持原来的自然渲染方式，内置字体的常规、粗体、斜体和粗斜体随程序提供。来源和许可见[第三方说明](THIRD_PARTY_NOTICES.md)。
+终端默认使用内嵌 **JetBrains Mono** 与系统**微软雅黑 UI**，已有字体选择保持不变；设置中还可选择 Cascadia Mono、Hack 及可用的 Windows 字体。保持原来的自然渲染方式，内置字体的常规、粗体、斜体和粗斜体随程序提供。来源和许可见[第三方说明](THIRD_PARTY_NOTICES.md)。
 
 ## 常见问题
 

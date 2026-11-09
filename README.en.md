@@ -12,7 +12,7 @@ Use Codex, Claude Code, Qoder CN, Kimi Code, ZCode and TRAE CLI in a familiar te
 [![Platform](https://img.shields.io/badge/platform-Windows%20x64-0078D4)](#platform-support)
 [![License](https://img.shields.io/badge/license-MIT-5c8a66)](LICENSE)
 
-[Get started](#quick-start) · [Features](#built-for-multiple-sessions) · [Supported Agents](#supported-agents) · [Changelog](CHANGELOG.en.md) · [FAQ](#frequently-asked-questions) · [Contribute](CONTRIBUTING.en.md)
+[Get started](#quick-start) · [Features](#built-for-multiple-sessions) · [Git workspace](#inspect-git-changes-and-history) · [Supported Agents](#supported-agents) · [Changelog](CHANGELOG.en.md) · [FAQ](#frequently-asked-questions) · [Contribute](CONTRIBUTING.en.md)
 
 [简体中文](README.md) | English
 
@@ -32,7 +32,7 @@ Enable the floating bar to see session avatars and status above other windows. C
 
 ![AI Terminal floating session bar](assets/readme/floating.en.png)
 
-> Screenshots use the real 0.4.8 interface with synthetic sessions, example directories and simulated status. They contain no real usernames, working directories or private conversations. Click an image for its original resolution.
+> Screenshots use real 0.5.0 native components with synthetic sessions, terminal text, Git metadata and task status. They contain no real user data or private conversations. Click an image for its original resolution.
 
 ## Built for multiple sessions
 
@@ -47,6 +47,16 @@ Enable the floating bar to see session avatars and status above other windows. C
 | **Git workspace** | See the current branch and line additions/deletions in the header, with changed files and current-branch history in a collapsible right panel that follows the terminal directory. See [Git panel](docs/git.en.md). |
 | **Terminal fonts** | Default to JetBrains Mono and switch instantly to Cascadia Mono, Hack or two available Windows fonts in Settings while sessions stay connected and saved choices are preserved. |
 | **Chinese and English** | Follow the system language or choose Simplified Chinese or English in settings. |
+
+## Inspect Git changes and history
+
+When the terminal directory belongs to a Git repository, the header shows its branch and line additions/deletions alongside the session name and path. Click the branch to open the right panel, then switch between Changes and History. Resize or collapse the panel while the terminal stays connected.
+
+Changes shows file status and net line totals against HEAD, combining staged, unstaged and untracked text. History shows commits reachable from the current branch with authors, dates and commit IDs; load 50 at a time, up to 300. Changing the terminal directory or repository refreshes the view automatically, with Refresh also available.
+
+![AI Terminal Git history with branch and line totals beside the terminal](assets/readme/git-history.en.png)
+
+Requires an installed Git for Windows. The panel is read-only; staging, committing, pulling and pushing remain terminal operations. See [Git panel details](docs/git.en.md) for binary, content-filter and large-file counting boundaries.
 
 ## Supported Agents
 
@@ -100,7 +110,7 @@ Use the gear at the top left to set the language, terminal font and floating bar
 
 Interactively launching `powershell`, `cmd` or `bash` through a managed entry updates the avatar to the current shell; `exit` restores each level. Codex/Claude/Qoder CN/Kimi Code/ZCode/TRAE CLI take avatar priority while active, then return to the current shell. One-off scripts and tool commands inside Agents do not change shell identity.
 
-Version 0.4.10 defaults to embedded **JetBrains Mono** with system **Microsoft YaHei UI** for CJK, preserving saved font choices. Settings also offers Cascadia Mono, Hack and available Windows fonts. Original native rendering is retained, and regular, bold, italic and bold-italic styles of embedded families ship with the app. See [third-party notices](THIRD_PARTY_NOTICES.en.md) for provenance and licensing.
+The terminal defaults to embedded **JetBrains Mono** with system **Microsoft YaHei UI** for CJK, preserving saved font choices. Settings also offers Cascadia Mono, Hack and available Windows fonts. Original native rendering is retained, and regular, bold, italic and bold-italic styles of embedded families ship with the app. See [third-party notices](THIRD_PARTY_NOTICES.en.md) for provenance and licensing.
 
 ## Frequently asked questions
 

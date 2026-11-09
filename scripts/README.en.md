@@ -70,7 +70,18 @@ The preview.3 island_move_probe also checks native movement enter/exit notificat
 
 The preview.4 cross-monitor probe uses the same commands and moves its own main and floating windows while native movement state spans DPI changes, saving main-*.png/move-*.png and dpi_trace. Check suggested/actual rectangle error, nested DPI depth, deferred mid-move size repair and stable dimensions on repeated crossings. physical_mouse_drag remains false; physical mouse-modal dragging requires separate acceptance. Local winit build sources/embedded assets are included in package source identity and its license is collected in the dependency inventory.
 
-Public README captures (Windows only): build `cargo build --offline --locked --release --example readme_capture --example island_probe`, then separately run `target/release/examples/readme_capture.exe output/<unique-readme-workspace>` and `target/release/examples/island_probe.exe output/<unique-readme-floating>`. The former reuses production sidebar, font and terminal components with fixed text, example directories and synthetic status; the latter captures the production floating bar. Neither launches an Agent/model or loads user profiles; only owned windows and PTYs are managed. Check exit codes, JSON, PNGs and privacy before copying workspace.png and island-zh.png unchanged into README assets, then update version, provenance, dimensions and SHA-256 in assets/readme/SOURCE.json.
+Public README captures (Windows only; PowerShell / Git Bash):
+
+```powershell
+cargo build --offline --locked --release --example readme_capture --example island_probe
+target/release/examples/readme_capture.exe output/<unique-workspace-zh> zh
+target/release/examples/readme_capture.exe output/<unique-workspace-en> en
+target/release/examples/readme_capture.exe output/<unique-history-zh> zh history
+target/release/examples/readme_capture.exe output/<unique-history-en> en history
+target/release/examples/island_probe.exe output/<unique-floating>
+```
+
+Use a fresh directory each time. `readme_capture <output> [zh|en] [history]` defaults to Changes; the third argument selects History, and both modes produce workspace.png. Production sidebar, font, header, Git panel and terminal components use only fixed text, example paths and synthetic Git/task metadata, without querying user repositories. `island_probe` produces Chinese/English floating-bar and Settings captures. Neither launches Agents/models or reads user profiles; only owned windows and PTYs are managed. Verify exit codes, result.json, owned PTY cleanup, actual PNGs and privacy, then copy both workspace.png files, the history-mode workspace.png files and island-zh.png/island-en.png unchanged to their workspace, git-history and floating bilingual names in assets/readme. Update version, source, dimensions and SHA-256 in SOURCE.json. Display fixtures do not replace actual Git or Agent acceptance.
 
 Native Codex lifecycle/overview and mode badges (Windows only): build `cargo build --offline --locked --release --bins --example agents_status_probe`. From an existing trusted directory, run `target/release/examples/agents_status_probe.exe codex output/<unique-agents-probe>`; only Left/overview and Esc/return are sent, producing three PNGs and finite-state JSON. No prompts, project/hook trust acceptance or shared-server stop. `target/release/examples/agents_status_probe.exe badges output/<unique-badge-probe>` uses fixed PowerShell text to capture adjacent triangles/pause/emoji at 100%/146%/200%. Check JSON, exit code and actual images; startup/navigation is not a model turn. Existing POSIX native restrictions apply; no new project action is added.
 
