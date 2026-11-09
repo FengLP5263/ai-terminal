@@ -313,6 +313,9 @@ pub struct App {
     font: TerminalFont,
     preferences: model::UiSettings,
     settings_open: bool,
+    git: Option<ai_terminal::git::GitClient>,
+    git_view: ai_terminal::git_ui::GitView,
+    git_focused: bool,
     floating_session_count: Option<usize>,
     floating_zoom: Option<f32>,
     floating: ai_terminal::floating::FloatingBar,
@@ -426,6 +429,13 @@ impl App {
             font: ai_terminal::appearance::terminal_font_for(actual_font, 14.0),
             preferences,
             settings_open: false,
+            git: if !cfg!(test) && !smoke && !idle_benchmark {
+                Some(ai_terminal::git::GitClient::new(cc.egui_ctx.clone()))
+            } else {
+                None
+            },
+            git_view: Default::default(),
+            git_focused: false,
             floating_session_count: None,
             floating_zoom: None,
             floating,
@@ -675,6 +685,21 @@ impl App {
             }
         }
         self.receive_events(ctx);
+        let active_directory = self
+            .sessions
+            .iter()
+            .find(|s| Some(&s.spec.id) == self.active.as_ref())
+            .map(|s| s.spec.directory.as_path());
+        let focused = ctx.input(|i| i.viewport().focused.unwrap_or(false));
+        if let Some(git) = &mut self.git {
+            if git.set_directory(active_directory) {
+                self.git_view.reset();
+            } else if focused && !self.git_focused {
+                git.refresh();
+            }
+            git.poll();
+        }
+        self.git_focused = focused;
         if self
             .preferences_save_at
             .is_some_and(|deadline| Instant::now() >= deadline)
@@ -764,6 +789,7 @@ impl App {
     }
     fn receive_events(&mut self, ctx: &egui::Context) {
         let focused = ctx.input(|i| i.viewport().focused.unwrap_or(false));
+        let mut git_prompt = false;
         if let Some(bridge) = &self.bridge {
             for event in bridge.receiver.try_iter().take(256) {
                 let Some(session) = self
@@ -827,6 +853,7 @@ impl App {
                     if let Some(path) =
                         ai_terminal::shell::directory_from_title(&title, &session.generation)
                     {
+                        git_prompt |= self.active.as_deref() == Some(&session.spec.id);
                         if (session.status.native_lifecycle && session.invocation.is_none())
                             || session.agent_process.as_ref().is_some_and(|p| p.exited())
                         {
@@ -868,6 +895,9 @@ impl App {
                 PtyEvent::Bell => {} // Agent lifecycle events own status; terminal bells are not completion.
                 _ => {}
             }
+        }
+        if git_prompt && let Some(git) = &mut self.git {
+            git.refresh();
         }
         if focused
             && let Some(session) = self
@@ -1017,51 +1047,19 @@ impl App {
                     && !self.confirm_exit
                     && !self.settings_open
                     && !egui::Popup::is_any_open(&ctx);
-                let mut reset = false;
-                ui.allocate_ui_with_layout(
-                    egui::vec2(ui.available_width(), ai_terminal::chrome::CONTROL),
-                    egui::Layout::left_to_right(egui::Align::Center),
-                    |ui| {
-                        let session = &self.sessions[index];
-                        let name_width = ui.available_width() * 0.45;
-                        ai_terminal::ui_text::label_with_width(
-                            ui,
-                            &session.spec.name,
-                            14.0,
-                            ai_terminal::chrome::TEXT,
-                            name_width,
-                        );
-                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            reset = ui
-                                .add_sized(
-                                    [56.0, ai_terminal::chrome::CONTROL],
-                                    egui::Button::new(format!(
-                                        "{:.0}%",
-                                        self.preferences.ui_scale * 100.0
-                                    ))
-                                    .frame(false),
-                                )
-                                .on_hover_text(tr(&ctx,"Ctrl＋滚轮缩放整个界面 · 点击恢复 100%","Ctrl+wheel zooms the window · Click to reset to 100%"))
-                                .clicked();
-                            if session.backend.is_some() && !session.display_agent().is_shell() {
-                                ai_terminal::connection_ui::show(
-                                    ui,
-                                    session.display_agent(),
-                                    &session.status,
-                                );
-                            }
-                            ui.add(
-                                egui::Label::new(
-                                    RichText::new(session.spec.directory.to_string_lossy())
-                                        .size(12.0)
-                                        .color(MUTED),
-                                )
-                                .truncate(),
-                            )
-                            .on_hover_text(session.spec.directory.display().to_string());
-                        });
-                    },
-                );
+                let session = &self.sessions[index];
+                let was_git_open = self.preferences.git_panel_open;
+                let reset = ai_terminal::git_ui::header(ui, ai_terminal::git_ui::Header {
+                    name: &session.spec.name,
+                    directory: &session.spec.directory,
+                    scale: self.preferences.ui_scale,
+                    connection: (session.backend.is_some() && !session.display_agent().is_shell()).then_some((session.display_agent(), &session.status)),
+                }, self.git.as_ref(), &mut self.preferences.git_panel_open);
+                if was_git_open != self.preferences.git_panel_open {
+                    if self.preferences.git_panel_open && let Some(git) = &mut self.git { git.refresh(); }
+                    self.preferences_changed(&ctx);
+                    ctx.request_repaint();
+                }
                 ui.add_space(8.0);
                 if reset {
                     self.set_ui_scale(1.0, &ctx);
@@ -1522,6 +1520,23 @@ impl eframe::App for App {
             });
         }
         self.sidebar(ui);
+        let was_git_open = self.preferences.git_panel_open;
+        let git_actions =
+            self.git_view
+                .panel(ui, self.git.as_ref(), &mut self.preferences.git_panel_open);
+        if git_actions.refresh
+            && let Some(git) = &mut self.git
+        {
+            git.refresh();
+        }
+        if git_actions.more
+            && let Some(git) = &mut self.git
+        {
+            git.more();
+        }
+        if was_git_open != self.preferences.git_panel_open {
+            self.preferences_changed(&ctx);
+        }
         self.terminal(ui);
         self.dialogs(&ctx);
         if self.closing.is_none() {
@@ -2327,6 +2342,51 @@ Send-State 'state=clear'; Wait-Step 5
                 .unwrap()
                 .should_interrupt_composition,
             "focus restoration must not repeat on the next repaint"
+        );
+    }
+
+    #[test]
+    fn git_panel_and_refresh_preserve_live_terminal_identity_and_saved_preference() {
+        let directory = tempfile::tempdir().unwrap();
+        let ctx = egui::Context::default();
+        let creation = eframe::CreationContext::_new_kittest(ctx.clone());
+        let mut app = App::new(&creation, directory.path().to_owned(), false, false);
+        use_built_helper(&mut app);
+        app.last_directory = Some(directory.path().to_owned());
+        app.new_shell(Agent::Cmd, &ctx);
+        app.git = Some(ai_terminal::git::GitClient::new(ctx.clone()));
+        let id = app.active.clone();
+        let pid = app.sessions[0].backend.as_ref().unwrap().pty_id();
+        for open in [false, true, true, false, true] {
+            app.preferences.git_panel_open = open;
+            let _ = ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1200.0, 700.0),
+                    )),
+                    ..Default::default()
+                },
+                |ui| {
+                    app.sidebar(ui);
+                    app.git_view
+                        .panel(ui, app.git.as_ref(), &mut app.preferences.git_panel_open);
+                    app.terminal(ui);
+                },
+            );
+            app.git.as_mut().unwrap().refresh();
+            assert_eq!(app.active, id);
+            assert_eq!(app.sessions.len(), 1);
+            assert_eq!(app.sessions[0].backend.as_ref().unwrap().pty_id(), pid);
+        }
+        app.preferences_changed(&ctx);
+        app.preferences_save_at = Some(Instant::now());
+        app.background_tick(&ctx);
+        assert!(
+            model::load(&directory.path().join("sessions.json"))
+                .unwrap()
+                .ui
+                .git_panel_open
         );
     }
 

@@ -24,3 +24,5 @@ assets/fonts/LICENSE-Cascadia.txt -text -whitespace
 # Preserve the original installer-toolchain license bytes.
 scripts/installer/NSIS-LICENSE.txt -text -whitespace
 assets/fonts/LICENSE-JetBrainsMono.txt -text -whitespace
+assets/fonts/LICENSE-Codicons.txt -text -whitespace
+assets/fonts/Codicons-mapping.css -text -whitespace

@@ -84,3 +84,7 @@ Windows 闪烁核查：构建并运行 render_update_probe（完整命令见 scr
 0.4.10 默认 JetBrains Mono；新工作区、缺少／未知字体 ID 的设置使用默认，已有选择保持不变。typography_probe 未指定字体时使用正式默认。字体回归通过正式设置下拉选择 Hack，验证原 ConPTY PID、会话身份、保存和重载；typography_probe 新增 courier_new／jetbrains_mono，并用第四参数 settings-zh／settings-en 截图正式设置控件（第三参数 default）。五款字体分别检查 100%／103%／110%／150%／200%，缺失字体不能当作通过。安装验收只运行 -Acceptance 包，以相同 -AcceptanceId 配对旧／新版本；`project.ps1 installer-smoke -Path <new.json> -Previous <old.json>` 使用唯一 output 路径、HKCU 测试键和快捷方式，验证安装、占用拒绝、升级、包内就绪后六 PTY 截图、卸载及用户文件保留。不得对普通安装执行自动卸载。
 
 启动器递归回归位于 tests/shell_sessions.rs：有界假 qodercn 分发到公开 qoderclicn，核对参数、真实退出码和单次开始／退出通知；旧逻辑最多重入一次后失败，不能用无界递归制造进程风暴。PATH 纯函数另覆盖大小写、斜杠、中文／空格和相似前缀目录。真实版本核查仅调用 --version，在隔离进程树中限时退出，不发送 Ctrl+C 或模型提示，不操作用户会话。
+
+会话配色原生核查：`cargo build --offline --locked --release --example session_color_probe`，随后运行 `target/release/examples/session_color_probe.exe output/<unique-session-colors>`。使用正式侧栏和色盘，在 100%／103%／200% 截取选中、悬停、无颜色和收起状态，不启动 PTY／Agent、不注入系统输入。sidebar_interaction 验证全部色块与清除不切换会话、单排菜单以及悬停／选中底色一致且无独立描边；旧颜色 ID 往返另由 model 回归覆盖。
+
+Git 面板核查：`cargo build --offline --locked --release --example git_probe` 后运行 `target/release/examples/git_probe.exe output/<unique-git-probe>`。探针创建自身独立样例仓库并使用正式 Git 后台、摘要、面板和真实 PowerShell ConPTY，截取 100%／103%／114%／200% 中英文更改、历史和收起状态，核对单行标题栏、Codicons 图标及 JetBrains Mono／Hack 字体继承，检查同一 PTY PID；不操作用户仓库、不调用 Agent／模型。git_repository 覆盖真实本地 Git 的净变化、二进制／大文件、新仓库／游离 HEAD、分支历史、分页、目录通知、忽略文件及输出限额；git_panel 核查正式控件，App 回归检查面板开合后终端身份和偏好保存。

@@ -17,6 +17,7 @@ struct Harness {
     extra: Vec<String>,
     width: f32,
     height: f32,
+    active: &'static str,
 }
 impl Harness {
     fn new() -> Self {
@@ -34,6 +35,7 @@ impl Harness {
             extra: Vec::new(),
             width: 238.0,
             height: 600.0,
+            active: "a",
         }
     }
     fn frame(&mut self, events: Vec<Event>, collapsed: bool) -> Actions {
@@ -80,7 +82,14 @@ impl Harness {
         }));
         let mut actions = Actions::default();
         let output = self.ctx.run_ui(input, |ui| {
-            actions = sidebar::show(ui, &entries, Some("a"), collapsed, self.width, &self.icons);
+            actions = sidebar::show(
+                ui,
+                &entries,
+                Some(self.active),
+                collapsed,
+                self.width,
+                &self.icons,
+            );
         });
         self.output = Some(output);
         if !collapsed {
@@ -474,10 +483,81 @@ fn settings_replaces_title_and_aligns_with_header_controls_at_all_zoom_levels() 
 }
 
 #[test]
+fn hovered_and_selected_cards_share_one_fill_without_a_separate_outline() {
+    fn card(h: &Harness) -> egui::epaint::RectShape {
+        fn find(shape: &egui::Shape, rect: Rect) -> Option<egui::epaint::RectShape> {
+            match shape {
+                egui::Shape::Rect(shape) if shape.rect == rect => Some(shape.clone()),
+                egui::Shape::Vec(shapes) => shapes.iter().find_map(|shape| find(shape, rect)),
+                _ => None,
+            }
+        }
+        h.output
+            .as_ref()
+            .unwrap()
+            .shapes
+            .iter()
+            .find_map(|shape| find(&shape.shape, h.row("b")))
+            .expect("card background")
+    }
+    fn outlined(h: &Harness) -> bool {
+        fn find(shape: &egui::Shape, rect: Rect) -> bool {
+            match shape {
+                egui::Shape::Rect(shape) => {
+                    shape.rect.center().distance(rect.center()) < 0.1
+                        && (shape.rect.width() - rect.width()).abs() < 2.0
+                        && shape.stroke != egui::Stroke::NONE
+                }
+                egui::Shape::Vec(shapes) => shapes.iter().any(|shape| find(shape, rect)),
+                _ => false,
+            }
+        }
+        h.output
+            .as_ref()
+            .unwrap()
+            .shapes
+            .iter()
+            .any(|shape| find(&shape.shape, h.row("b")))
+    }
+    for collapsed in [false, true] {
+        for color in std::iter::once(None).chain(SessionColor::ALL.into_iter().map(Some)) {
+            let mut h = Harness::new();
+            h.color = color;
+            h.frame(
+                vec![Event::PointerMoved(egui::pos2(800.0, 500.0))],
+                collapsed,
+            );
+            let normal = card(&h);
+            h.active = "b";
+            h.frame(vec![], collapsed);
+            let selected = card(&h);
+            assert!(!outlined(&h), "selected card has no separate outline");
+            h.active = "a";
+            let pos = h.row("b").center();
+            h.frame(vec![Event::PointerMoved(pos)], collapsed);
+            let hovered = card(&h);
+            assert!(!outlined(&h), "hovered card has no separate outline");
+            assert_eq!(hovered.fill, selected.fill, "hover and selected: {color:?}");
+            assert_ne!(
+                normal.fill, selected.fill,
+                "normal remains subdued: {color:?}"
+            );
+            for state in [normal, selected, hovered] {
+                assert_eq!(
+                    state.stroke,
+                    egui::Stroke::NONE,
+                    "no contrasting card outline"
+                );
+            }
+        }
+    }
+}
+
+#[test]
 fn right_click_palette_sets_and_resets_color_without_selecting_another_tab() {
     for collapsed in [false, true] {
         let mut h = Harness::new();
-        for wanted in [Some(SessionColor::Purple), None] {
+        for wanted in SessionColor::ALL.into_iter().map(Some).chain([None]) {
             h.frame(vec![], collapsed);
             let pos = h.row("b").center();
             for pressed in [true, false] {
@@ -498,6 +578,21 @@ fn right_click_palette_sets_and_resets_color_without_selecting_another_tab() {
             let menu = text_rect(h.output.as_ref().unwrap(), "会话颜色").unwrap();
             h.click(menu.center(), collapsed);
             h.frame(vec![], collapsed);
+            let swatches: Vec<_> = std::iter::once(None)
+                .chain(SessionColor::ALL.into_iter().map(Some))
+                .map(|color| {
+                    h.ctx
+                        .read_response(egui::Id::new(("session-color", "b", color)))
+                        .unwrap()
+                        .rect
+                })
+                .collect();
+            assert!(
+                swatches
+                    .iter()
+                    .all(|rect| (rect.center().y - swatches[0].center().y).abs() < 0.1),
+                "all seven choices must stay on one row"
+            );
             let swatch = h
                 .ctx
                 .read_response(egui::Id::new(("session-color", "b", wanted)))

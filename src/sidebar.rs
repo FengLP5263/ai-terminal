@@ -278,14 +278,6 @@ fn paint_card(
         );
     }
     painter.rect_filled(rect, 6, fill);
-    if style.selected || style.raised {
-        painter.rect_stroke(
-            rect.shrink(0.5),
-            5,
-            Stroke::new(1.0, chrome::session_border(entry.color)),
-            egui::StrokeKind::Inside,
-        );
-    }
     let avatar = Rect::from_center_size(
         Pos2::new(
             if collapsed {
@@ -312,7 +304,7 @@ fn paint_card(
             text_rect.left_top(),
             entry.name,
             14.0,
-            if style.selected {
+            if style.selected || style.hovered {
                 Color32::from_gray(245)
             } else {
                 chrome::TEXT
@@ -329,7 +321,7 @@ fn paint_card(
             egui::Align2::LEFT_TOP,
             project,
             egui::FontId::proportional(12.0),
-            if style.selected {
+            if style.selected || style.hovered {
                 Color32::from_gray(180)
             } else {
                 chrome::SECONDARY
@@ -572,30 +564,10 @@ pub fn show(
                         ui.menu_button(
                             crate::i18n::tr(ui.ctx(), "会话颜色", "Session color"),
                             |ui| {
-                                egui::Grid::new(("session-palette", entry.id))
-                                    .num_columns(4)
-                                    .spacing(egui::vec2(6.0, 6.0))
-                                    .show(ui, |ui| {
-                                        for (index, color) in std::iter::once(None)
-                                            .chain(SessionColor::ALL.into_iter().map(Some))
-                                            .enumerate()
-                                        {
-                                            if color_swatch(
-                                                ui,
-                                                entry.id,
-                                                color,
-                                                entry.color == color,
-                                            )
-                                            .clicked()
-                                            {
-                                                actions.color = Some((entry.id.into(), color));
-                                                ui.close();
-                                            }
-                                            if index % 4 == 3 {
-                                                ui.end_row();
-                                            }
-                                        }
-                                    });
+                                if let Some(color) = color_palette(ui, entry.id, entry.color) {
+                                    actions.color = Some((entry.id.into(), color));
+                                    ui.close();
+                                }
                             },
                         );
                         if ui
@@ -747,6 +719,33 @@ fn new_session_menu_inner(ui: &mut egui::Ui, id: egui::Id, rail: bool) -> Option
     selected
 }
 
+/// Shared by the context menu and isolated native appearance captures.
+pub fn color_palette(
+    ui: &mut egui::Ui,
+    session: &str,
+    current: Option<SessionColor>,
+) -> Option<Option<SessionColor>> {
+    let mut changed = None;
+    egui::Grid::new(("session-palette", session))
+        .num_columns(7)
+        .spacing(egui::vec2(6.0, 0.0))
+        .show(ui, |ui| {
+            for color in std::iter::once(None).chain(SessionColor::ALL.into_iter().map(Some)) {
+                if color_swatch(
+                    ui,
+                    session,
+                    color,
+                    current.map(SessionColor::palette_color) == color,
+                )
+                .clicked()
+                {
+                    changed = Some(color);
+                }
+            }
+        });
+    changed
+}
+
 fn color_swatch(
     ui: &mut egui::Ui,
     session: &str,
@@ -759,38 +758,35 @@ fn color_swatch(
         egui::Id::new(("session-color", session, color)),
         Sense::click(),
     );
-    let label =
-        color
-            .map(SessionColor::label)
-            .unwrap_or(crate::i18n::tr(ui.ctx(), "默认", "Default"));
+    let label = color
+        .map(|color| crate::i18n::color(crate::i18n::locale(ui.ctx()), color))
+        .unwrap_or(crate::i18n::tr(ui.ctx(), "无颜色", "No color"));
     response.widget_info(|| {
         egui::WidgetInfo::labeled(egui::WidgetType::Button, ui.is_enabled(), label)
     });
     if response.hovered() || response.is_pointer_button_down_on() {
         ui.painter().rect_filled(rect, 6, chrome::HOVER);
     }
-    let fill = color
-        .map(|c| {
-            let [r, g, b] = c.rgb();
-            Color32::from_rgb(r, g, b)
-        })
-        .unwrap_or(Color32::from_gray(90));
-    ui.painter().circle_filled(rect.center(), 9.0, fill);
-    if color.is_none() {
+    if let Some(color) = color {
+        let [r, g, b] = color.rgb();
+        ui.painter()
+            .circle_filled(rect.center(), 11.5, Color32::from_rgb(r, g, b));
+    } else {
+        let stroke = Stroke::new(1.7, Color32::from_gray(242));
+        ui.painter().circle_stroke(rect.center(), 9.5, stroke);
         ui.painter().line_segment(
             [
-                rect.center() + egui::vec2(-5.0, 5.0),
-                rect.center() + egui::vec2(5.0, -5.0),
+                rect.center() + egui::vec2(-6.5, -6.5),
+                rect.center() + egui::vec2(6.5, 6.5),
             ],
-            Stroke::new(1.5, Color32::from_gray(200)),
+            stroke,
         );
     }
     if selected || response.has_focus() {
-        ui.painter().rect_stroke(
-            rect.shrink(0.5),
-            6,
-            Stroke::new(1.5, chrome::TEXT),
-            egui::StrokeKind::Inside,
+        ui.painter().circle_stroke(
+            rect.center(),
+            14.0,
+            Stroke::new(2.0, Color32::from_rgb(25, 170, 216)),
         );
     }
     response.on_hover_text(label)

@@ -11,6 +11,15 @@ pub struct CliSearch {
 }
 
 impl CliSearch {
+    /// Resolve a real Git executable from explicit absolute search directories.
+    /// Do not let a selected project's working directory supply the executable.
+    pub fn git(&self) -> Option<PathBuf> {
+        self.directories
+            .iter()
+            .map(|dir| dir.join(if cfg!(windows) { "git.exe" } else { "git" }))
+            .find(|path| path.is_file())
+    }
+
     /// Read once per launch; never poll the registry or mutate the GUI environment.
     pub fn current() -> Self {
         let mut directories = Vec::new();

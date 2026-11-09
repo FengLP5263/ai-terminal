@@ -24,7 +24,7 @@ Choose Settings → Terminal font. Changes apply to all sessions immediately and
 | Consolas | Installed Windows font | Disabled when unavailable |
 | Courier New | Installed Windows font | Disabled when unavailable |
 
-Chinese keeps system Microsoft YaHei UI and emoji keeps the system color font. Interface language, session names and control fonts remain unchanged; this setting changes terminal text. System fonts are not copied into application/installer files. New workspaces, older settings without a font field and unknown future font IDs use JetBrains Mono. Existing saved choices are preserved, and unavailable fonts from another PC safely fall back to the default. Known system files are checked once; no complete font scan or per-frame disk reads are used.
+Chinese keeps system Microsoft YaHei UI and emoji keeps the system color font. This setting changes terminal text and, from 0.5.0, the terminal header and Git panel. Interface language and other controls remain unchanged. System fonts are not copied into application/installer files. New workspaces, older settings without a font field and unknown future font IDs use JetBrains Mono. Existing saved choices are preserved, and unavailable fonts from another PC safely fall back to the default. Known system files are checked once; no complete font scan or per-frame disk reads are used.
 
 ## Local build and acceptance
 

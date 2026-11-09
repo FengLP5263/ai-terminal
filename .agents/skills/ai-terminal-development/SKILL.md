@@ -29,3 +29,5 @@ Git Bash 加载系统／用户登录配置后再追加会话集成，保留提�
 
 
 0.4.10 的字体目录与设置共用 FontChoice；改动不能重启运行终端。内置字体保持来源字节，系统字体仅从 Windows Fonts 读取，不安装或复制。安装版源在 scripts/installer，独立于 Rust GUI／helper；编译工具通过忽略目录或 AI_TERMINAL_NSIS 配置，固定身份后才运行。命令见 scripts/README.md。
+
+通用功能图标优先复用已集成的微软 Codicons，保持字号和缩放一致；新资产保留官方来源、原始许可和哈希。

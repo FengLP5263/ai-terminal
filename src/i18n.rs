@@ -99,11 +99,10 @@ pub fn activity(locale: Locale, state: crate::status::Activity) -> &'static str 
 pub fn color(locale: Locale, color: crate::model::SessionColor) -> &'static str {
     use crate::model::SessionColor::*;
     match color {
-        Blue => locale.text("蓝色", "Blue"),
+        Red | Orange => locale.text("红色", "Red"),
+        Blue | Teal => locale.text("蓝色", "Blue"),
         Green => locale.text("绿色", "Green"),
-        Teal => locale.text("青色", "Teal"),
         Amber => locale.text("黄色", "Yellow"),
-        Orange => locale.text("橙色", "Orange"),
         Pink => locale.text("粉色", "Pink"),
         Purple => locale.text("紫色", "Purple"),
     }

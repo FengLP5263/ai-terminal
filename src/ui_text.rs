@@ -24,6 +24,17 @@ pub(crate) fn layout_rows(
     width: f32,
     rows: usize,
 ) -> Arc<Galley> {
+    layout_font_rows(ctx, text, FontId::proportional(size), color, width, rows)
+}
+
+pub(crate) fn layout_font_rows(
+    ctx: &egui::Context,
+    text: &str,
+    font_id: FontId,
+    color: Color32,
+    width: f32,
+    rows: usize,
+) -> Arc<Galley> {
     let mut job = egui::text::LayoutJob::default();
     job.wrap.max_width = width.max(1.0);
     job.wrap.max_rows = rows;
@@ -38,9 +49,9 @@ pub(crate) fn layout_rows(
         let emoji = is_emoji(cluster);
         has_emoji |= emoji;
         let font = if emoji && emoji_face {
-            FontId::new(size, FontFamily::Name("ui-emoji".into()))
+            FontId::new(font_id.size, FontFamily::Name("ui-emoji".into()))
         } else {
-            FontId::proportional(size)
+            font_id.clone()
         };
         job.append(
             cluster,
@@ -149,7 +160,18 @@ pub fn label_with_width(
     color: Color32,
     width: f32,
 ) -> egui::Response {
-    let galley = layout(ui, text, size, color, width);
+    label_with_font(ui, text, FontId::proportional(size), color, width)
+}
+
+pub fn label_with_font(
+    ui: &mut Ui,
+    text: &str,
+    font: FontId,
+    color: Color32,
+    width: f32,
+) -> egui::Response {
+    let size = font.size;
+    let galley = layout_font_rows(ui.ctx(), text, font, color, width, 1);
     let (rect, response) = ui.allocate_exact_size(galley.size(), egui::Sense::hover());
     response
         .widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Label, ui.is_enabled(), text));
