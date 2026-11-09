@@ -695,7 +695,7 @@ impl App {
             if git.set_directory(active_directory) {
                 self.git_view.reset();
             } else if focused && !self.git_focused {
-                git.refresh();
+                git.refresh_if_needed();
             }
             git.poll();
         }
@@ -897,7 +897,7 @@ impl App {
             }
         }
         if git_prompt && let Some(git) = &mut self.git {
-            git.refresh();
+            git.refresh_if_needed();
         }
         if focused
             && let Some(session) = self
@@ -1056,7 +1056,7 @@ impl App {
                     connection: (session.backend.is_some() && !session.display_agent().is_shell()).then_some((session.display_agent(), &session.status)),
                 }, self.git.as_ref(), &mut self.preferences.git_panel_open);
                 if was_git_open != self.preferences.git_panel_open {
-                    if self.preferences.git_panel_open && let Some(git) = &mut self.git { git.refresh(); }
+                    if self.preferences.git_panel_open && let Some(git) = &mut self.git { git.refresh_if_needed(); }
                     self.preferences_changed(&ctx);
                     ctx.request_repaint();
                 }
@@ -1215,8 +1215,8 @@ impl App {
                 .show(ctx, |ui| {
                     ui.label(tr(
                         ctx,
-                        "终端会话将关闭，下次可以恢复对话历史。Codex 共享后台中的任务可能继续运行。",
-                        "Terminal sessions will close. You can resume conversations next time. Tasks in the shared Codex server may keep running.",
+                        "终端会话将关闭，下次可以恢复对话历史。",
+                        "Terminal sessions will close. You can resume conversations next time.",
                     ));
                     ui.horizontal(|ui| {
                         exit = ui.button(tr(ctx, "退出", "Quit")).clicked();
@@ -1533,6 +1533,11 @@ impl eframe::App for App {
             && let Some(git) = &mut self.git
         {
             git.more();
+        }
+        if let Some(id) = git_actions.inspect
+            && let Some(git) = &mut self.git
+        {
+            git.inspect(&id);
         }
         if was_git_open != self.preferences.git_panel_open {
             self.preferences_changed(&ctx);

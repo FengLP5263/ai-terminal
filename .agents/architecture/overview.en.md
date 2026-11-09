@@ -50,3 +50,5 @@ Known limits: all physical IME combinations, all image clipboard sources, sustai
 0.4.10 preview: `font_choice.rs` defines stable font IDs persisted in `UiSettings.terminal_font`. appearance applies the same definitions to the app, terminals and probes; UI emoji use the current terminal native font to avoid repeated atlas recreation. NSIS owns per-user installation/uninstallation independently of runtime and Agent integrations; ZIP remains available.
 
 0.4.12 preview: `src/git/` owns read-only local Git snapshots for the active directory, bounded background commands and Windows directory notifications. `src/git_ui.rs` provides the header summary and collapsible right panel. Branches, line totals and history do not affect Agent status, and panel changes do not recreate terminals.
+
+Git history inspection: `src/git/commit.rs` reads immutable commits through independent bounded request/result slots and cancellation generations. `git_ui/history.rs` draws the timeline, interactive cards and expanded files using production fonts and Codicons. App::logic alone consumes results; UI and terminal identity remain independent.

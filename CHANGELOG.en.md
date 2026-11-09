@@ -4,6 +4,65 @@
 
 Record user-visible additions, improvements, fixes, and compatibility changes for each release; omit categories that do not apply. Review both languages together, use the same version entry in GitHub Releases, and ship both files in the ZIP. Historical summaries follow existing GitHub release notes and UTC publication dates; development versions without a separate release do not receive invented release dates.
 
+## [0.6.0] - 2026-11-09
+
+### Added
+
+- Show commit history as a compact dot-and-line timeline. Hover for author, UTC time, message and file/line totals; display a commit icon and seven-character ID, while row and card controls copy the full commit ID.
+- Click a commit to expand changed files, then click again to collapse. Handle root, empty and merge commits, explicitly comparing merges against their first parent. Read details on demand in the background and cancel old requests when directories change.
+
+### Changed
+
+- Share compact file rows between Changes and commits and align expanded file icons with commit text. Distinguish Markdown, code, JSON, configuration, scripts, media, PDF, archives and binary files with Microsoft Codicons glyphs.
+- Keep reading status inside the existing refresh button without adding a row or shifting the list.
+- Let healthy directory monitoring own automatic updates, reusing snapshots on prompts, focus and panel opens. Missing-watch fallback is action-driven and limited to once every two seconds; explicit refresh remains available. Ignore Git reflog, lock and object writes and coalesce edits using a 250 ms quiet window, capped at one second during sustained changes.
+- Simplify quit confirmation to “Terminal sessions will close. You can resume conversations next time.” in both languages, and update native README images.
+
+### Compatibility
+
+- Preserve workspaces, session directories/order, fonts and running terminals. Commit details stay in bounded memory, with no new persisted fields, repository writes or Git-configuration changes.
+- Git for Windows is still required, with six-second/2 MiB per-command limits. Display at most 500 commit files while totals cover all queried results. Binary files have no line counts; renames appear as deletion and addition.
+- Compatible features added since 0.5.0 advance the minor version to 0.6.0 under semantic versioning. Isolated preview data directories are local acceptance fixtures; the stable program keeps its original default data directory.
+
+### Verification scope
+
+- Passed 229 Rust and 20 Python offline regressions, governance, formatting and Clippy. Coverage includes abbreviated display/full-ID copying, alignment at three zoom levels, stable loading layout, root/empty/merge commits, query limits, monitoring filters and refresh gating.
+- Twelve native Git images cover Chinese/English, 100%/103%/114%/200%, JetBrains Mono/Hack, changes/expanded history/collapsed views and hover cards. Six-terminal smoke makes no model requests. The user accepted preview.3; see the release notes for stable installation-upgrade and artifact verification records.
+
+## [0.6.0-preview.3] - 2026-11-09
+
+Local preview for continued interface acceptance.
+
+### Changed
+
+- Show a Microsoft Codicons commit icon and seven-character abbreviated ID in commit hover cards; copy controls still copy the full commit ID.
+- Simplify quit confirmation to “Terminal sessions will close. You can resume conversations next time.” with matching Chinese text.
+
+## [0.6.0-preview.2] - 2026-11-09
+
+Local preview for continued Git-panel acceptance.
+
+### Changed
+
+- Share compact file rows between Changes and expanded commits. Align file-icon left edges with commit text and distinguish Markdown, code, JSON, configuration, scripts, media, archives, PDF and binary files with Microsoft Codicons glyphs.
+- Put reading status inside the existing refresh button instead of inserting a row or shifting the list.
+- Let healthy directory monitoring own automatic refreshes. Prompts, focus and opening the panel no longer repeat full queries. If monitoring fails, action-driven fallback reads are limited to once every two seconds; explicit refresh remains available. Ignore Git reflog, lock and object writes and coalesce ongoing edits with a quiet window.
+
+## [0.6.0-preview.1] - 2026-11-09
+
+Local preview pending user acceptance; not a public release. Compatible features added since 0.5.0 target minor version 0.6.0.
+
+### Added
+
+- Show commit history as a compact dot-and-line timeline. Hover for author, UTC time, message and line totals; copy the full commit ID from the card or row.
+- Click a commit to expand changed files, status and totals, then click again to collapse. Root, empty, merge and binary changes have explicit displays; merge changes compare against the first parent.
+- Read details on demand in the background and cancel old requests on directory changes. Preserve terminals, working directories and font settings; reuse Microsoft Codicons for copy/file symbols.
+
+### Verification scope
+
+- Passed 226 Rust and 20 Python offline regressions, governance, formatting and Clippy, plus a final rerun of 16 Git-specific tests.
+- The isolated native repository probe produces twelve Chinese/English captures covering zoom levels, changes/history/collapsed views and hover cards, with normal exit and owned PTY cleanup verified. Six-terminal smoke passed without model requests.
+
 ## [0.5.0] - 2026-11-09
 
 ### Added

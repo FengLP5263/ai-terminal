@@ -3,7 +3,10 @@
 use ai_terminal::{
     appearance,
     floating::{Item, Snapshot},
-    git::{Commit, FileChange, GitClient, Snapshot as GitSnapshot},
+    git::{
+        Commit, CommitDetails, CommitFile, FileChange, GitClient, Inspection,
+        Snapshot as GitSnapshot,
+    },
     git_ui::{self, GitView},
     i18n::{self, Language, Locale},
     model::{Agent, SessionColor},
@@ -30,6 +33,7 @@ struct Capture {
     began: Instant,
     requested: bool,
     captured: bool,
+    click_stage: u8,
 }
 impl eframe::App for Capture {
     #[cfg(feature = "renderer-glow")]
@@ -47,12 +51,28 @@ impl eframe::App for Capture {
         }
         ctx.request_repaint_after(Duration::from_millis(80));
     }
-    fn raw_input_hook(&mut self, _: &egui::Context, input: &mut egui::RawInput) {
+    fn raw_input_hook(&mut self, ctx: &egui::Context, input: &mut egui::RawInput) {
         // Discard incidental typing/hover within this isolated capture window.
         input
             .events
             .retain(|e| matches!(e, egui::Event::Screenshot { .. }));
         input.events.push(egui::Event::PointerGone);
+        if self.history
+            && self.click_stage < 2
+            && self.began.elapsed() > Duration::from_secs(1)
+            && let Some(commit) = self.git.snapshot.as_ref().and_then(|s| s.commits.first())
+            && let Some(row) = ctx.read_response(egui::Id::new(("git-commit-row", &commit.id)))
+        {
+            let pos = row.rect.center();
+            input.events.push(egui::Event::PointerMoved(pos));
+            input.events.push(egui::Event::PointerButton {
+                pos,
+                button: egui::PointerButton::Primary,
+                pressed: self.click_stage == 0,
+                modifiers: egui::Modifiers::NONE,
+            });
+            self.click_stage += 1;
+        }
         for event in &input.events {
             if let egui::Event::Screenshot { image, .. } = event {
                 let file = std::fs::File::create(self.output.join("workspace.png")).unwrap();
@@ -265,7 +285,36 @@ fn main() -> eframe::Result {
             .unwrap();
             let icons = Icons::new(&cc.egui_ctx);
             let mut git = GitClient::new(cc.egui_ctx.clone());
-            git.snapshot = Some(std::sync::Arc::new(git_fixture()));
+            let fixture = git_fixture();
+            if history {
+                let commit = &fixture.commits[0];
+                git.inspection = Some(Inspection {
+                    id: commit.id.clone(),
+                    loading: false,
+                    error: None,
+                    data: Some(std::sync::Arc::new(CommitDetails {
+                        id: commit.id.clone(),
+                        message: commit.subject.clone(),
+                        parents: commit.parents.clone(),
+                        files: fixture
+                            .files
+                            .iter()
+                            .map(|f| CommitFile {
+                                path: f.path.clone(),
+                                status: if f.index == '?' { 'A' } else { 'M' },
+                                added: f.added,
+                                deleted: f.deleted,
+                                binary: false,
+                            })
+                            .collect(),
+                        total_files: 3,
+                        added: 42,
+                        deleted: 11,
+                        partial: false,
+                    })),
+                });
+            }
+            git.snapshot = Some(std::sync::Arc::new(fixture));
             git.watching = true;
             let mut git_view = GitView::default();
             git_view.set_history(history);
@@ -364,6 +413,7 @@ fn main() -> eframe::Result {
                 began: Instant::now(),
                 requested: false,
                 captured: false,
+                click_stage: 0,
             }))
         }),
     )?;

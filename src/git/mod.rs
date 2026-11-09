@@ -1,8 +1,10 @@
 //! Local read-only Git snapshots. No model access, credentials, writes, or network.
 mod command;
+mod commit;
 mod service;
 mod watch;
 use command::Runner;
+pub use commit::{CommitDetails, CommitFile, Inspection, read_commit};
 pub use service::GitClient;
 use std::{
     collections::{HashMap, HashSet},
