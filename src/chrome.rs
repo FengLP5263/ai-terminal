@@ -212,20 +212,9 @@ pub fn session_fill(
     hovered: bool,
 ) -> Color32 {
     if let Some(color) = color {
-        tint(
-            color,
-            if selected {
-                0.30
-            } else if hovered {
-                0.22
-            } else {
-                0.15
-            },
-        )
-    } else if selected {
+        tint(color, if selected || hovered { 0.52 } else { 0.15 })
+    } else if selected || hovered {
         SELECTED
-    } else if hovered {
-        HOVER
     } else {
         crate::appearance::SIDEBAR_BG
     }

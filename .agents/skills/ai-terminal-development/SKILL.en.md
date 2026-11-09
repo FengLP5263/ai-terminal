@@ -22,3 +22,5 @@ Pinned native console assets live in assets/windows/conpty. build.rs stages conp
 
 
 For 0.4.10, the font catalog and Settings share FontChoice; changes must preserve running terminals. Embedded fonts retain original bytes, while system fonts are read only from Windows Fonts, never installed/copied. Installer sources live in scripts/installer independently of the Rust GUI/helper. Configure the pinned compiler under ignored tooling or AI_TERMINAL_NSIS; see scripts/README.en.md.
+
+Prefer the integrated Microsoft Codicons for general feature icons, keeping size and zoom consistent. Preserve official provenance, original licenses and hashes for new assets.

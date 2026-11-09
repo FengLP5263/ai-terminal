@@ -70,3 +70,5 @@ All three avoid screen-text parsing, automatic login and trust approval. Real mo
 0.4.9 preview Qoder metadata adds only allowlisted permission_mode and bounded toolName/toolUseId from Notification.details; input, message and unknown modes are discarded immediately. Public CN 1.1.83 installed code and official hook/permission documentation were checked. Synthetic helper events, real CLI startup and user model-task acceptance remain separate evidence.
 
 0.4.11 preview: before launching a real Agent, exclude only this session's shim directory from child PATH so public dispatchers resolving another alias cannot reenter manager wrappers. The outer interactive shell retains its entries; user PATH, CLI files and configuration remain unchanged, and hooks retain absolute helper paths.
+
+0.4.12: Git for Windows is an optional read-only tool for the active directory's branch, status and history. It is not bundled or automatically installed, and no remotes are accessed. Viewing a repository grants no authority to edit, commit or synchronize it. File contents, commit history and credentials are not persisted. See [Git panel](../../docs/git.en.md).

@@ -60,3 +60,5 @@ Windows 预览包通过 GitHub Releases 分发；尚无自动发布服务、云 
 
 
 0.4.10 预览：`font_choice.rs` 定义稳定字体 ID，设置将选择保存至 `UiSettings.terminal_font`。appearance 为正式界面、终端与探针统一应用字体；UI emoji 使用当前终端的原生字体实例，避免反复重建图集。NSIS 仅负责当前用户的安装／卸载，独立于运行时与 Agent 集成；ZIP 保留。
+
+0.4.12 预览：`src/git/` 负责当前活动目录的本地 Git 只读快照、有界后台命令及 Windows 目录通知；`src/git_ui.rs` 提供顶部摘要与右侧可收起面板。分支、文件行数与历史不进入 Agent 状态归约，终端进程不因面板变化重建。

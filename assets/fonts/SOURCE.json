@@ -92,6 +92,27 @@
       "archive_path": "OFL.txt",
       "bytes": 4399,
       "sha256": "30f0c136e3c88e422d0791acd97238870f9054a9729bc34cf2ff0d4ed8cac4ad"
+    },
+    "Codicons.ttf": {
+      "family": "Codicons (UI symbols only)",
+      "url": "https://registry.npmjs.org/@vscode/codicons/-/codicons-0.0.45.tgz",
+      "archive_path": "package/dist/codicon.ttf",
+      "bytes": 125828,
+      "sha256": "2bb558cb693451e73c28c33fe64aa89bc19b1a4b70f95948322c243f93476920"
+    },
+    "LICENSE-Codicons.txt": {
+      "family": "Codicons (UI symbols only)",
+      "url": "https://registry.npmjs.org/@vscode/codicons/-/codicons-0.0.45.tgz",
+      "archive_path": "package/LICENSE",
+      "bytes": 19242,
+      "sha256": "af5e030844efddbc7ab00dcfea8b019703753d4d9f5172d727c533a492aec665"
+    },
+    "Codicons-mapping.css": {
+      "family": "Codicons (UI symbols only)",
+      "url": "https://registry.npmjs.org/@vscode/codicons/-/codicons-0.0.45.tgz",
+      "archive_path": "package/dist/codicon.css",
+      "bytes": 33699,
+      "sha256": "04fca10892d8f2be5104c920b640d9a58ddcf87f4902ea300fcf08de6634f3f6"
     }
   },
   "families": {
@@ -150,5 +171,17 @@
     "license": "SIL OFL 1.1",
     "license_file": "LICENSE-JetBrainsMono.txt",
     "transforms": "None: original static TTF faces and license bytes."
+  },
+  "ui_icons": {
+    "family": "Codicons",
+    "version": "0.0.45",
+    "repository": "https://github.com/microsoft/vscode-codicons",
+    "license": "CC-BY-4.0",
+    "license_file": "LICENSE-Codicons.txt",
+    "archive_sha256": "dd7c6b20535753027c399dcaea4d12a0e6aaf73de10a3a8f4abfc51d13a88362",
+    "glyphs": {
+      "git-branch": "U+EC6F"
+    },
+    "changes": "Original font, CSS mapping and license bytes; only git-branch is rendered."
   }
 }

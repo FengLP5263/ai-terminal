@@ -5,6 +5,8 @@ pub mod connection_ui;
 pub mod dialogs;
 pub mod discovery;
 pub mod font_choice;
+pub mod git;
+pub mod git_ui;
 pub mod launch;
 pub mod model;
 pub mod native_console;

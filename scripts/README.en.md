@@ -114,3 +114,14 @@ Builds require the pinned official NSIS 3.13 ZIP. Obtain `nsis-3.13.zip` from th
 Outputs are an EXE, `.sha256` and `.json`. Digest verification does not establish signing or successful installation. Records identify the ZIP, installer scripts, compiler and preview state without personal paths. See [installation and font selection](../docs/installation.en.md).
 
 Native font captures: use the production default JetBrains Mono when no font is specified. Build `typography_probe`, then use `cascadia`, `hack`, `consolas`, `courier_new` or `jetbrains_mono` as its second argument to capture 100%/103%/110%/150%/200%. A fourth argument `settings-zh`/`settings-en` (third argument `default`) captures the real settings controls. Missing fonts fail explicitly rather than presenting a fallback as the requested family. Inspect the actual screenshots; fixtures contain only fixed local text.
+
+Session-color captures: build `cargo build --offline --locked --release --example session_color_probe`, then run `target/release/examples/session_color_probe.exe output/<unique-session-colors>`. Capture production palette/sidebar selected, hovered, No color and collapsed states at 100%/103%/200%. Fixed sessions and synthetic pointers only; no user-window operations or Agent launches. Check JSON, PNG and exit status.
+
+## Native Git panel acceptance
+
+```powershell
+cargo build --offline --locked --release --example git_probe
+target/release/examples/git_probe.exe output/<unique-git-probe>
+```
+
+Run on Windows with Git for Windows installed; Git Bash can use the same commands. Native builds on macOS/Linux are unsupported. The probe creates an isolated fixture repository, uses production Git components and its own real PowerShell PTY, and writes ten Chinese/English changes/history/collapsed screenshots at 100%/103%/114%/200%, including JetBrains Mono and Hack font inheritance plus result.json, checking totals and PTY PID. Check normal exit and actual images; no model calls or user terminals/repositories are involved.

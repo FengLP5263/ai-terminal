@@ -32,3 +32,7 @@ Brand icons identify integrations only. Names and marks belong to their respecti
 ## JetBrains Mono
 
 The optional terminal font comes from [JetBrains official v2.304](https://github.com/JetBrains/JetBrainsMono/releases/tag/v2.304) under SIL OFL 1.1. Four static styles and the license retain their original bytes; `assets/fonts/SOURCE.json` records provenance/SHA-256. Source license: [LICENSE-JetBrainsMono.txt](assets/fonts/LICENSE-JetBrainsMono.txt). The ZIP includes `JetBrainsMono-LICENSE.txt`; system fonts are not copied or redistributed.
+
+## Codicons
+
+The Git branch icon uses the original font and `git-branch` glyph (U+EC6F) from Microsoft's official [VS Code Codicons](https://github.com/microsoft/vscode-codicons) `@vscode/codicons` 0.0.45 package, licensed CC BY 4.0. Font, CSS mapping and license bytes are unchanged. See `assets/fonts/SOURCE.json` for provenance/hashes and `assets/fonts/LICENSE-Codicons.txt` for the original license; the ZIP includes `Codicons-LICENSE.txt`. It is only an in-app symbol, with no system font installation or terminal-font option.
