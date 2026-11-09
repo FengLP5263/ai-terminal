@@ -91,3 +91,7 @@ Kimi Code 使用官方仓库文档所用的 316×316 PNG，ZCode 使用官方仓
 0.4.12 Git 面板仅新增 `ui.git_panel_open` 布尔偏好，旧记录默认收起；分支、路径、行数和提交元数据只在当前后台快照内存中存在。未跟踪文本只临时读取以计行，不保存正文、差异、历史缓存或 Git 凭据；不更改会话数据根目录或用户仓库。
 
 0.4.12-preview.3：`assets/fonts/Codicons.ttf`、原始 CSS 字形映射及许可来自微软官方 Codicons 0.0.45 npm 包；SOURCE.json 记录原始字节、归档摘要和 U+EC6F 分支符号。该字体仅用于 UI 图标，不进入终端字体选项、不安装到系统。正式 appearance 与探针共用同一字体定义；helper 不加载。ZIP 复制 Codicons-LICENSE.txt 并计入字体许可校验。
+
+Git 提交详情不持久化：仅保留当前查询与已展开提交的内存数据，至多展示 500 个文件；每条命令仍为 6 秒／2 MiB 上限。复制仅由用户点击写入完整提交 ID；不自动读取剪贴板。复制与文件图标复用既有 Codicons U+EBCC／U+EA7B 原始字形，无新增资产。
+
+0.6.0-preview.2：更改与提交文件共用 git_ui/files.rs，分类图标全部来自既有 Codicons 原始字体；SOURCE.json 列出实际使用的 Markdown、代码、JSON、配置、脚本、媒体、PDF、归档与二进制字形。没有新增字体或图片资产。

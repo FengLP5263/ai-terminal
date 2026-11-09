@@ -107,10 +107,6 @@ impl Watcher {
                             shared.changed(None);
                             continue;
                         }
-                        if metadata {
-                            shared.changed(None);
-                            continue;
-                        }
                         let data = std::slice::from_raw_parts(
                             buffer.as_ptr().cast::<u8>(),
                             bytes as usize,
@@ -134,7 +130,11 @@ impl Watcher {
                                 .map(|s| u16::from_le_bytes([s[0], s[1]]))
                                 .collect();
                             let name = String::from_utf16_lossy(&chars);
-                            if !name
+                            if metadata {
+                                if affects_snapshot(&name) {
+                                    shared.changed(None);
+                                }
+                            } else if !name
                                 .split(['\\', '/'])
                                 .next()
                                 .is_some_and(|p| p.eq_ignore_ascii_case(".git"))
@@ -178,6 +178,34 @@ impl Watcher {
         }
     }
 }
+
+/// Only metadata used by status/history. Locks, reflogs and loose objects are
+/// intermediate writes; index/ref replacement supplies the final notification.
+fn affects_snapshot(name: &str) -> bool {
+    let name = name.replace('\\', "/").to_ascii_lowercase();
+    if name.ends_with(".lock") {
+        return false;
+    }
+    matches!(
+        name.as_str(),
+        "head"
+            | "index"
+            | "packed-refs"
+            | "config"
+            | "config.worktree"
+            | "shallow"
+            | "commondir"
+            | "gitdir"
+            | "info/exclude"
+            | "info/attributes"
+            | "refs"
+            | "refs/heads"
+    ) || name.starts_with("refs/heads/")
+        || name.starts_with("refs/worktree/")
+        || name == "reftable"
+        || name.starts_with("reftable/")
+}
+
 #[cfg(windows)]
 impl Drop for Watcher {
     fn drop(&mut self) {
@@ -204,5 +232,38 @@ impl Watcher {
             std::io::ErrorKind::Unsupported,
             "Windows filesystem events are unavailable",
         ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::affects_snapshot;
+    #[test]
+    fn metadata_events_represent_actual_snapshot_changes() {
+        for name in [
+            "HEAD",
+            "index",
+            "packed-refs",
+            "refs/heads/main",
+            "refs\\heads\\功能",
+            "config",
+            "info/exclude",
+            "reftable/tables.list",
+        ] {
+            assert!(affects_snapshot(name), "Must refresh for {name}");
+        }
+        for name in [
+            "index.lock",
+            "config.lock",
+            "refs/heads/main.lock",
+            "FETCH_HEAD",
+            "ORIG_HEAD",
+            "logs/HEAD",
+            "logs/refs/heads/main",
+            "objects/ab/cdef",
+            "objects/pack/pack-ab.idx",
+        ] {
+            assert!(!affects_snapshot(name), "Must ignore {name}");
+        }
     }
 }
