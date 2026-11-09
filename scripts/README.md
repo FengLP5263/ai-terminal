@@ -82,7 +82,18 @@ preview.3 的 island_move_probe 另检查原生移动开始／结束通知、移
 
 preview.4 跨屏探针沿用上述命令，同时移动自己的主窗口与浮窗，原生移动状态覆盖 DPI 切换，保存 main-*.png／move-*.png 和 dpi_trace。检查建议／实际矩形误差、递归深度、移动期间尺寸修正延迟和重复跨屏尺寸稳定。physical_mouse_drag 仍为 false；真实鼠标模态拖动另行验收。本地 winit 的构建源码／嵌入资产已计入制品源码身份及依赖许可证清单。
 
-README 公开截图（仅 Windows）：构建 `cargo build --offline --locked --release --example readme_capture --example island_probe`，分别运行 `target/release/examples/readme_capture.exe output/<unique-readme-workspace>` 和 `target/release/examples/island_probe.exe output/<unique-readme-floating>`。前者复用正式侧栏、字体与终端组件，仅输出固定文本、示例目录和合成状态；后者捕获正式浮窗。两者不启动 Agent／模型，不加载用户 profile，只管理自身窗口和 PTY。核对退出码、JSON、PNG 及隐私后，将 workspace.png 和 island-zh.png 原样作为 README 图片，更新 assets/readme/SOURCE.json 的版本、来源、尺寸与 SHA-256。
+README 公开截图（仅 Windows；PowerShell／Git Bash）：
+
+```powershell
+cargo build --offline --locked --release --example readme_capture --example island_probe
+target/release/examples/readme_capture.exe output/<unique-workspace-zh> zh
+target/release/examples/readme_capture.exe output/<unique-workspace-en> en
+target/release/examples/readme_capture.exe output/<unique-history-zh> zh history
+target/release/examples/readme_capture.exe output/<unique-history-en> en history
+target/release/examples/island_probe.exe output/<unique-floating>
+```
+
+每次使用全新目录；`readme_capture <output> [zh|en] [history]` 默认显示“更改”，第三参数切换“提交历史”，两种模式都输出 workspace.png。复用正式侧栏、字体、顶部摘要、Git 面板和终端组件，仅用固定文本、示例目录及合成 Git／任务状态，不查询用户仓库。`island_probe` 生成中英文浮窗与设置截图。两者不启动 Agent／模型或读取用户 profile，只管理自身窗口和 PTY。核对退出码、result.json、自身 PTY 回收、实际 PNG 和隐私后，将两套 workspace.png、历史模式 workspace.png 及 island-zh.png／island-en.png 原样复制到 assets/readme 对应的 workspace、git-history 与 floating 中英文文件，更新 SOURCE.json 的版本、来源、尺寸与 SHA-256。展示样例不能代替真实 Git 或 Agent 验收。
 
 Codex 原生状态／总览与模式图标（仅 Windows）：构建 `cargo build --offline --locked --release --bins --example agents_status_probe`。在已有可信目录运行 `target/release/examples/agents_status_probe.exe codex output/<unique-agents-probe>`，只发送左箭头进入 agents 总览和 Esc 返回，生成三张 PNG 与有限状态 JSON；不发送提示词、不接受项目／hook 信任、不停止用户共享后台。`target/release/examples/agents_status_probe.exe badges output/<unique-badge-probe>` 使用固定 PowerShell 文本，生成 100%／146%／200% 的相邻三角／暂停／emoji 截图。检查 JSON、退出码及实际图像；启动导航不是模型回合。POSIX 原生限制与既有入口一致，没有新增 project 动作。
 

@@ -50,7 +50,7 @@ Windows 10／11 分别运行 composer_probe、titlebar_probe 和 discovery_probe
 
 preview.4 的 island_move_probe 会保持原生移动状态跨越实际 DPI 边界，同时检查主窗口与浮窗，记录建议／实际矩形的差值、DPI 递归深度、拖动期间不额外修正尺寸、松手后恢复及重复跨屏尺寸稳定。该测试仍不注入系统鼠标，不等同于真实鼠标模态拖动；旧 preview.3 仅在跨屏前分别发送进入／退出通知的证据不能代替它。
 
-公开 README 截图用 Release 的 readme_capture 与 island_probe 分开生成；命令见 scripts/README.md。复用正式侧栏／终端／浮窗组件，只用固定合成文本、示例目录和模拟状态，不读取用户 profile、不启动 Agent 或模型。核对正常退出、原生 PNG 和隐私后原样复制，更新 assets/readme/SOURCE.json；不能用公开展示样例代替真实 Agent 验收。
+公开 README 截图用 Release 的 readme_capture 与 island_probe 分开生成；命令见 scripts/README.md。readme_capture 的参数为 `<output> [zh|en] [history]`，分别捕获中英文“更改”和“提交历史”；复用正式侧栏／顶部摘要／Git 面板／终端／浮窗组件，只用固定合成文本、示例目录及模拟 Git／任务状态，不查询用户仓库、不读取用户 profile、不启动 Agent 或模型。核对正常退出、自身 PTY 回收、原生 PNG 和隐私后原样复制，更新 assets/readme/SOURCE.json；不能用公开展示样例代替真实 Git 或 Agent 验收。
 
 原生 Codex 状态／agents 验收使用 agents_status_probe，命令见 scripts/README.md。codex 模式只发送左箭头和 Esc，核对真实入口、总览、返回及原生 idle 通知；不发送提示词、不接受 hook／项目信任、不停止共享后台。badges 模式只用合成文本截图核对 100%／146%／200% 下相邻模式图标。队列、旧代次、隐藏 ConPTY、未读及旧 hook 覆盖另由离线回归验证；启动／导航截图不能冒充真实模型回合。
 

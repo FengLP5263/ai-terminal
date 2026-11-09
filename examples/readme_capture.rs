@@ -1,12 +1,14 @@
 //! Public workspace capture using the production sidebar and terminal.
 //! Synthetic metadata and fixed console text only; no Agent/model/user profile.
 use ai_terminal::{
-    appearance, chrome,
+    appearance,
     floating::{Item, Snapshot},
+    git::{Commit, FileChange, GitClient, Snapshot as GitSnapshot},
+    git_ui::{self, GitView},
     i18n::{self, Language, Locale},
     model::{Agent, SessionColor},
     sidebar::{self, Entry, Icons},
-    status::Activity,
+    status::{Activity, Status},
 };
 use egui_term::{BackendSettings, TerminalBackend, TerminalView};
 use std::{
@@ -20,6 +22,10 @@ struct Capture {
     backend: TerminalBackend,
     icons: Icons,
     snapshot: Snapshot,
+    git: GitClient,
+    git_view: GitView,
+    status: Status,
+    history: bool,
     output: PathBuf,
     began: Instant,
     requested: bool,
@@ -36,7 +42,7 @@ impl eframe::App for Capture {
     }
     fn logic(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
         if self.captured || self.began.elapsed() > Duration::from_secs(18) {
-            std::fs::write(self.output.join("result.json"),serde_json::to_vec_pretty(&serde_json::json!({"ok":self.captured,"version":env!("CARGO_PKG_VERSION"),"synthetic_metadata":true,"example_paths":true,"model_requests":false,"user_profiles":false,"pty_pid":self.backend.pty_id()})).unwrap()).unwrap();
+            std::fs::write(self.output.join("result.json"),serde_json::to_vec_pretty(&serde_json::json!({"ok":self.captured,"version":env!("CARGO_PKG_VERSION"),"synthetic_metadata":true,"synthetic_git":true,"history":self.history,"example_paths":true,"model_requests":false,"user_profiles":false,"pty_pid":self.backend.pty_id()})).unwrap()).unwrap();
             ctx.send_viewport_cmd(egui::ViewportCommand::Close);
         }
         ctx.request_repaint_after(Duration::from_millis(80));
@@ -102,6 +108,8 @@ impl eframe::App for Capture {
             })
             .collect();
         sidebar::show(ui, &entries, Some("readme-0"), false, 238.0, &self.icons);
+        let mut open = true;
+        self.git_view.panel(ui, Some(&self.git), &mut open);
         egui::CentralPanel::default()
             .frame(
                 egui::Frame::new()
@@ -109,22 +117,17 @@ impl eframe::App for Capture {
                     .inner_margin(12),
             )
             .show(ui, |ui| {
-                ui.horizontal(|ui| {
-                    ai_terminal::ui_text::label(
-                        ui,
-                        &self.snapshot.items[0].name,
-                        14.0,
-                        chrome::TEXT,
-                    );
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        ui.label("100%");
-                        ui.colored_label(
-                            chrome::WORKING,
-                            i18n::activity(self.snapshot.locale, Activity::Working),
-                        );
-                        ui.colored_label(chrome::SECONDARY, "C:\\Workspace\\web-app");
-                    });
-                });
+                git_ui::header(
+                    ui,
+                    git_ui::Header {
+                        name: &self.snapshot.items[0].name,
+                        directory: std::path::Path::new("C:/Workspace/web-app"),
+                        scale: 1.0,
+                        connection: Some((Agent::Codex, &self.status)),
+                    },
+                    Some(&self.git),
+                    &mut open,
+                );
                 ui.add_space(8.0);
                 let view = TerminalView::new(ui, &mut self.backend)
                     .set_font(appearance::terminal_font(14.0))
@@ -164,13 +167,15 @@ fn main() -> eframe::Result {
         "Use a fresh directory"
     );
     let english = std::env::args().nth(2).as_deref() == Some("en");
+    let history = std::env::args().nth(3).as_deref() == Some("history");
     let verify = output.clone();
     eframe::run_native(
         "ai-terminal public README capture",
         eframe::NativeOptions {
             renderer: eframe::Renderer::Glow,
             viewport: egui::ViewportBuilder::default()
-                .with_inner_size([1120.0, 680.0])
+                .with_inner_size([1280.0, 720.0])
+                .with_active(false)
                 .with_transparent(true)
                 .with_icon(appearance::window_icon()),
             ..Default::default()
@@ -199,7 +204,7 @@ fn main() -> eframe::Result {
                     "  Release       Build complete, ready for your review",
                     "",
                     "  Stay in the flow",
-                    "  ✓ Native lifecycle events and session hooks",
+                    "  ✓ Branch, changes and history alongside your work",
                     "  ✓ Clear avatars and unread completion badges ✨",
                     "  ✓ Switch sessions without restarting your agents",
                     "",
@@ -220,7 +225,7 @@ fn main() -> eframe::Result {
                     "  发布准备    构建已完成，等你回来查看",
                     "",
                     "  保持专注",
-                    "  ✓ 原生生命周期与会话级任务通知",
+                    "  ✓ 当前分支、文件更改与提交历史，一眼可见",
                     "  ✓ 清晰的头像与未读完成标记 ✨",
                     "  ✓ 随时切换会话，不用重新启动 Agent",
                     "",
@@ -259,6 +264,15 @@ fn main() -> eframe::Result {
             )
             .unwrap();
             let icons = Icons::new(&cc.egui_ctx);
+            let mut git = GitClient::new(cc.egui_ctx.clone());
+            git.snapshot = Some(std::sync::Arc::new(git_fixture()));
+            git.watching = true;
+            let mut git_view = GitView::default();
+            git_view.set_history(history);
+            let mut status = Status::default();
+            status.activity = Activity::Working;
+            status.native_lifecycle = true;
+            status.last_event = Some("UserPromptSubmit".into());
             let snapshot = Snapshot {
                 items: [
                     (
@@ -342,6 +356,10 @@ fn main() -> eframe::Result {
                 backend,
                 icons,
                 snapshot,
+                git,
+                git_view,
+                status,
+                history,
                 output,
                 began: Instant::now(),
                 requested: false,
@@ -354,4 +372,68 @@ fn main() -> eframe::Result {
             .unwrap();
     assert_eq!(result["ok"], true);
     Ok(())
+}
+
+fn git_fixture() -> GitSnapshot {
+    GitSnapshot {
+        root: "C:/Workspace/web-app".into(),
+        git_dir: "C:/Workspace/web-app/.git".into(),
+        common_dir: "C:/Workspace/web-app/.git".into(),
+        branch: "feature/sign-in".into(),
+        detached: false,
+        unborn: false,
+        added: 42,
+        deleted: 11,
+        total_files: 3,
+        files: [
+            ("src/components/SignIn.tsx", ' ', 'M', 24, 6),
+            ("tests/sign-in.spec.ts", 'M', ' ', 12, 5),
+            ("docs/sign-in.md", '?', '?', 6, 0),
+        ]
+        .into_iter()
+        .map(|(path, index, worktree, added, deleted)| FileChange {
+            path: path.into(),
+            index,
+            worktree,
+            added,
+            deleted,
+            binary: false,
+            omitted: false,
+        })
+        .collect(),
+        partial: false,
+        commits: [
+            (
+                "a24df891c7f34985b6e219d078ac523946afe103",
+                "Alex",
+                "feat: add the sign-in form",
+            ),
+            (
+                "39b8a210d467ef93c08a174b5fa6298d30be65c2",
+                "Sam",
+                "fix: preserve session navigation",
+            ),
+            (
+                "5ef731a892b4c06de19f3ac845ba1d702c69e083",
+                "Alex",
+                "test: cover sign-in validation",
+            ),
+            (
+                "b73a54f091cd268e37ba8f06c245e9d1a30478bc",
+                "Sam",
+                "docs: explain workspace setup",
+            ),
+        ]
+        .into_iter()
+        .enumerate()
+        .map(|(i, (id, author, subject))| Commit {
+            id: id.into(),
+            parents: vec![],
+            author: author.into(),
+            timestamp: 1794182400 - i as i64 * 86400,
+            subject: subject.into(),
+        })
+        .collect(),
+        more: false,
+    }
 }
