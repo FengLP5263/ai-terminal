@@ -28,6 +28,7 @@ Windows-native Agent terminal manager. The project focuses on project/session na
 ## Git and files
 
 - Use `develop` for daily work; `main` was established from the same initial baseline. Independent features use `feature/<name>` and fixes use `fix/<name>`.
+- Choose releases with the [semantic version policy](docs/versioning.en.md): patch for compatible fixes, minor with patch reset for compatible features, and major for incompatible stable contracts; the policy defines 0.x conventions. Classify the full range since the previous stable tag and never overwrite published tags/artifacts.
 - Changes enter `main` through review. Commit, remote, tag, PR merge, and release actions follow the user's current authorization separately.
 - Do not track real `.env` files, private keys, user configuration, databases, output, runtime data, or handoff archives. Optional machine-local `.tools/env.ps1` and `.tools/cargo-network.toml` remain ignored.
 - Use relative paths or environment variables in documentation; do not include developer usernames or personal workspace paths.

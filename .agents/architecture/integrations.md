@@ -81,3 +81,5 @@ Kimi Code 2.5.0 使用自身 pi-tui 的 OSC 7501 `app=kimi-code`；仅受管入�
 0.4.9 预览的 Qoder 元数据仅新增白名单 permission_mode，并从 Notification.details 提取有长度上限的 toolName／toolUseId；input、message 与未知模式当场丢弃。已核对 CN 1.1.83 的公开安装代码和官方 hook／权限文档；合成 helper 事件、真实 CLI 启动与用户模型任务验收分别记录。
 
 0.4.11 预览：调用真实 Agent 前，仅从其子进程 PATH 排除本会话 shim 目录，避免公共分发器查询其他别名时再次进入管理器包装器。外层交互 Shell 保留入口；用户 PATH、CLI 文件和配置不变，hook 继续使用绝对 helper 路径。
+
+0.4.12：Git for Windows 另作为可选只读工具，提供当前目录的分支、状态与历史；不捆绑、自动安装或访问远端。不把查看仓库视为修改代码、提交或同步的授权；不持久化文件正文、提交历史或凭据。界面和限制见 [Git 面板](../../docs/git.md)。

@@ -87,6 +87,15 @@ pub fn set_terminal_font(ctx: &egui::Context, requested: FontChoice) -> FontChoi
         FontChoice::default()
     };
     let mut fonts = FontDefinitions::default();
+    fonts.font_data.insert(
+        "codicons".into(),
+        Arc::new(FontData::from_static(include_bytes!(
+            "../assets/fonts/Codicons.ttf"
+        ))),
+    );
+    fonts
+        .families
+        .insert(FontFamily::Name("codicons".into()), vec!["codicons".into()]);
     let embedded = match choice {
         FontChoice::Hack => &HACK,
         FontChoice::JetBrainsMono => &JETBRAINS,

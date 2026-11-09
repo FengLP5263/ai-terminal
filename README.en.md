@@ -44,6 +44,7 @@ Enable the floating bar to see session avatars and status above other windows. C
 | **Always-on-top bar** | Show only session avatars and status, up to 10 at a time. Drag the avatar area to see more, and click an avatar to return to its session. |
 | **Your workspace** | Drag to reorder, rename or color sessions, collapse the sidebar, and scale the entire interface with Ctrl + mouse wheel. |
 | **Familiar terminal behavior** | Use Chinese text, ANSI colors, and system color emoji; pass clipboard images to Codex, Claude Code or Qoder CN CLI for the CLI to handle. |
+| **Git workspace** | See the current branch and line additions/deletions in the header, with changed files and current-branch history in a collapsible right panel that follows the terminal directory. See [Git panel](docs/git.en.md). |
 | **Terminal fonts** | Default to JetBrains Mono and switch instantly to Cascadia Mono, Hack or two available Windows fonts in Settings while sessions stay connected and saved choices are preserved. |
 | **Chinese and English** | Follow the system language or choose Simplified Chinese or English in settings. |
 

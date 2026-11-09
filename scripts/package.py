@@ -155,6 +155,9 @@ def font_notices(folder,root=ROOT):
     if 'LICENSE-JetBrainsMono.txt' in record['files']:
         shutil.copy2(source/'LICENSE-JetBrainsMono.txt',folder/'JetBrainsMono-LICENSE.txt')
         result['licenses'].append('JetBrainsMono-LICENSE.txt')
+    if 'LICENSE-Codicons.txt' in record['files']:
+        shutil.copy2(source/'LICENSE-Codicons.txt',folder/'Codicons-LICENSE.txt')
+        result['licenses'].append('Codicons-LICENSE.txt')
     if 'terminal_choices' in record:result['terminal_choices']=record['terminal_choices']
     return result
 

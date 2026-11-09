@@ -85,3 +85,9 @@ Kimi Code 使用官方仓库文档所用的 316×316 PNG，ZCode 使用官方仓
 
 
 0.4.10 预览：`ui.terminal_font` 使用 `jetbrains_mono`（默认）、`cascadia_mono`、`hack`、`consolas`、`courier_new` 稳定 ID。三个内置家族复用已固定的四种字形；新增系统字体不分发字节，SOURCE.json 记录选择目录与来源边界。NSIS 编译工具及原始许可固定在 scripts/installer 的来源记录；程序安装文件带独立身份标记，卸载只删除生成清单中的文件和空目录，不递归删除程序目录，不接触数据目录。EXE／摘要／JSON 输出与隔离安装证据均在忽略的 output/。
+
+0.4.12 预览：颜色菜单为六色加无颜色，沿用 `blue`、`green`、`amber`、`pink`、`purple` 并新增 `red`。旧 `teal`、`orange` 原 ID 可往返保存，显示及菜单选择分别映射到蓝／红，不改写会话 UUID、目录或顺序。颜色和无颜色图标均为代码绘制，无新增图片或字体资产。
+
+0.4.12 Git 面板仅新增 `ui.git_panel_open` 布尔偏好，旧记录默认收起；分支、路径、行数和提交元数据只在当前后台快照内存中存在。未跟踪文本只临时读取以计行，不保存正文、差异、历史缓存或 Git 凭据；不更改会话数据根目录或用户仓库。
+
+0.4.12-preview.3：`assets/fonts/Codicons.ttf`、原始 CSS 字形映射及许可来自微软官方 Codicons 0.0.45 npm 包；SOURCE.json 记录原始字节、归档摘要和 U+EC6F 分支符号。该字体仅用于 UI 图标，不进入终端字体选项、不安装到系统。正式 appearance 与探针共用同一字体定义；helper 不加载。ZIP 复制 Codicons-LICENSE.txt 并计入字体许可校验。

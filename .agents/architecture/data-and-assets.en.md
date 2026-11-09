@@ -66,3 +66,9 @@ Published upstream terminal recordings use binary diffs, and Git EOL conversion 
 
 
 0.4.10 preview: `ui.terminal_font` uses stable IDs `jetbrains_mono` (default), `cascadia_mono`, `hack`, `consolas` and `courier_new`. All three embedded families reuse the pinned four styles; system font bytes are not redistributed, and SOURCE.json records catalog/provenance boundaries. scripts/installer pins the NSIS compiler source and original license. Installed programs carry an ownership marker; uninstall deletes only generated listed files and empty directories, never recursively removes the application directory or touches session data. EXE/checksum/JSON outputs and isolated installation evidence stay under ignored output/.
+
+0.4.12 preview: the menu offers six colors plus No color, retaining blue/green/amber/pink/purple IDs and adding red. Legacy teal/orange IDs round-trip unchanged while rendering and menu selection map to blue/red. Session UUIDs, directories and order are untouched. Colors and the No color icon are drawn in code without new bitmap/font assets.
+
+0.4.12 Git adds only the boolean `ui.git_panel_open` preference, defaulting to collapsed for older records. Branch, path, line totals and commit metadata remain in the current in-memory snapshot. Untracked text is read temporarily to count lines; no contents, diffs, history cache or Git credentials are saved. Session data roots and user repositories are unchanged.
+
+0.4.12-preview.3: `assets/fonts/Codicons.ttf`, original CSS glyph mapping and license come from Microsoft's official Codicons 0.0.45 npm package. SOURCE.json records original bytes, archive digest and the U+EC6F branch symbol. This is a UI icon font, neither a terminal-font option nor a system installation. Production appearance and probes share its definition; the helper never loads it. ZIP packaging copies Codicons-LICENSE.txt and validates it as a declared font license.

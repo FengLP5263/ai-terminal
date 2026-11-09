@@ -4,6 +4,31 @@
 
 Record user-visible additions, improvements, fixes, and compatibility changes for each release; omit categories that do not apply. Review both languages together, use the same version entry in GitHub Releases, and ship both files in the ZIP. Historical summaries follow existing GitHub release notes and UTC publication dates; development versions without a separate release do not receive invented release dates.
 
+## [0.5.0] - 2026-11-09
+
+### Added
+
+- Add a Git workspace view for the active terminal directory: branch and line totals in the header, plus changed files and history reachable from the current HEAD in a collapsible, resizable right panel. Load 50 commits at a time, up to 300.
+- Run read-only local Git queries in the background and coalesce Windows directory notifications, filtering ignored build files. Support prompt, focus and manual refresh, reject stale directory results on session changes and preserve running terminals during panel operations.
+
+### Changed
+
+- Share one header row for the name, path, branch and line totals. Follow the font selected in ai-terminal settings, inherit application text size and shorten long metadata to fit.
+- Use the original Microsoft Codicons branch glyph, scaling with text. Preserve original font/mapping bytes, provenance hashes and the CC BY 4.0 license.
+- Present red, green, yellow, blue, pink, purple and No color in one menu row. Draw a clear No color circle/slash; hovered and selected sessions share emphasized fills and text brightness, with no separate card outline in either sidebar layout.
+- Establish ongoing semantic versioning. Compatible features added since 0.4.11 advance the minor version to 0.5.0; future releases classify their complete change range.
+
+### Compatibility
+
+- Keep the existing workspace, session names, directories, order and font preferences. Preserve readable/savable legacy teal/orange IDs while mapping them to blue/red. The Git panel defaults to collapsed for older records.
+- Git views require an installed Git for Windows and display local data without modifying repositories, Git configuration or credentials. Binary, large and content-filter files and display limits have explicit counting boundaries. Content filters and missing-object downloads do not run automatically. See [Git panel](docs/git.en.md).
+- Setup and portable ZIP continue sharing the same data directory. No system fonts are installed and user terminals are not stopped automatically. Existing public tags and release assets remain unchanged.
+
+### Verification scope
+
+- Automated regressions cover real Git net changes, untracked files, unborn/detached HEAD, branch history, pagination, notifications, filter isolation and output caps, plus session colors, single-row headers, settings-font inheritance and preserved ConPTY identity.
+- Native Git captures check Chinese/English, 100%/103%/114%/200% zoom, JetBrains Mono/Hack, changes/history/collapsed panels and composite emoji. Six-terminal smoke uses synthetic lifecycle events without real model calls. See release notes for installer upgrades and final artifact digests.
+
 ## [0.4.11] - 2026-11-06
 
 ### Fixed

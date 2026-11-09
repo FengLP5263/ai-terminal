@@ -39,6 +39,7 @@ impl Agent {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
 pub enum SessionColor {
+    Red,
     Blue,
     Green,
     Teal,
@@ -48,35 +49,56 @@ pub enum SessionColor {
     Purple,
 }
 impl SessionColor {
-    pub const ALL: [Self; 7] = [
-        Self::Blue,
+    pub const ALL: [Self; 6] = [
+        Self::Red,
         Self::Green,
-        Self::Teal,
         Self::Amber,
-        Self::Orange,
+        Self::Blue,
         Self::Pink,
         Self::Purple,
     ];
+    /// Keep legacy saved IDs readable while presenting the current six-color palette.
+    pub fn palette_color(self) -> Self {
+        match self {
+            Self::Orange => Self::Red,
+            Self::Teal => Self::Blue,
+            _ => self,
+        }
+    }
     pub fn label(self) -> &'static str {
         match self {
-            Self::Blue => "蓝色",
+            Self::Red | Self::Orange => "红色",
+            Self::Blue | Self::Teal => "蓝色",
             Self::Green => "绿色",
-            Self::Teal => "青色",
             Self::Amber => "黄色",
-            Self::Orange => "橙色",
             Self::Pink => "粉色",
             Self::Purple => "紫色",
         }
     }
     pub fn rgb(self) -> [u8; 3] {
         match self {
-            Self::Blue => [112, 181, 255],
-            Self::Green => [115, 220, 153],
-            Self::Teal => [93, 215, 211],
-            Self::Amber => [246, 211, 112],
-            Self::Orange => [255, 174, 128],
-            Self::Pink => [239, 157, 200],
-            Self::Purple => [189, 163, 255],
+            Self::Red | Self::Orange => [255, 130, 114],
+            Self::Green => [180, 250, 114],
+            Self::Amber => [254, 253, 194],
+            Self::Blue | Self::Teal => [165, 213, 254],
+            Self::Pink => [255, 143, 253],
+            Self::Purple => [208, 209, 254],
+        }
+    }
+}
+
+#[cfg(test)]
+mod color_compatibility_tests {
+    use super::SessionColor;
+
+    #[test]
+    fn saved_legacy_colors_keep_their_ids_and_highlight_a_current_palette_choice() {
+        for (id, expected) in [("orange", SessionColor::Red), ("teal", SessionColor::Blue)] {
+            let value: SessionColor = serde_json::from_str(&format!("\"{id}\"")).unwrap();
+            assert_eq!(value.palette_color(), expected);
+            assert!(SessionColor::ALL.contains(&value.palette_color()));
+            assert_eq!(value.rgb(), expected.rgb());
+            assert_eq!(serde_json::to_string(&value).unwrap(), format!("\"{id}\""));
         }
     }
 }
@@ -99,6 +121,7 @@ pub struct UiSettings {
     pub sidebar_width: f32,
     pub terminal_font_size: f32,
     pub terminal_font: crate::font_choice::FontChoice,
+    pub git_panel_open: bool,
     pub ui_scale: f32,
     pub language: crate::i18n::Language,
     pub floating_enabled: bool,
@@ -113,6 +136,7 @@ impl Default for UiSettings {
             sidebar_width: 238.0,
             terminal_font_size: 14.0,
             terminal_font: crate::font_choice::FontChoice::default(),
+            git_panel_open: false,
             ui_scale: 1.0,
             language: crate::i18n::Language::System,
             floating_enabled: false,

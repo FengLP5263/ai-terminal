@@ -70,6 +70,8 @@ class ArchiveVerification(unittest.TestCase):
             self.assertEqual(metadata['default_latin'],'JetBrains Mono')
             self.assertEqual((destination/'Cascadia-LICENSE.txt').read_bytes(),(root/'assets/fonts/LICENSE-Cascadia.txt').read_bytes())
             self.assertEqual((destination/'FONT-SOURCE.json').read_bytes(),(root/'assets/fonts/SOURCE.json').read_bytes())
+            self.assertIn('Codicons-LICENSE.txt',metadata['licenses'])
+            self.assertEqual((destination/'Codicons-LICENSE.txt').read_bytes(),(root/'assets/fonts/LICENSE-Codicons.txt').read_bytes())
             self.assertIn('JetBrainsMono-LICENSE.txt',metadata['licenses'])
             self.assertEqual((destination/'JetBrainsMono-LICENSE.txt').read_bytes(),(root/'assets/fonts/LICENSE-JetBrainsMono.txt').read_bytes())
             font=root/'assets/fonts/CascadiaMono-Regular.ttf'

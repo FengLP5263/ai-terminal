@@ -126,3 +126,14 @@ POSIX 对应动作与参数相同；`verify-installer` 可跨平台只读运行�
 安装版生成 EXE、`.sha256` 和 `.json`；EXE 校验不等于签名或实际安装验收。源清单记录 ZIP／安装脚本／编译器身份及预览状态，不包含个人路径。程序与测试边界见 [安装与字体说明](../docs/installation.md)。
 
 字体原生截图：未指定字体时使用正式默认 JetBrains Mono。构建 `typography_probe` 后，以 `cascadia`、`hack`、`consolas`、`courier_new`、`jetbrains_mono` 作为第二参数，分别捕获 100%／103%／110%／150%／200%。第四参数可用 `settings-zh`／`settings-en`（第三参数使用 `default`）捕获正式设置控件。缺失字体明确失败，不冒充回退字体。截图需目视验收，样例仅含本地固定文本。
+
+会话配色截图：`cargo build --offline --locked --release --example session_color_probe`，然后运行 `target/release/examples/session_color_probe.exe output/<unique-session-colors>`；捕获正式色盘与侧栏的选中／悬停／无颜色／收起状态，覆盖 100%／103%／200%。只使用固定会话和合成指针，不操作用户窗口或启动 Agent；结果 JSON、PNG 及退出码都需核查。
+
+## Git 面板原生核查
+
+```powershell
+cargo build --offline --locked --release --example git_probe
+target/release/examples/git_probe.exe output/<unique-git-probe>
+```
+
+在 Git for Windows 已安装的 Windows 设备运行；Git Bash 可执行相同命令，macOS/Linux 原生构建不支持。使用新建隔离样例仓库、正式 Git 组件和自身真实 PowerShell PTY，生成 10 张中英文、100%／103%／114%／200% 更改／历史／收起截图，含 JetBrains Mono 与 Hack 字体继承及 result.json，核对统计与 PTY PID。正常退出和实际截图均须检查，不调用模型、不操作用户终端或仓库。

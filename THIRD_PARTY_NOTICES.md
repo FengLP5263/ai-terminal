@@ -35,3 +35,7 @@ Windows 系统字体只在运行时读取，不随包复制。项目 LICENSE 适
 ## JetBrains Mono
 
 可选终端字体来自 [JetBrains 官方 v2.304](https://github.com/JetBrains/JetBrainsMono/releases/tag/v2.304)，采用 SIL OFL 1.1。四种静态字形与许可保留原始字节，来源和 SHA-256 见 `assets/fonts/SOURCE.json`。源码许可原文为 [LICENSE-JetBrainsMono.txt](assets/fonts/LICENSE-JetBrainsMono.txt)，发行 ZIP 随附 `JetBrainsMono-LICENSE.txt`；系统字体不复制或分发。
+
+## Codicons
+
+Git 分支图标采用微软 [VS Code Codicons](https://github.com/microsoft/vscode-codicons) 官方 `@vscode/codicons` 0.0.45 包的原始字体和 `git-branch` 字形（U+EC6F），CC BY 4.0。字体、CSS 映射和许可未改动；来源及哈希见 `assets/fonts/SOURCE.json`，原许可为 `assets/fonts/LICENSE-Codicons.txt`，ZIP 随附 `Codicons-LICENSE.txt`。只作为程序内符号使用，不安装系统字体或作为终端字体选项。
