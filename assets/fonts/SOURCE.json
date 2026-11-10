@@ -195,7 +195,15 @@
       "git-commit": "U+EAFC",
       "terminal-powershell": "U+EBC7",
       "terminal-bash": "U+EBCA",
-      "terminal-cmd": "U+EBC4"
+      "terminal-cmd": "U+EBC4",
+      "folder": "U+EA83",
+      "folder-opened": "U+EAF7",
+      "chevron-down": "U+EAB4",
+      "chevron-right": "U+EAB6",
+      "collapse-all": "U+EAC5",
+      "file-symlink-file": "U+EAEE",
+      "refresh": "U+EB37",
+      "close": "U+EA76"
     },
     "changes": "Original font, CSS mapping and license bytes; UI uses the listed branch, commit, copy, file-type and terminal glyphs."
   }

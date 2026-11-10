@@ -122,6 +122,7 @@ pub struct UiSettings {
     pub terminal_font_size: f32,
     pub terminal_font: crate::font_choice::FontChoice,
     pub git_panel_open: bool,
+    pub project_files_open: bool,
     pub ui_scale: f32,
     #[serde(default = "legacy_floating_scale")]
     pub floating_scale: f32,
@@ -139,6 +140,7 @@ impl Default for UiSettings {
             terminal_font_size: 14.0,
             terminal_font: crate::font_choice::FontChoice::default(),
             git_panel_open: false,
+            project_files_open: false,
             ui_scale: 1.0,
             floating_scale: 1.0,
             language: crate::i18n::Language::System,
@@ -157,6 +159,9 @@ impl UiSettings {
     pub const MIN_FONT: f32 = 8.0;
     pub const MAX_FONT: f32 = 32.0;
     pub fn normalize(mut self) -> Self {
+        if self.project_files_open {
+            self.git_panel_open = false;
+        }
         self.ui_scale = if self.ui_scale.is_finite() {
             self.ui_scale.clamp(Self::MIN_ZOOM, Self::MAX_ZOOM)
         } else {

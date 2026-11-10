@@ -74,3 +74,5 @@ preview.6：git/worktree.rs 按需读取 HEAD 与当前文件的净差异，与�
 0.8.0-preview.2：git/syntax.rs 用锁定 two-face 的 bat 扩展语法与 Oniguruma，替代默认语法及 JS 对 TS 的近似映射；仍只在文件查询后台生成有界快照，不运行脚本、LSP、插件或用户语法设置。chrome::paint_shell 使用既有 Codicons 的标准字形，所有 Shell 入口及头像共用。
 
 0.8.0-preview.3：浮窗按独立比例直接布局，不缩放已经栅格化的图层；Icons 按实际头像物理尺寸请求纹理／Codicons，角标和命中区域使用相同坐标。dialogs.rs 集中表单字号、44 点控件、间距和表面，settings.rs 使用固定字段列与窄屏堆叠；样式只在弹窗内生效，不改变终端文字。
+
+0.9.0 预览：project_files.rs 提供单个后台文件浏览线程、最多 64 项目录缓存及最新文件请求／结果；project_ui.rs 共用右侧“文件 / Git”面板，惰性文件树只绘制可见行。普通文件与 Git 差异共用 git_ui::diff::body、语法准备、缩进线和 emoji，file_icons.rs 统一标准 Codicons 类型图标。

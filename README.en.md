@@ -32,7 +32,7 @@ Enable the floating bar to see session avatars and status above other windows. C
 
 ![AI Terminal floating session bar](assets/readme/floating.en.png)
 
-> Screenshots use real 0.8.0 native components with synthetic sessions, terminal text, Git metadata and task status. They contain no real user data or private conversations. Click an image for its original resolution.
+> Screenshots use real 0.9.0 native components with synthetic sessions, terminal text, Git metadata and task status. They contain no real user data or private conversations. Click an image for its original resolution.
 
 ## Built for multiple sessions
 
@@ -44,11 +44,20 @@ Enable the floating bar to see session avatars and status above other windows. C
 | **Always-on-top bar** | Show only session avatars and status, up to 10 at a time. Drag the avatar area to see more, and click an avatar to return to its session. Scale it independently in Settings or with Ctrl+wheel over the bar. |
 | **Your workspace** | Drag to reorder, rename or color sessions, collapse the sidebar, and scale the entire interface with Ctrl + mouse wheel. |
 | **Familiar terminal behavior** | Use Chinese text, ANSI colors, and system color emoji; pass clipboard images to Codex, Claude Code or Qoder CN CLI for the CLI to handle. |
+| **Project files** | Browse the project tree and view files read-only with syntax colors, line numbers and emoji. Files / Git share the right panel and standard icons. See [project files](docs/files.en.md). |
 | **Git workspace** | See the current branch and line additions/deletions in the header, with changed files and current-branch history in a collapsible right panel that follows the terminal directory. See [Git panel](docs/git.en.md). |
 | **Locate long output** | Drag the terminal history scrollbar or click its track to revisit earlier output, with up to 5,000 history lines. |
 | **Read-only file diffs** | Click a working or committed file to inspect its complete body, syntax colors and red/green change backgrounds. |
 | **Terminal fonts** | Default to JetBrains Mono and switch instantly to Cascadia Mono, Hack or two available Windows fonts in Settings while sessions stay connected and saved choices are preserved. |
 | **Chinese and English** | Follow the system language or choose Simplified Chinese or English in settings. |
+
+## Browse project files
+
+Click the folder button in the terminal header to browse the current project in the right-side Files tab. Switch between Files and Git, resize the panel, expand folders on demand, refresh or collapse all folders. Ordinary directories work too.
+
+Click a file to read its full content in the center with line numbers, syntax colors, indentation guides and color emoji. The tree marks the open file. Closing it returns to the original terminal while the Agent and background output keep running. See [project files](docs/files.en.md) for encoding support and read limits.
+
+![AI Terminal project files: tree, standard folder icons and read-only syntax highlighting](assets/readme/project-files.en.png)
 
 ## Inspect Git changes and history
 

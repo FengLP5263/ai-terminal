@@ -109,3 +109,7 @@ preview.6 的工作区文件正文同样只存在于当前有界内存结果，�
 0.8.0-preview.2 语法数据来自 Cargo.lock 固定的 two-face 0.5.2+bat-0.26.1，使用完整 Oniguruma 变体，不加载第三方主题。assets/syntaxes/LICENSES.json 从该 crate 的 acknowledgement::listing().for_syntaxes() 导出，保留 66 项完整许可文本；SOURCE.json 记录版本、Cargo 归档校验值、导出命令与 SHA-256。治理／打包核对来源，ZIP 携带 Syntax-LICENSES.json／SYNTAX-SOURCE.json，两者计入源码身份。two-face、onig/onig_sys 自身许可另随依赖清单归档。字体字节未变，来源记录新增 terminal-powershell（U+EBC7）、terminal-bash（U+EBCA）、terminal-cmd（U+EBC4）。
 
 0.8.0-preview.3 不新增字体或图标资产，不修改字体字节或笔画参数；头像缓存按最终像素尺寸命中，保持每个图标至多 12 个尺寸。新表单样式与响应式布局不改变会话配置字段、目录或数据根。
+
+0.9.0 预览只新增项目文件面板布尔偏好，不保存文件正文、目录快照或最近文件。目录每级最多 1,000 项，最多 64 个展开目录；文本最多 2 MiB、20,000 行、每行 4,000 字符。支持 UTF-8／BOM 和带 BOM 的 UTF-16，错误明确；拒绝跟随符号链接／junction。Codicons 字节不变，仅扩展 SOURCE.json 中已使用字形的登记。详见 docs/files.md。
+
+0.9.0 的公开 README 图使用 readme_capture 的默认／history／diff／files 模式和 island_probe，共十张中英文原生 PNG。文件树样例仅写入自身输出目录，顶部固定示例路径；不读取用户项目。原样复制并逐文件记录来源、版本、尺寸与摘要，不覆盖历史 Agent 头像的来源版本。
