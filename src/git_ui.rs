@@ -5,6 +5,7 @@ use crate::{
     i18n,
 };
 use egui::{Color32, RichText};
+pub mod diff;
 mod files;
 mod history;
 const HISTORY_INDENT: f32 = 25.0;
@@ -13,6 +14,7 @@ const HISTORY_INDENT: f32 = 25.0;
 pub struct GitView {
     history: bool,
     selected: Option<String>,
+    open_file: Option<(crate::git::PatchSource, String)>,
     inspection: Option<crate::git::Inspection>,
     expanded_details: Option<std::sync::Arc<crate::git::CommitDetails>>,
     copied: Option<String>,
@@ -23,6 +25,7 @@ pub struct Actions {
     pub more: bool,
     pub close: bool,
     pub inspect: Option<String>,
+    pub file: Option<(crate::git::PatchSource, String)>,
 }
 
 /// Header text uses the font selected in ai-terminal, at the inherited UI size.
@@ -255,6 +258,7 @@ impl GitView {
     }
     pub fn reset(&mut self) {
         self.selected = None;
+        self.open_file = None;
         self.inspection = None;
         self.expanded_details = None;
     }
@@ -264,6 +268,12 @@ impl GitView {
         client: Option<&GitClient>,
         open: &mut bool,
     ) -> Actions {
+        let open_file = client
+            .and_then(|c| c.patch.as_ref())
+            .map(|p| (&p.source, &p.path));
+        if self.open_file.as_ref().map(|(id, path)| (id, path)) != open_file {
+            self.open_file = open_file.map(|(id, path)| (id.clone(), path.clone()));
+        }
         if !*open {
             return Actions::default();
         }
@@ -360,6 +370,12 @@ impl GitView {
                     )
                 }
                 GitError::Cancelled => String::new(),
+                GitError::InvalidUtf8 => locale
+                    .text(
+                        "文件内容不是有效 UTF-8，无法准确显示。",
+                        "File content is not valid UTF-8 and cannot be displayed accurately.",
+                    )
+                    .into(),
             };
             ui.colored_label(chrome::WAITING, message);
         }
@@ -455,7 +471,7 @@ impl GitView {
                         ui.label(locale.text("工作区干净", "Working tree clean"));
                     }
                     for file in &snapshot.files {
-                        files::show(
+                        let response = files::show(
                             ui,
                             files::FileRow {
                                 path: &file.path,
@@ -464,8 +480,20 @@ impl GitView {
                                 deleted: file.deleted,
                                 binary: file.binary,
                                 omitted: file.omitted,
+                                selected: self.open_file.as_ref().is_some_and(|(source, path)| {
+                                    source == &crate::git::PatchSource::WorkingTree
+                                        && path == &file.path
+                                }),
                             },
+                            egui::Id::new(("git-working-file", &file.path)),
                         );
+                        if response
+                            .on_hover_cursor(egui::CursorIcon::PointingHand)
+                            .clicked()
+                        {
+                            actions.file =
+                                Some((crate::git::PatchSource::WorkingTree, file.path.clone()));
+                        }
                     }
                 }
             });

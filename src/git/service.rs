@@ -54,6 +54,8 @@ impl Shared {
 /// One active repository, one coalesced request/result slot, event-driven updates.
 pub struct GitClient {
     inspector: Inspector,
+    patch_reader: super::patch::Reader,
+    pub patch: Option<super::PatchResult>,
     pub inspection: Option<Inspection>,
     shared: Arc<Shared>,
     directory: Option<PathBuf>,
@@ -68,6 +70,7 @@ pub struct GitClient {
 impl GitClient {
     pub fn new(ctx: egui::Context) -> Self {
         let inspector = Inspector::new(ctx.clone());
+        let patch_reader = super::patch::Reader::new(ctx.clone());
         let (tx, rx) = mpsc::sync_channel(1);
         let shared = Arc::new(Shared {
             request: Mutex::new(None),
@@ -197,6 +200,8 @@ impl GitClient {
             .expect("Git worker thread");
         Self {
             inspector,
+            patch_reader,
+            patch: None,
             inspection: None,
             shared,
             directory: None,
@@ -216,6 +221,7 @@ impl GitClient {
         self.directory = directory.map(Path::to_owned);
         self.inspector.clear();
         self.inspection = None;
+        self.close_patch();
         self.snapshot = None;
         self.error = None;
         self.not_repository = false;
@@ -276,8 +282,45 @@ impl GitClient {
             loading: true,
         });
     }
+    /// Restrict requests to a commit in the active repository's displayed history.
+    pub fn open_patch(&mut self, id: &str, path: &str) {
+        self.open_file(super::PatchSource::Commit(id.into()), path);
+    }
+    pub fn open_file(&mut self, source: super::PatchSource, path: &str) {
+        let Some(snapshot) = &self.snapshot else {
+            return;
+        };
+        let valid = match &source {
+            super::PatchSource::Commit(id) => snapshot.commits.iter().any(|c| &c.id == id),
+            super::PatchSource::WorkingTree => snapshot.files.iter().any(|f| f.path == path),
+        };
+        if !valid
+            || self
+                .patch
+                .as_ref()
+                .is_some_and(|p| p.source == source && p.path == path && p.error.is_none())
+        {
+            return;
+        }
+        self.patch_reader.read(&snapshot.root, source.clone(), path);
+        self.patch = Some(super::PatchResult {
+            source,
+            path: path.into(),
+            data: None,
+            error: None,
+            loading: true,
+        });
+    }
+    pub fn close_patch(&mut self) {
+        self.patch_reader.clear();
+        self.patch = None;
+    }
     pub fn poll(&mut self) -> bool {
         let mut updated = false;
+        if let Some(patch) = self.patch_reader.poll() {
+            self.patch = Some(patch);
+            updated = true;
+        }
         if let Some(inspection) = self.inspector.poll() {
             self.inspection = Some(inspection);
             updated = true;
@@ -288,6 +331,9 @@ impl GitClient {
                 return false;
             }
             self.loading = false;
+            // A slow completed query is still fresh; fallback cooldown begins
+            // when its result is consumed, rather than when it was requested.
+            self.last_refresh = Some(Instant::now());
             self.watching = watching;
             match result {
                 Ok(snapshot) => {
@@ -298,6 +344,26 @@ impl GitClient {
                     }) {
                         self.inspector.clear();
                         self.inspection = None;
+                    }
+                    if self.patch.as_ref().is_some_and(|p| {
+                        !snapshot.as_ref().is_some_and(|s| match &p.source {
+                            super::PatchSource::Commit(id) => s.commits.iter().any(|c| &c.id == id),
+                            super::PatchSource::WorkingTree => {
+                                s.files.iter().any(|f| f.path == p.path)
+                            }
+                        })
+                    }) {
+                        self.close_patch();
+                    }
+                    // Mutable files refresh only when an event/manual repository query
+                    // finishes. Repeated UI draws/clicks reuse the current result.
+                    if let Some(patch) = self.patch.as_mut()
+                        && patch.source == super::PatchSource::WorkingTree
+                        && let Some(snapshot) = &snapshot
+                    {
+                        self.patch_reader
+                            .read(&snapshot.root, patch.source.clone(), &patch.path);
+                        patch.loading = true;
                     }
                     self.not_repository = snapshot.is_none();
                     self.snapshot = snapshot.map(Arc::new);

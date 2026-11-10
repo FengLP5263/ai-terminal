@@ -38,9 +38,13 @@ fn main() {
         }
     }
     let sgr = mode != "legacy";
+    if mode == "scrollbar" {
+        for n in 0..400 {print!("HISTORY_LINE_{n:04}\r\n");}
+    }
     print!(
-        "\x1b[?1049h{}{}APP_WHEEL_READY",
-        if mode == "pager" || mode == "select-all" {
+        "{}{}{}APP_WHEEL_READY",
+        if mode == "scrollbar" {""} else {"\x1b[?1049h"},
+        if mode == "pager" || mode == "select-all" || mode == "scrollbar" {
             "\x1b[?1003h"
         } else if mode == "select-motion" {
             "\x1b[?1002h"

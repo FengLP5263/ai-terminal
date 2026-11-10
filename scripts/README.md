@@ -90,10 +90,12 @@ target/release/examples/readme_capture.exe output/<unique-workspace-zh> zh
 target/release/examples/readme_capture.exe output/<unique-workspace-en> en
 target/release/examples/readme_capture.exe output/<unique-history-zh> zh history
 target/release/examples/readme_capture.exe output/<unique-history-en> en history
+target/release/examples/readme_capture.exe output/<unique-diff-zh> zh diff
+target/release/examples/readme_capture.exe output/<unique-diff-en> en diff
 target/release/examples/island_probe.exe output/<unique-floating>
 ```
 
-每次使用全新目录；`readme_capture <output> [zh|en] [history]` 默认显示“更改”，第三参数切换“提交历史”，只向自己的 egui 输入合成点击以展开样例提交；两种模式都输出 workspace.png。复用正式侧栏、字体、顶部摘要、Git 面板和终端组件，仅用固定文本、示例目录及合成 Git／任务状态，不查询用户仓库。`island_probe` 生成中英文浮窗与设置截图。两者不启动 Agent／模型或读取用户 profile，只管理自身窗口和 PTY。核对退出码、result.json、自身 PTY 回收、实际 PNG 和隐私后，将两套 workspace.png、历史模式 workspace.png 及 island-zh.png／island-en.png 原样复制到 assets/readme 对应的 workspace、git-history 与 floating 中英文文件，更新 SOURCE.json 的版本、来源、尺寸与 SHA-256。展示样例不能代替真实 Git 或 Agent 验收。
+每次使用全新目录；`readme_capture <output> [zh|en] [history|diff]` 默认显示“更改”，第三参数切换“提交历史”或只读文件差异，只向自己的 egui 输入合成点击以展开样例提交；三种模式都输出 workspace.png。复用正式侧栏、字体、顶部摘要、Git 面板和终端组件，仅用固定文本、示例目录及合成 Git／任务状态，不查询用户仓库。`island_probe` 生成中英文浮窗与设置截图。两者不启动 Agent／模型或读取用户 profile，只管理自身窗口和 PTY。核对退出码、result.json、自身 PTY 回收、实际 PNG 和隐私后，将两套 workspace.png、历史模式 workspace.png 及 island-zh.png／island-en.png 原样复制到 assets/readme 对应的 workspace、git-history、git-diff 与 floating 中英文文件，更新 SOURCE.json 的版本、来源、尺寸与 SHA-256。展示样例不能代替真实 Git 或 Agent 验收。
 
 Codex 原生状态／总览与模式图标（仅 Windows）：构建 `cargo build --offline --locked --release --bins --example agents_status_probe`。在已有可信目录运行 `target/release/examples/agents_status_probe.exe codex output/<unique-agents-probe>`，只发送左箭头进入 agents 总览和 Esc 返回，生成三张 PNG 与有限状态 JSON；不发送提示词、不接受项目／hook 信任、不停止用户共享后台。`target/release/examples/agents_status_probe.exe badges output/<unique-badge-probe>` 使用固定 PowerShell 文本，生成 100%／146%／200% 的相邻三角／暂停／emoji 截图。检查 JSON、退出码及实际图像；启动导航不是模型回合。POSIX 原生限制与既有入口一致，没有新增 project 动作。
 
@@ -150,3 +152,13 @@ target/release/examples/git_probe.exe output/<unique-git-probe>
 在 Git for Windows 已安装的 Windows 设备运行；Git Bash 可执行相同命令，macOS/Linux 原生构建不支持。使用新建隔离样例仓库、正式 Git 组件和自身真实 PowerShell PTY，生成 12 张中英文、100%／103%／114%／200% 更改／历史／收起截图，含实际点击展开文件与中英文悬停详情，含 JetBrains Mono 与 Hack 字体继承及 result.json，核对统计与 PTY PID。仅向自身 egui 输入合成指针，不注入系统鼠标或改写剪贴板；复制完整 ID 由 git_panel 的输出命令回归验证。正常退出和实际截图均须检查，不调用模型、不操作用户终端或仓库。
 
 Git preview.2 沿用上述 git_probe 命令，提交样例含 Markdown、JSON、配置、PowerShell 与媒体文件；检查文件图标分类、展开列表与注释左对齐及读取按钮不新增行。静态布局／限频由 git_panel、git_repository 与 watch 模块回归覆盖。
+
+终端历史条原生截图（仅 Windows；PowerShell／Git Bash）：`cargo build --offline --locked --release --example history_probe` 后运行 `target/release/examples/history_probe.exe output/<unique-history-probe>`。真实无 profile PowerShell 固定输出、自身 egui 拖动输入，生成 100%／103%／200% 顶部／中间／底部九张 PNG，核对位置与同一 PTY。不操作用户窗口，不启动 Agent／模型。git_probe 增至 16 图，增加点击提交文件后的中英文和多档缩放差异截图。核对正常退出、自身 PTY 回收并人工检查图片。Windows/POSIX 统一入口和参数不变，macOS/Linux 原生动作仍明确不支持。
+
+git_probe 的 20 图沿用既有运行命令，追加 settings.json 与 history.md 的中英文、多档缩放文件阅读截图，核对原始 @@／模式不占正文、关键词区分与缩进线。语法资源来自锁定 Syntect crate，构建时需要依赖缓存；运行时不访问网络或读取项目语法脚本。Windows/POSIX 统一入口与参数不变。
+
+git_probe 的 JSON 样例现带 UTF-8 BOM 与正常中文；沿用现有命令与 20 图数量，核对 UTF-8 文字正确、当前文件灰底／细标记在指针离开后保持。编码错误与历史原数据已损坏分别记录，不把自动猜测替换当作源码还原。
+
+0.7.0-preview.5 的 git_probe 继续使用上述命令，生成 22 张图；Markdown 表格的彩色 emoji 与文本变体在 100%／103%／114%／200% 及 JetBrains Mono／Hack 下复用正式文件视图。仅使用自建仓库和自身 PTY，截图完成后检查正常退出及进程回收。
+
+0.7.0-preview.6 的 git_probe 沿用同一命令生成 26 张图，追加“更改”文件点击及只读新增／修改／二进制视图，核对未跟踪标签、当前文件标记、字体与多档缩放；命令及入口参数不变。

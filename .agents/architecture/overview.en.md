@@ -52,3 +52,9 @@ Known limits: all physical IME combinations, all image clipboard sources, sustai
 0.4.12 preview: `src/git/` owns read-only local Git snapshots for the active directory, bounded background commands and Windows directory notifications. `src/git_ui.rs` provides the header summary and collapsible right panel. Branches, line totals and history do not affect Agent status, and panel changes do not recreate terminals.
 
 Git history inspection: `src/git/commit.rs` reads immutable commits through independent bounded request/result slots and cancellation generations. `git_ui/history.rs` draws the timeline, interactive cards and expanded files using production fonts and Codicons. App::logic alone consumes results; UI and terminal identity remain independent.
+
+0.7.0 preview: egui_term view/scrollbar.rs uses O(1) history range and offset for local scrolling; ScrollTo never reaches the PTY. src/git/patch.rs uses independent bounded request/result slots for committed-file diffs; git_ui/diff.rs lays out visible rows only. Showing a diff disables terminal paint wakeups while retaining output draining and the original process.
+
+0.7.0-preview.3: git/syntax.rs uses pinned Syntect 5.3.0 default grammars and project-owned color rules in the file worker. It produces bounded presentation metadata containing source-row indices, byte ranges/RGB and indentation, with independent old/new parser states and no full-file UI scan. git_ui/diff.rs virtualizes multicolor LayoutJobs and indent guides, filtering raw Git metadata from the body.
+
+preview.6: git/worktree.rs reads HEAD-to-current-file net diffs on demand, sharing patch.rs parsing, limits and background slots with historical files. PatchSource explicitly distinguishes Commit and WorkingTree. Reads do not write the index/disk caches or invoke external drivers; Git snapshot events refresh an open working file, while UI frames do not trigger reads.

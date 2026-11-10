@@ -572,6 +572,7 @@ impl App {
                 b.set_visible(
                     self.can_draw
                         && !self.confirm_exit
+                        && self.git.as_ref().is_none_or(|g| g.patch.is_none())
                         && self.closing.is_none()
                         && self.active.as_deref() == Some(&s.spec.id),
                 );
@@ -691,6 +692,7 @@ impl App {
             .find(|s| Some(&s.spec.id) == self.active.as_ref())
             .map(|s| s.spec.directory.as_path());
         let focused = ctx.input(|i| i.viewport().focused.unwrap_or(false));
+        let had_diff = self.git.as_ref().is_some_and(|g| g.patch.is_some());
         if let Some(git) = &mut self.git {
             if git.set_directory(active_directory) {
                 self.git_view.reset();
@@ -700,6 +702,9 @@ impl App {
             git.poll();
         }
         self.git_focused = focused;
+        if had_diff != self.git.as_ref().is_some_and(|g| g.patch.is_some()) {
+            self.sync_visibility();
+        }
         if self
             .preferences_save_at
             .is_some_and(|deadline| Instant::now() >= deadline)
@@ -1064,6 +1069,15 @@ impl App {
                 if reset {
                     self.set_ui_scale(1.0, &ctx);
                     self.terminal_focus_pending = true;
+                }
+                if let Some(patch) = self.git.as_ref().and_then(|g| g.patch.as_ref()) {
+                    if ai_terminal::git_ui::diff::show(ui, patch) {
+                        if let Some(git) = &mut self.git {git.close_patch();}
+                        self.sync_visibility();
+                        self.terminal_focus_pending = true;
+                        ctx.request_repaint();
+                    }
+                    return;
                 }
                 let session = &mut self.sessions[index];
                 if let Some(error) = &session.error {
@@ -1538,6 +1552,12 @@ impl eframe::App for App {
             && let Some(git) = &mut self.git
         {
             git.inspect(&id);
+        }
+        if let Some((source, path)) = git_actions.file
+            && let Some(git) = &mut self.git
+        {
+            git.open_file(source, &path);
+            self.sync_visibility();
         }
         if was_git_open != self.preferences.git_panel_open {
             self.preferences_changed(&ctx);
@@ -2347,6 +2367,106 @@ Send-State 'state=clear'; Wait-Step 5
                 .unwrap()
                 .should_interrupt_composition,
             "focus restoration must not repeat on the next repaint"
+        );
+    }
+
+    #[test]
+    fn viewing_and_closing_file_diff_keeps_the_original_live_terminal_and_input() {
+        let directory = tempfile::tempdir().unwrap();
+        let ctx = egui::Context::default();
+        let creation = eframe::CreationContext::_new_kittest(ctx.clone());
+        let mut app = App::new(&creation, directory.path().to_owned(), false, false);
+        use_built_helper(&mut app);
+        app.last_directory = Some(directory.path().to_owned());
+        app.new_shell(Agent::Cmd, &ctx);
+        app.git = Some(ai_terminal::git::GitClient::new(ctx.clone()));
+        fn frame(app: &mut App, ctx: &egui::Context, events: Vec<egui::Event>) {
+            let _ = ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1200.0, 700.0),
+                    )),
+                    events,
+                    ..Default::default()
+                },
+                |ui| app.terminal(ui),
+            );
+        }
+        frame(&mut app, &ctx, vec![]);
+        let id = app.active.clone();
+        let pid = app.sessions[0].backend.as_ref().unwrap().pty_id();
+        let before: egui_term::WindowSize = app.sessions[0]
+            .backend
+            .as_mut()
+            .unwrap()
+            .sync()
+            .terminal_size
+            .into();
+        app.git.as_mut().unwrap().patch = Some(ai_terminal::git::PatchResult {
+            source: ai_terminal::git::PatchSource::Commit("1".repeat(40)),
+            path: "fixture.txt".into(),
+            data: None,
+            error: None,
+            loading: true,
+        });
+        app.sync_visibility();
+        frame(
+            &mut app,
+            &ctx,
+            vec![egui::Event::Text("SHOULD_NOT_REACH_PTY".into())],
+        );
+        assert!(
+            app.terminal_rect.is_none(),
+            "the terminal must not route input under a diff"
+        );
+        app.sessions[0].backend.as_mut().unwrap().process_command(
+            egui_term::BackendCommand::Write(b"echo DIFF_HIDDEN_OUTPUT\r".to_vec()),
+        );
+        let until = Instant::now() + Duration::from_secs(8);
+        loop {
+            let text = app.sessions[0].backend.as_mut().unwrap().plain_text();
+            if text.contains("DIFF_HIDDEN_OUTPUT") {
+                assert!(!text.contains("SHOULD_NOT_REACH_PTY"));
+                break;
+            }
+            assert!(Instant::now() < until, "hidden terminal stopped draining");
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        let pos = ctx
+            .read_response(egui::Id::new("git-diff-close"))
+            .unwrap()
+            .rect
+            .center();
+        for pressed in [true, false] {
+            frame(
+                &mut app,
+                &ctx,
+                vec![
+                    egui::Event::PointerMoved(pos),
+                    egui::Event::PointerButton {
+                        pos,
+                        button: egui::PointerButton::Primary,
+                        pressed,
+                        modifiers: egui::Modifiers::NONE,
+                    },
+                ],
+            );
+        }
+        frame(&mut app, &ctx, vec![]);
+        assert!(app.git.as_ref().unwrap().patch.is_none() && app.terminal_rect.is_some());
+        assert_eq!(app.active, id);
+        assert_eq!(app.sessions[0].backend.as_ref().unwrap().pty_id(), pid);
+        let after: egui_term::WindowSize = app.sessions[0]
+            .backend
+            .as_mut()
+            .unwrap()
+            .sync()
+            .terminal_size
+            .into();
+        assert_eq!(
+            (before.num_cols, before.num_lines),
+            (after.num_cols, after.num_lines)
         );
     }
 

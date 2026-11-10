@@ -76,3 +76,11 @@ Published upstream terminal recordings use binary diffs, and Git EOL conversion 
 Commit inspection is not persisted: retain only current and expanded details in memory, display at most 500 files and keep the six-second/2 MiB per-command bounds. Only an explicit copy click writes the full commit ID; the clipboard is never read automatically. Copy/file icons reuse the original Codicons U+EBCC/U+EA7B glyphs without new assets.
 
 0.6.0-preview.2: Changes and commit files share git_ui/files.rs. File-type icons all use the existing original Codicons font; SOURCE.json lists Markdown, code, JSON, configuration, script, media, PDF, archive and binary glyphs in use. No font or bitmap assets were added.
+
+0.7.0 preview: history size is O(1) viewport metadata without full-history copying. Diffs retain one bounded memory result (20,000 lines/4,000 characters per line, 2-MiB command output cap), with no workspace/disk persistence. No fonts/images are added; colors reuse chrome::COMPLETED/FAILED.
+
+Syntect 5.3.0 embeds grammars from the locked crate; default theme resources are disabled and colors are defined by project code. Cargo.lock records the archive checksum; the original MIT LICENSE.txt is packaged through dependencies.json and licenses/syntect-5.3.0/. Current-file presentation retains at most 100,000 tokens, with 256 spans per line, containing byte boundaries, RGB, source-row indices and indentation without workspace persistence. The artifact inventory records fancy-regex and other added dependencies and their original licenses.
+
+preview.6 working-file bodies likewise exist only in the current bounded memory result, with no file copies, index writes or disk diff cache. PatchSource is a presentation-memory type and does not change sessions.json. No fonts, images or third-party dependencies are added.
+
+0.7.0 README images come from optimized readme_capture (default/history/diff) and island_probe. Eight localized workspace/Git-history/read-only-diff/floating PNGs retain native bytes; SOURCE.json records each version, language, dimensions and SHA-256. Code, metadata and history are fixed synthetic content, with no reads of real user configuration, repositories or sessions.

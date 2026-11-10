@@ -339,6 +339,9 @@ fn reading_status_and_diff_never_executes_configured_content_filters() {
     repo.write("one.txt", "changed\nsecond\n");
     let snapshot = repo.snapshot();
     assert!(!repo.dir().join("filter-ran").exists());
+    let patch = git::read_worktree_patch(repo.dir(), "one.txt").unwrap();
+    assert!(patch.lines.iter().any(|line| line.text == "changed"));
+    assert!(!repo.dir().join("filter-ran").exists());
     assert!(snapshot.partial);
     assert!(
         snapshot
@@ -356,6 +359,194 @@ fn reading_status_and_diff_never_executes_configured_content_filters() {
         !repo.dir().join("filter-ran").exists(),
         "A standalone clean filter must also remain disabled"
     );
+}
+
+#[test]
+fn working_file_diff_combines_staged_and_unstaged_without_writing_index_or_files() {
+    use git::{PatchKind::*, PatchSource};
+    let repo = Repo::new();
+    let path = "文件 [1].txt";
+    repo.write(path, "first\nold second\nold third\nlast\n");
+    repo.commit("base");
+    repo.write(path, "first\nstaged second\nold third\nlast\n");
+    repo.run(&["add", "--", path]);
+    repo.write(path, "first\nstaged second\nunstaged third\nlast\n");
+    let before = std::fs::read(repo.dir().join(".git/index")).unwrap();
+    let contents = std::fs::read(repo.dir().join(path)).unwrap();
+    let patch = git::read_worktree_patch(repo.dir(), path).unwrap();
+    assert_eq!(patch.source, PatchSource::WorkingTree);
+    for (text, kind) in [
+        ("first", Context),
+        ("old second", Deleted),
+        ("staged second", Added),
+        ("old third", Deleted),
+        ("unstaged third", Added),
+        ("last", Context),
+    ] {
+        assert!(
+            patch
+                .lines
+                .iter()
+                .any(|line| line.text == text && line.kind == kind),
+            "Missing {kind:?}: {text}"
+        );
+    }
+    assert_eq!(patch.lines.iter().filter(|l| l.kind == Added).count(), 2);
+    assert_eq!(patch.lines.iter().filter(|l| l.kind == Deleted).count(), 2);
+    assert_eq!(
+        std::fs::read(repo.dir().join(".git/index")).unwrap(),
+        before
+    );
+    assert_eq!(std::fs::read(repo.dir().join(path)).unwrap(), contents);
+}
+
+#[test]
+fn working_files_cover_untracked_unborn_deleted_binary_encoding_and_limits() {
+    use git::PatchKind::*;
+    let repo = Repo::new();
+    let path = "literal [1] 中文.md";
+    repo.write(path, "\u{feff}# 中文 🔥\nlast\n");
+    repo.write("literal 1 中文.md", "MUST NOT MATCH\n");
+    for staged in [false, true] {
+        if staged {
+            repo.run(&["add", "--", path]);
+        }
+        let patch = git::read_worktree_patch(repo.dir(), path).unwrap();
+        assert_eq!(patch.lines.len(), 2);
+        assert_eq!(patch.lines[0].text, "# 中文 🔥");
+        assert!(
+            patch
+                .lines
+                .iter()
+                .all(|l| l.kind == Added && l.old.is_none())
+        );
+        assert_eq!(patch.lines[1].new, Some(2));
+    }
+    repo.commit("root");
+    std::fs::remove_file(repo.dir().join(path)).unwrap();
+    for staged in [false, true] {
+        if staged {
+            repo.run(&["add", "--", path]);
+        }
+        let patch = git::read_worktree_patch(repo.dir(), path).unwrap();
+        assert!(
+            patch
+                .lines
+                .iter()
+                .filter(|l| git::syntax::is_file_line(l))
+                .all(|l| l.kind == Deleted && l.new.is_none())
+        );
+        assert!(patch.lines.iter().any(|l| l.text == "last"));
+    }
+    // Recreated after an indexed deletion: the index must not hide its new contents.
+    repo.write(path, "replacement\n");
+    let patch = git::read_worktree_patch(repo.dir(), path).unwrap();
+    assert!(
+        patch
+            .lines
+            .iter()
+            .any(|l| l.kind == Deleted && l.text == "last")
+    );
+    assert!(
+        patch
+            .lines
+            .iter()
+            .any(|l| l.kind == Added && l.text == "replacement")
+    );
+    repo.write("raw.bin", [0, 0xff]);
+    assert!(
+        git::read_worktree_patch(repo.dir(), "raw.bin")
+            .unwrap()
+            .binary
+    );
+    repo.write("bad.txt", [0xff, 0xfe]);
+    assert_eq!(
+        git::read_worktree_patch(repo.dir(), "bad.txt").unwrap_err(),
+        GitError::InvalidUtf8
+    );
+    repo.write("big.txt", vec![b'x'; 2 * 1024 * 1024 + 1]);
+    assert!(
+        matches!(git::read_worktree_patch(repo.dir(),"big.txt"),Err(GitError::Command(s)) if s.contains("2 MiB"))
+    );
+    repo.write("many.txt", "line\n".repeat(20_010));
+    let patch = git::read_worktree_patch(repo.dir(), "many.txt").unwrap();
+    assert!(patch.partial);
+    assert_eq!(patch.lines.len(), 20_000);
+    for path in ["../outside.txt", "C:/outside.txt", "bad\0.txt", ""] {
+        assert!(git::read_worktree_patch(repo.dir(), path).is_err());
+    }
+}
+
+#[test]
+fn working_diff_worker_reuses_refreshes_and_cancels_with_its_repository() {
+    use git::PatchSource;
+    let repo = Repo::new();
+    repo.write("live.txt", "base\n");
+    repo.commit("base");
+    repo.write("live.txt", "first view\n");
+    let mut client = GitClient::new(egui::Context::default());
+    client.set_directory(Some(repo.dir()));
+    wait(&mut client, |s| {
+        s.files.iter().any(|f| f.path == "live.txt")
+    });
+    client.open_file(PatchSource::WorkingTree, "missing.txt");
+    assert!(
+        client.patch.is_none(),
+        "Only listed working files may be opened"
+    );
+    client.open_file(PatchSource::WorkingTree, "live.txt");
+    let await_text = |client: &mut GitClient, text: &str| {
+        let until = Instant::now() + Duration::from_secs(10);
+        loop {
+            client.poll();
+            if let Some(patch) = &client.patch {
+                assert!(patch.error.is_none(), "{:?}", patch.error);
+                if !patch.loading
+                    && patch
+                        .data
+                        .as_ref()
+                        .is_some_and(|p| p.lines.iter().any(|l| l.text == text))
+                {
+                    break;
+                }
+            }
+            assert!(Instant::now() < until, "Working file result timed out");
+            std::thread::sleep(Duration::from_millis(20));
+        }
+    };
+    await_text(&mut client, "first view");
+    let first = client.patch.as_ref().unwrap().data.clone().unwrap();
+    client.open_file(PatchSource::WorkingTree, "live.txt");
+    assert!(Arc::ptr_eq(
+        &first,
+        client.patch.as_ref().unwrap().data.as_ref().unwrap()
+    ));
+    repo.write("live.txt", "second view\n");
+    client.refresh();
+    await_text(&mut client, "second view");
+    // Only an event/manual query refreshes it; the UI is not a polling source.
+    let second = client.patch.as_ref().unwrap().data.clone().unwrap();
+    for _ in 0..20 {
+        client.poll();
+    }
+    assert!(Arc::ptr_eq(
+        &second,
+        client.patch.as_ref().unwrap().data.as_ref().unwrap()
+    ));
+    repo.write("live.txt", "base\n");
+    client.refresh();
+    wait(&mut client, |s| s.files.is_empty());
+    assert!(
+        client.patch.is_none(),
+        "Reverting the file clears the obsolete diff"
+    );
+    repo.write("live.txt", "pending\n");
+    client.refresh();
+    wait(&mut client, |s| !s.files.is_empty());
+    client.open_file(PatchSource::WorkingTree, "live.txt");
+    client.set_directory(None);
+    client.poll();
+    assert!(client.patch.is_none());
 }
 
 #[test]
@@ -497,4 +688,233 @@ fn merge_inspection_is_against_first_parent_and_directory_switch_cancels_old_det
         client.inspection.is_none(),
         "An unrelated commit must not be queried"
     );
+}
+
+#[test]
+fn file_diffs_read_committed_content_with_literal_paths_and_correct_numbers() {
+    use git::PatchKind;
+    let repo = Repo::new();
+    let file = "中文 [data].txt";
+    repo.write(file, "old\nkeep\nlast");
+    repo.write("binary.bin", b"\0old");
+    repo.commit("base");
+    let root = repo.run(&["rev-parse", "HEAD"]);
+    let patch = git::read_patch(repo.dir(), &root, file).unwrap();
+    assert!(patch.lines.iter().any(|l| l.kind == PatchKind::Added
+        && l.new == Some(1)
+        && l.old.is_none()
+        && l.text == "old"));
+    repo.write(file, "new\nkeep\nlast\nextra\n");
+    repo.write("binary.bin", b"\0new");
+    repo.commit("edit");
+    let id = repo.run(&["rev-parse", "HEAD"]);
+    repo.write(file, "UNCOMMITTED SECRET MUST NOT APPEAR\n");
+    repo.run(&[
+        "config",
+        "diff.external",
+        "cmd /c echo external > external-ran",
+    ]);
+    repo.run(&[
+        "config",
+        "diff.fixture.textconv",
+        "cmd /c echo textconv > textconv-ran",
+    ]);
+    repo.write(".gitattributes", "* diff=fixture\n");
+    let patch = git::read_patch(repo.dir(), &id, file).unwrap();
+    assert!(!patch.binary && !patch.partial && !patch.first_parent);
+    assert!(patch.lines.iter().any(|l| l.kind == PatchKind::Deleted
+        && l.old == Some(1)
+        && l.new.is_none()
+        && l.text == "old"));
+    assert!(
+        patch
+            .lines
+            .iter()
+            .any(|l| l.kind == PatchKind::Added && l.new == Some(1) && l.text == "new")
+    );
+    assert!(patch.lines.iter().any(|l| l.kind == PatchKind::Context
+        && l.old == Some(2)
+        && l.new == Some(2)
+        && l.text == "keep"));
+    assert!(!patch.lines.iter().any(|l| l.text.contains("SECRET")));
+    assert!(
+        git::read_patch(repo.dir(), &id, "binary.bin")
+            .unwrap()
+            .binary
+    );
+    assert!(!repo.dir().join("external-ran").exists() && !repo.dir().join("textconv-ran").exists());
+    assert!(git::read_patch(repo.dir(), "--all", file).is_err());
+    assert!(git::read_patch(repo.dir(), &id, "invalid\0path").is_err());
+    // A literal wildcard path must not accidentally include other files.
+    assert!(
+        git::read_patch(repo.dir(), &id, "*.bin")
+            .unwrap()
+            .lines
+            .is_empty()
+    );
+}
+
+#[test]
+fn file_view_includes_unchanged_first_and_last_lines_around_a_middle_edit() {
+    use git::PatchKind;
+    let repo = Repo::new();
+    let original: String = (1..=100).map(|n| format!("line {n}\n")).collect();
+    repo.write("complete.txt", &original);
+    repo.write("binary.bin", b"\0binary");
+    repo.commit("complete original");
+    repo.write(
+        "complete.txt",
+        original.replace("line 50\n", "edited line 50\n"),
+    );
+    repo.commit("edit middle");
+    let patch = git::read_patch(
+        repo.dir(),
+        &repo.run(&["rev-parse", "HEAD"]),
+        "complete.txt",
+    )
+    .unwrap();
+    assert!(!patch.partial);
+    assert!(patch.lines.iter().any(|l| l.kind == PatchKind::Context
+        && l.old == Some(1)
+        && l.new == Some(1)
+        && l.text == "line 1"));
+    assert!(
+        patch
+            .lines
+            .iter()
+            .any(|l| l.kind == PatchKind::Deleted && l.old == Some(50) && l.text == "line 50")
+    );
+    assert!(
+        patch
+            .lines
+            .iter()
+            .any(|l| l.kind == PatchKind::Added && l.new == Some(50) && l.text == "edited line 50")
+    );
+    assert!(patch.lines.iter().any(|l| l.kind == PatchKind::Context
+        && l.old == Some(100)
+        && l.new == Some(100)
+        && l.text == "line 100"));
+    let new_lines: Vec<_> = patch.lines.iter().filter_map(|l| l.new).collect();
+    assert_eq!(new_lines, (1..=100).collect::<Vec<_>>());
+    repo.run(&["update-index", "--chmod=+x", "complete.txt"]);
+    repo.run(&["update-index", "--chmod=+x", "binary.bin"]);
+    repo.run(&["commit", "-m", "mode only"]);
+    let mode = git::read_patch(
+        repo.dir(),
+        &repo.run(&["rev-parse", "HEAD"]),
+        "complete.txt",
+    )
+    .unwrap();
+    assert!(
+        mode.lines
+            .iter()
+            .any(|l| l.text == "line 1" && l.new == Some(1))
+    );
+    assert!(
+        mode.lines
+            .iter()
+            .any(|l| l.text == "line 100" && l.new == Some(100))
+    );
+    assert!(
+        !mode
+            .lines
+            .iter()
+            .any(|l| matches!(l.kind, PatchKind::Added | PatchKind::Deleted))
+    );
+    let binary =
+        git::read_patch(repo.dir(), &repo.run(&["rev-parse", "HEAD"]), "binary.bin").unwrap();
+    assert!(binary.binary && !binary.lines.iter().any(|l| l.text.contains('\0')));
+}
+
+#[test]
+fn file_view_preserves_utf8_and_reports_invalid_bytes_without_guessing_repairs() {
+    let repo = Repo::new();
+    let correct = "{\n  \"text\": \"中文、café 与 😀\"\n}\n";
+    let mut bom = vec![0xef, 0xbb, 0xbf];
+    bom.extend_from_slice(correct.as_bytes());
+    repo.write("bom.json", bom);
+    let historical = "{\"text\":\"ä¸\u{ad}æ–‡??\",\"escaped\":\"\\u0085\"}\n";
+    repo.write("historical.json", historical);
+    repo.write("legacy.txt", [0xd6, 0xd0, 0xce, 0xc4, b'\n']);
+    repo.commit("encoding fixtures");
+    let id = repo.run(&["rev-parse", "HEAD"]);
+    let patch = git::read_patch(repo.dir(), &id, "bom.json").unwrap();
+    let text = patch
+        .lines
+        .iter()
+        .filter(|l| l.new.is_some())
+        .map(|l| l.text.as_str())
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert_eq!(text, correct.trim_end());
+    assert!(!text.contains('\u{fffd}'));
+    assert!(!text.contains('\u{feff}'));
+    let patch = git::read_patch(repo.dir(), &id, "historical.json").unwrap();
+    assert!(
+        patch.lines.iter().any(|l| l.text == historical.trim_end()),
+        "valid UTF-8 source must not be guessed or rewritten"
+    );
+    assert_eq!(
+        git::read_patch(repo.dir(), &id, "legacy.txt").unwrap_err(),
+        GitError::InvalidUtf8
+    );
+}
+
+#[test]
+fn file_diff_worker_handles_merge_limits_reuse_and_old_repository_cancellation() {
+    let repo = Repo::new();
+    repo.write("base.txt", "base\n");
+    repo.commit("base");
+    repo.run(&["switch", "-c", "topic"]);
+    repo.write("topic.txt", "topic\n");
+    repo.commit("topic");
+    repo.run(&["switch", "main"]);
+    repo.write("main.txt", "main\n");
+    repo.commit("main");
+    repo.run(&["merge", "--no-ff", "topic", "-m", "merge"]);
+    let id = repo.run(&["rev-parse", "HEAD"]);
+    let patch = git::read_patch(repo.dir(), &id, "topic.txt").unwrap();
+    assert!(patch.first_parent && patch.lines.iter().any(|l| l.text == "topic"));
+    assert!(
+        git::read_patch(repo.dir(), &id, "main.txt")
+            .unwrap()
+            .lines
+            .is_empty()
+    );
+    let mut client = GitClient::new(egui::Context::default());
+    client.set_directory(Some(repo.dir()));
+    wait(&mut client, |s| s.commits[0].id == id);
+    client.open_patch(&id, "topic.txt");
+    let until = Instant::now() + Duration::from_secs(10);
+    while client.patch.as_ref().is_none_or(|p| p.loading) && Instant::now() < until {
+        client.poll();
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    let first = client
+        .patch
+        .as_ref()
+        .unwrap()
+        .data
+        .as_ref()
+        .unwrap()
+        .clone();
+    client.open_patch(&id, "topic.txt");
+    assert!(Arc::ptr_eq(
+        &first,
+        client.patch.as_ref().unwrap().data.as_ref().unwrap()
+    ));
+    client.open_patch(&id, "base.txt");
+    client.set_directory(None);
+    client.poll();
+    assert!(client.patch.is_none());
+    repo.write("large.txt", "line\n".repeat(20_100));
+    repo.commit("large");
+    let large =
+        git::read_patch(repo.dir(), &repo.run(&["rev-parse", "HEAD"]), "large.txt").unwrap();
+    assert!(large.partial);
+    assert_eq!(large.lines.len(), 20_000);
+    repo.write("wide.txt", "x".repeat(5000));
+    repo.commit("wide");
+    let wide = git::read_patch(repo.dir(), &repo.run(&["rev-parse", "HEAD"]), "wide.txt").unwrap();
+    assert!(wide.partial && wide.lines.iter().all(|l| l.text.chars().count() <= 4001));
 }

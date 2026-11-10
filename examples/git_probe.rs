@@ -15,7 +15,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-const STATES: [(f32, bool, bool, Language, FontChoice); 12] = [
+const STATES: [(f32, bool, bool, Language, FontChoice); 26] = [
     (1.0, false, true, Language::ZhCn, FontChoice::JetBrainsMono),
     (1.0, true, true, Language::ZhCn, FontChoice::JetBrainsMono),
     (1.03, false, true, Language::ZhCn, FontChoice::JetBrainsMono),
@@ -28,6 +28,20 @@ const STATES: [(f32, bool, bool, Language, FontChoice); 12] = [
     (1.0, false, false, Language::ZhCn, FontChoice::JetBrainsMono),
     (1.0, true, true, Language::ZhCn, FontChoice::JetBrainsMono),
     (1.0, true, true, Language::En, FontChoice::JetBrainsMono),
+    (1.0, true, true, Language::ZhCn, FontChoice::JetBrainsMono),
+    (1.0, true, true, Language::En, FontChoice::JetBrainsMono),
+    (1.03, true, true, Language::ZhCn, FontChoice::JetBrainsMono),
+    (2.0, true, true, Language::ZhCn, FontChoice::JetBrainsMono),
+    (1.0, true, true, Language::ZhCn, FontChoice::JetBrainsMono),
+    (2.0, true, true, Language::En, FontChoice::JetBrainsMono),
+    (1.0, true, true, Language::En, FontChoice::JetBrainsMono),
+    (2.0, true, true, Language::ZhCn, FontChoice::JetBrainsMono),
+    (1.03, true, true, Language::ZhCn, FontChoice::JetBrainsMono),
+    (1.14, true, true, Language::En, FontChoice::Hack),
+    (1.0, false, true, Language::ZhCn, FontChoice::JetBrainsMono),
+    (1.03, false, true, Language::En, FontChoice::JetBrainsMono),
+    (2.0, false, true, Language::ZhCn, FontChoice::JetBrainsMono),
+    (1.14, false, true, Language::En, FontChoice::Hack),
 ];
 struct Probe {
     renderer: egui_term::TextRendererSession,
@@ -73,6 +87,29 @@ impl eframe::App for Probe {
         input
             .events
             .retain(|e| matches!(e, egui::Event::Screenshot { .. }));
+        if self.stage >= 22 && self.stage < STATES.len() && self.frames >= 4 {
+            let path = match self.stage {
+                23 => "terminal.rs",
+                25 => "icon.bin",
+                _ => "新增说明.md",
+            };
+            if self.interaction < 2 {
+                if let Some(file) = ctx.read_response(egui::Id::new(("git-working-file", path))) {
+                    let pos = file.rect.center();
+                    input.events.push(egui::Event::PointerMoved(pos));
+                    input.events.push(egui::Event::PointerButton {
+                        pos,
+                        button: egui::PointerButton::Primary,
+                        pressed: self.interaction == 0,
+                        modifiers: egui::Modifiers::NONE,
+                    });
+                    self.interaction += 1;
+                }
+            } else {
+                input.events.push(egui::Event::PointerGone);
+            }
+            return;
+        }
         if self.stage >= STATES.len() || !STATES[self.stage].1 || self.frames < 4 {
             input.events.push(egui::Event::PointerGone);
             return;
@@ -101,6 +138,32 @@ impl eframe::App for Probe {
                 modifiers: egui::Modifiers::NONE,
             });
             self.interaction += 1;
+        } else if self.stage >= 12 {
+            if self.interaction < 4 {
+                if let Some(file) = ctx.read_response(egui::Id::new((
+                    "git-commit-file",
+                    &commit.id,
+                    if self.stage >= 18 {
+                        "history.md"
+                    } else if self.stage >= 16 {
+                        "settings.json"
+                    } else {
+                        "terminal.rs"
+                    },
+                ))) {
+                    let pos = file.rect.center();
+                    input.events.push(egui::Event::PointerMoved(pos));
+                    input.events.push(egui::Event::PointerButton {
+                        pos,
+                        button: egui::PointerButton::Primary,
+                        pressed: self.interaction == 2,
+                        modifiers: egui::Modifiers::NONE,
+                    });
+                    self.interaction += 1;
+                }
+            } else {
+                input.events.push(egui::Event::PointerGone);
+            }
         } else if self.stage >= 10 {
             if self.interaction == 2
                 && self.clicked_at.elapsed() > Duration::from_millis(250)
@@ -126,6 +189,7 @@ impl eframe::App for Probe {
         let (scale, history, mut open, language, font_choice) = STATES[self.stage];
         if self.frames == 0 {
             self.view.reset();
+            self.client.close_patch();
             if self.font_choice != font_choice {
                 appearance::set_terminal_font(ui.ctx(), font_choice);
                 self.font_choice = font_choice;
@@ -160,6 +224,9 @@ impl eframe::App for Probe {
         if let Some(id) = actions.inspect {
             self.client.inspect(&id);
         }
+        if let Some((source, path)) = actions.file {
+            self.client.open_file(source, &path);
+        }
         egui::CentralPanel::default()
             .frame(
                 egui::Frame::new()
@@ -167,6 +234,12 @@ impl eframe::App for Probe {
                     .inner_margin(14),
             )
             .show(ui, |ui| {
+                if let Some(patch) = &self.client.patch {
+                    assert!(!git_ui::diff::show(ui, patch));
+                    self.terminal.set_visible(false);
+                    return;
+                }
+                self.terminal.set_visible(true);
                 let terminal = TerminalView::new(ui, &mut self.terminal)
                     .set_focus(false)
                     .set_font(appearance::current_terminal_font(ui.ctx(), 14.0));
@@ -193,7 +266,13 @@ impl eframe::App for Probe {
                 "git-{}-{}-{}.png",
                 self.stage,
                 (scale * 100.0).round() as u32,
-                if history { "history" } else { "changes" }
+                if self.stage >= 12 {
+                    "diff"
+                } else if history {
+                    "history"
+                } else {
+                    "changes"
+                }
             );
             let mut encoder = png::Encoder::new(
                 std::fs::File::create(self.output.join(&name)).unwrap(),
@@ -213,7 +292,7 @@ impl eframe::App for Probe {
                         .collect::<Vec<_>>(),
                 )
                 .unwrap();
-            self.records.push(serde_json::json!({"image":name,"scale":scale,"history":history,"open":open,"pty_pid":self.pid,"font":font_choice,"expanded":history,"tooltip":self.stage>=10,"commit_details":self.client.inspection.as_ref().and_then(|i| i.data.as_deref())}));
+            self.records.push(serde_json::json!({"image":name,"scale":scale,"history":history,"open":open,"pty_pid":self.pid,"font":font_choice,"expanded":history,"tooltip":(10..12).contains(&self.stage),"commit_details":self.client.inspection.as_ref().and_then(|i| i.data.as_deref()),"file_diff":self.client.patch.as_ref().and_then(|p|p.data.as_deref())}));
             self.stage += 1;
             if self.stage < STATES.len() {
                 ui.ctx().set_zoom_factor(STATES[self.stage].0);
@@ -240,16 +319,19 @@ impl eframe::App for Probe {
                         .as_ref()
                         .is_some_and(|i| i.data.is_some())))
             && (self.stage < 10
-                || self
-                    .client
-                    .snapshot
-                    .as_ref()
-                    .and_then(|s| s.commits.first())
-                    .and_then(|c| {
-                        ui.ctx()
-                            .read_response(egui::Id::new(("git-commit-row", &c.id)))
-                    })
-                    .is_some_and(|r| r.is_tooltip_open()))
+                || (self.stage >= 12
+                    && self.client.patch.as_ref().is_some_and(|p| p.data.is_some()))
+                || ((10..12).contains(&self.stage)
+                    && self
+                        .client
+                        .snapshot
+                        .as_ref()
+                        .and_then(|s| s.commits.first())
+                        .and_then(|c| {
+                            ui.ctx()
+                                .read_response(egui::Id::new(("git-commit-row", &c.id)))
+                        })
+                        .is_some_and(|r| r.is_tooltip_open())))
         {
             assert_eq!(
                 (snapshot.added, snapshot.deleted, snapshot.total_files),
@@ -306,7 +388,15 @@ fn fixture(root: &Path) {
         "Use a new probe output directory"
     );
     run(&["init", "-b", "feature/native-git"]);
-    std::fs::write(root.join("terminal.rs"), "first\nold\nthird\n").unwrap();
+    let original = format!(
+        "first\nold\nthird\n{}last line\n",
+        (4..12)
+            .map(|n| format!("unchanged line {n}\n"))
+            .collect::<String>()
+    );
+    std::fs::write(root.join("terminal.rs"), &original).unwrap();
+    let config = "\u{feff}{\n  \"name\": \"native-preview\",\n  \"label\": \"中文正常显示\",\n  \"version\": \"0.6.0\",\n  \"enabled\": true,\n  \"count\": 7,\n  \"nested\": {\n    \"path\": \"src\",\n    \"items\": [\"one\", \"two\"]\n  }\n}\n";
+    std::fs::write(root.join("settings.json"), config).unwrap();
     run(&["add", "--all"]);
     run(&["commit", "-m", "feat: create native terminal workspace"]);
     for message in [
@@ -316,18 +406,29 @@ fn fixture(root: &Path) {
     ] {
         if message == "feat: show current branch commit history" {
             std::fs::write(
+                root.join("terminal.rs"),
+                original.replacen("old\n", "committed\n", 1),
+            )
+            .unwrap();
+            std::fs::write(
                 root.join("history.md"),
-                "Commit details stay local.\nNo model requests.\n",
+                "# Local commit history\n\n| Project | Status | Memory |\n| --- | --- | --- |\n| `terminal` | Active 🔥 | ✔️ |\n| `legacy` | Retired ⛔ | ✖ |\n\n- **Review** with 👩🏽‍💻 ❤️ 🇨🇳 1️⃣\n  - Text symbols: ✖\u{fe0e} ✔\u{fe0e}\n\n```json\n{\"count\": 42, \"enabled\": true}\n```\n\n[Documentation](https://example.invalid)\n",
             )
             .unwrap();
             for (path, content) in [
-                ("settings.json", "{\"enabled\":true}\n"),
                 ("build.ps1", "Write-Output 'fixture only'\n"),
                 (".gitignore", "ignored-output/\n"),
                 ("icon.svg", "<svg xmlns=\"http://www.w3.org/2000/svg\"/>\n"),
             ] {
                 std::fs::write(root.join(path), content).unwrap();
             }
+            std::fs::write(
+                root.join("settings.json"),
+                config
+                    .replace("0.6.0", "0.7.0")
+                    .replace("\"count\": 7", "\"count\": 42"),
+            )
+            .unwrap();
             run(&["add", "--all"]);
         }
         run(&[
@@ -339,10 +440,14 @@ fn fixture(root: &Path) {
             "Inspect author, date, full commit ID and changed files.\nOnly the isolated fixture repository is read.",
         ]);
     }
-    std::fs::write(root.join("terminal.rs"), "first\nnew\nthird\nfourth\n").unwrap();
+    std::fs::write(
+        root.join("terminal.rs"),
+        format!("{}new final line\n", original.replacen("old\n", "new\n", 1)),
+    )
+    .unwrap();
     std::fs::write(
         root.join("新增说明.md"),
-        "Git workspace\nLocal fixture only\nNo model requests\n",
+        "# Working file 🔥\n\n中文只读 · Local changes ⛔ 👩🏽‍💻\n",
     )
     .unwrap();
     std::fs::write(root.join("icon.bin"), [0, 1, 2, 3]).unwrap();

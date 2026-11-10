@@ -112,7 +112,7 @@ pub(super) fn show(
                                 .and_then(|i| i.data.as_deref())
                         });
                     if let Some(data) = data {
-                        files(ui, data);
+                        files(ui, data, actions, view.open_file.as_ref());
                     } else if let Some(error) = view
                         .inspection
                         .as_ref()
@@ -264,7 +264,12 @@ fn totals(ui: &mut egui::Ui, data: &CommitDetails) {
         ui.colored_label(chrome::FAILED, format!("−{}", data.deleted));
     });
 }
-fn files(ui: &mut egui::Ui, data: &CommitDetails) {
+fn files(
+    ui: &mut egui::Ui,
+    data: &CommitDetails,
+    actions: &mut Actions,
+    open_file: Option<&(crate::git::PatchSource, String)>,
+) {
     let locale = i18n::locale(ui.ctx());
     totals(ui, data);
     if data.parents.len() > 1 {
@@ -274,7 +279,7 @@ fn files(ui: &mut egui::Ui, data: &CommitDetails) {
         ui.weak(locale.text("此提交没有文件更改", "No file changes in this commit"));
     }
     for file in &data.files {
-        super::files::show(
+        let response = super::files::show(
             ui,
             super::files::FileRow {
                 path: &file.path,
@@ -283,8 +288,22 @@ fn files(ui: &mut egui::Ui, data: &CommitDetails) {
                 deleted: file.deleted,
                 binary: file.binary,
                 omitted: false,
+                selected: open_file.is_some_and(|(source, path)| {
+                    matches!(source, crate::git::PatchSource::Commit(id) if id == &data.id)
+                        && path == &file.path
+                }),
             },
+            egui::Id::new(("git-commit-file", &data.id, &file.path)),
         );
+        if response
+            .on_hover_cursor(egui::CursorIcon::PointingHand)
+            .clicked()
+        {
+            actions.file = Some((
+                crate::git::PatchSource::Commit(data.id.clone()),
+                file.path.clone(),
+            ));
+        }
     }
     if data.partial {
         ui.weak(locale.text(

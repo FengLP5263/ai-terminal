@@ -50,6 +50,121 @@ fn text_rect(output: &egui::FullOutput, value: &str) -> Option<Rect> {
     }
     output.shapes.iter().find_map(|s| find(&s.shape, value))
 }
+
+#[test]
+fn file_diff_is_read_only_and_keeps_text_colors_over_red_green_backgrounds() {
+    use ai_terminal::{
+        chrome,
+        git::{FilePatch, PatchKind, PatchLine, PatchResult},
+    };
+    let ctx = egui::Context::default();
+    appearance::setup(&ctx);
+    i18n::apply(&ctx, Language::En);
+    let mut lines = vec![
+        PatchLine {
+            kind: PatchKind::Deleted,
+            old: Some(3),
+            new: None,
+            text: "old value".into(),
+        },
+        PatchLine {
+            kind: PatchKind::Added,
+            old: None,
+            new: Some(3),
+            text: "new value".into(),
+        },
+    ];
+    lines.extend((4..6000).map(|n| PatchLine {
+        kind: PatchKind::Context,
+        old: Some(n),
+        new: Some(n),
+        text: format!("context {n}"),
+    }));
+    let presentation = ai_terminal::git::syntax::Presentation {
+        rows: (0..lines.len())
+            .map(|source| ai_terminal::git::syntax::Row {
+                source,
+                ..Default::default()
+            })
+            .collect(),
+        indent_width: 2,
+    };
+    let result = PatchResult {
+        source: ai_terminal::git::PatchSource::WorkingTree,
+        path: "package-lock.json".into(),
+        data: Some(std::sync::Arc::new(FilePatch {
+            source: ai_terminal::git::PatchSource::WorkingTree,
+            path: "package-lock.json".into(),
+            lines,
+            binary: false,
+            partial: false,
+            first_parent: false,
+            max_columns: 20,
+            presentation,
+        })),
+        error: None,
+        loading: false,
+    };
+    let frame = |events| {
+        let mut close = false;
+        let out = ctx.run_ui(
+            egui::RawInput {
+                screen_rect: Some(Rect::from_min_size(Pos2::ZERO, egui::vec2(900.0, 600.0))),
+                events,
+                ..Default::default()
+            },
+            |ui| {
+                close = ai_terminal::git_ui::diff::show(ui, &result);
+            },
+        );
+        (out, close)
+    };
+    frame(vec![]);
+    let (out, _) = frame(vec![Event::Text("MUST NOT EDIT".into())]);
+    assert!(text_rect(&out, "Read only").is_some());
+    assert!(text_rect(&out, "Local changes").is_some());
+    assert!(text_rect(&out, "old value").is_some());
+    assert!(text_rect(&out, "new value").is_some());
+    assert!(
+        text_rect(&out, "context 5000").is_none(),
+        "offscreen history should not be laid out"
+    );
+    assert!(out.shapes.len() < 180, "all diff rows were painted");
+    for (text, color) in [
+        ("old value", chrome::TEXT),
+        ("new value", chrome::TEXT),
+        ("−", chrome::FAILED),
+        ("+", chrome::COMPLETED),
+    ] {
+        let shape = out
+            .shapes
+            .iter()
+            .find_map(|s| {
+                if let egui::Shape::Text(t) = &s.shape {
+                    if t.galley.job.text == text {
+                        Some(t)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            })
+            .unwrap();
+        assert_eq!(shape.galley.job.sections[0].format.color, color);
+    }
+    for color in [chrome::FAILED, chrome::COMPLETED] {
+        assert!(out.shapes.iter().any(|s| matches!(&s.shape, egui::Shape::Rect(rect) if rect.fill == color.gamma_multiply(0.13))), "Diff background must retain the application red/green");
+    }
+    let pos = ctx
+        .read_response(egui::Id::new("git-diff-close"))
+        .expect("close control")
+        .rect
+        .center();
+    frame(pointer(pos, true));
+    let (_, closed) = frame(pointer(pos, false));
+    assert!(closed);
+}
 fn pointer(pos: Pos2, pressed: bool) -> Vec<Event> {
     vec![
         Event::PointerMoved(pos),
@@ -60,6 +175,259 @@ fn pointer(pos: Pos2, pressed: bool) -> Vec<Event> {
             modifiers: Modifiers::NONE,
         },
     ]
+}
+
+#[test]
+fn opened_file_highlight_survives_hover_switches_with_the_file_and_clears_on_close() {
+    use ai_terminal::git::{CommitDetails, CommitFile, GitClient, Inspection, PatchResult};
+    use std::sync::Arc;
+    let ctx = egui::Context::default();
+    appearance::setup(&ctx);
+    i18n::apply(&ctx, Language::En);
+    let snapshot = fixture();
+    let id = snapshot.commits[0].id.clone();
+    let mut client = GitClient::new(ctx.clone());
+    client.snapshot = Some(Arc::new(snapshot));
+    client.watching = true;
+    client.inspection = Some(Inspection {
+        id: id.clone(),
+        data: Some(Arc::new(CommitDetails {
+            id: id.clone(),
+            message: "fixture".into(),
+            parents: vec![],
+            files: ["first.json", "second.json"]
+                .into_iter()
+                .map(|path| CommitFile {
+                    path: path.into(),
+                    status: 'M',
+                    added: 1,
+                    deleted: 1,
+                    binary: false,
+                })
+                .collect(),
+            total_files: 2,
+            added: 2,
+            deleted: 2,
+            partial: false,
+        })),
+        error: None,
+        loading: false,
+    });
+    let mut view = GitView::default();
+    view.set_history(true);
+    fn frame(
+        ctx: &egui::Context,
+        view: &mut GitView,
+        client: &GitClient,
+        events: Vec<Event>,
+    ) -> egui::FullOutput {
+        ctx.run_ui(
+            egui::RawInput {
+                screen_rect: Some(Rect::from_min_size(Pos2::ZERO, egui::vec2(1000.0, 700.0))),
+                events,
+                ..Default::default()
+            },
+            |ui| {
+                view.panel(ui, Some(client), &mut true);
+            },
+        )
+    }
+    frame(&ctx, &mut view, &client, vec![]);
+    frame(&ctx, &mut view, &client, vec![]);
+    let row = ctx
+        .read_response(egui::Id::new(("git-commit-row", &id)))
+        .unwrap()
+        .rect;
+    for pressed in [true, false] {
+        frame(&ctx, &mut view, &client, pointer(row.center(), pressed));
+    }
+    frame(&ctx, &mut view, &client, vec![]);
+    let first = ctx
+        .read_response(egui::Id::new(("git-commit-file", &id, "first.json")))
+        .unwrap()
+        .rect;
+    let second = ctx
+        .read_response(egui::Id::new(("git-commit-file", &id, "second.json")))
+        .unwrap()
+        .rect;
+    let selected = |out: &egui::FullOutput, rect: Rect| {
+        out.shapes.iter().any(|s|matches!(&s.shape,egui::Shape::Rect(r) if r.fill==ai_terminal::chrome::WORKING && (r.rect.center().y-rect.center().y).abs()<0.5 && r.rect.width()==2.0))
+    };
+    let opened = |id: &str, path: &str| {
+        Some(PatchResult {
+            source: ai_terminal::git::PatchSource::Commit(id.into()),
+            path: path.into(),
+            data: None,
+            error: None,
+            loading: true,
+        })
+    };
+    client.patch = opened(&id, "first.json");
+    let out = frame(
+        &ctx,
+        &mut view,
+        &client,
+        vec![Event::PointerMoved(second.center())],
+    );
+    assert!(
+        selected(&out, first) && !selected(&out, second),
+        "hover must not move the active file indication"
+    );
+    client.patch = opened(&id, "second.json");
+    let out = frame(&ctx, &mut view, &client, vec![Event::PointerGone]);
+    assert!(!selected(&out, first) && selected(&out, second));
+    client.patch = opened(&"b".repeat(40), "second.json");
+    let out = frame(&ctx, &mut view, &client, vec![]);
+    assert!(
+        !selected(&out, second),
+        "matching paths from another commit must not appear selected"
+    );
+    client.patch = None;
+    let out = frame(&ctx, &mut view, &client, vec![]);
+    assert!(!selected(&out, first) && !selected(&out, second));
+}
+
+#[test]
+fn syntax_coloring_and_indentation_do_not_show_raw_git_headers_or_use_diff_text_colors() {
+    use ai_terminal::{
+        chrome,
+        git::{
+            FilePatch, PatchKind, PatchLine, PatchResult,
+            syntax::{KEY, NUMBER, Presentation, Row, TEXT, Token},
+        },
+    };
+    let ctx = egui::Context::default();
+    appearance::setup(&ctx);
+    #[cfg(windows)]
+    let _renderer = egui_term::TextRendererSession::new(&ctx);
+    let text = "    \"count\": 42, // 🔥 ⛔ 👩🏽‍💻";
+    let number = text.find("42").unwrap();
+    let tokens = vec![
+        Token {
+            end: number as u32,
+            color: KEY,
+        },
+        Token {
+            end: (number + 2) as u32,
+            color: NUMBER,
+        },
+        Token {
+            end: text.len() as u32,
+            color: TEXT,
+        },
+    ];
+    let patch = FilePatch {
+        source: ai_terminal::git::PatchSource::Commit("a".repeat(40)),
+        path: "config.json".into(),
+        lines: vec![
+            PatchLine {
+                kind: PatchKind::Note,
+                old: None,
+                new: None,
+                text: "new file mode 100644".into(),
+            },
+            PatchLine {
+                kind: PatchKind::Hunk,
+                old: None,
+                new: None,
+                text: "@@ -1 +1 @@".into(),
+            },
+            PatchLine {
+                kind: PatchKind::Deleted,
+                old: Some(1),
+                new: None,
+                text: text.into(),
+            },
+            PatchLine {
+                kind: PatchKind::Added,
+                old: None,
+                new: Some(1),
+                text: text.into(),
+            },
+        ],
+        binary: false,
+        partial: false,
+        first_parent: false,
+        max_columns: 20,
+        presentation: Presentation {
+            rows: vec![
+                Row {
+                    source: 2,
+                    indent: 4,
+                    tokens: tokens.clone(),
+                },
+                Row {
+                    source: 3,
+                    indent: 4,
+                    tokens,
+                },
+            ],
+            indent_width: 2,
+        },
+    };
+    let result = PatchResult {
+        source: patch.source.clone(),
+        path: patch.path.clone(),
+        data: Some(std::sync::Arc::new(patch)),
+        error: None,
+        loading: false,
+    };
+    let frame = || {
+        ctx.run_ui(
+            egui::RawInput {
+                screen_rect: Some(Rect::from_min_size(Pos2::ZERO, egui::vec2(900.0, 600.0))),
+                ..Default::default()
+            },
+            |ui| {
+                ai_terminal::git_ui::diff::show(ui, &result);
+            },
+        )
+    };
+    frame();
+    let out = frame();
+    assert!(text_rect(&out, "new file mode 100644").is_none());
+    assert!(text_rect(&out, "@@ -1 +1 @@").is_none());
+    let colors: Vec<_> = out
+        .shapes
+        .iter()
+        .filter_map(|s| {
+            if let egui::Shape::Text(t) = &s.shape {
+                if t.galley.job.text == text {
+                    Some(
+                        t.galley
+                            .job
+                            .sections
+                            .iter()
+                            .map(|s| s.format.color)
+                            .collect::<Vec<_>>(),
+                    )
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        })
+        .collect();
+    assert_eq!(colors.len(), 2);
+    assert_eq!(colors[0], colors[1]);
+    assert_eq!(
+        colors[0][0],
+        egui::Color32::from_rgb(KEY[0], KEY[1], KEY[2])
+    );
+    assert_eq!(
+        colors[0][1],
+        egui::Color32::from_rgb(NUMBER[0], NUMBER[1], NUMBER[2])
+    );
+    assert!(!colors[0].contains(&chrome::COMPLETED) && !colors[0].contains(&chrome::FAILED));
+    assert!(colors[0].contains(&egui::Color32::TRANSPARENT));
+    #[cfg(windows)]
+    assert_eq!(
+        out.shapes.iter().filter(|s| matches!(&s.shape, egui::Shape::Mesh(mesh) if mesh.vertices.iter().all(|v| v.color == egui::Color32::WHITE))).count(),
+        6,
+        "Both deleted and added rows must paint three native color emoji overlays"
+    );
+    assert!(out.shapes.iter().any(|s|matches!(&s.shape,egui::Shape::LineSegment{stroke,..} if stroke.color==egui::Color32::from_gray(53))));
 }
 #[test]
 fn real_controls_switch_history_expand_commit_request_more_and_refresh() {
@@ -564,4 +932,65 @@ fn narrow_headers_shorten_metadata_instead_of_overlapping_or_wrapping() {
         assert!(branch.right() <= scale.left());
         assert!(text_rect(&output, "terminal-content").unwrap().top() < 50.0);
     }
+}
+
+#[test]
+fn working_file_clicks_open_read_only_source_and_keep_the_current_file_marked() {
+    use ai_terminal::git::{GitClient, PatchResult, PatchSource};
+    let ctx = egui::Context::default();
+    appearance::setup(&ctx);
+    i18n::apply(&ctx, Language::En);
+    let mut snapshot = fixture();
+    snapshot.files[0].index = '?';
+    snapshot.files[0].worktree = '?';
+    let path = snapshot.files[0].path.clone();
+    let mut client = GitClient::new(ctx.clone());
+    client.snapshot = Some(std::sync::Arc::new(snapshot));
+    let mut view = GitView::default();
+    let frame = |view: &mut GitView, client: &GitClient, events| {
+        let mut actions = Actions::default();
+        let out = ctx.run_ui(
+            egui::RawInput {
+                screen_rect: Some(Rect::from_min_size(Pos2::ZERO, egui::vec2(1000.0, 600.0))),
+                events,
+                ..Default::default()
+            },
+            |ui| {
+                actions = view.panel(ui, Some(client), &mut true);
+            },
+        );
+        (out, actions)
+    };
+    frame(&mut view, &client, vec![]);
+    let (out, _) = frame(&mut view, &client, vec![]);
+    assert!(text_rect(&out, "Untracked").is_some());
+    assert!(text_rect(&out, "??").is_none());
+    let row = ctx
+        .read_response(egui::Id::new(("git-working-file", &path)))
+        .unwrap()
+        .rect;
+    frame(&mut view, &client, pointer(row.center(), true));
+    let (_, actions) = frame(&mut view, &client, pointer(row.center(), false));
+    assert_eq!(actions.file, Some((PatchSource::WorkingTree, path.clone())));
+    client.patch = Some(PatchResult {
+        source: PatchSource::WorkingTree,
+        path: path.clone(),
+        data: None,
+        error: None,
+        loading: true,
+    });
+    let (out, _) = frame(&mut view, &client, vec![Event::PointerGone]);
+    let marked = |out: &egui::FullOutput| {
+        out.shapes.iter().any(|s|matches!(&s.shape,egui::Shape::Rect(r) if r.fill==ai_terminal::chrome::WORKING && r.rect.width()==2.0))
+    };
+    assert!(marked(&out));
+    client.patch.as_mut().unwrap().source = PatchSource::Commit("a".repeat(40));
+    let (out, _) = frame(&mut view, &client, vec![]);
+    assert!(
+        !marked(&out),
+        "A historical file is a separate selection from its working copy"
+    );
+    client.patch = None;
+    let (out, _) = frame(&mut view, &client, vec![]);
+    assert!(!marked(&out));
 }

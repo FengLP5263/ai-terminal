@@ -1,16 +1,21 @@
 //! Local read-only Git snapshots. No model access, credentials, writes, or network.
 mod command;
 mod commit;
+mod patch;
 mod service;
+pub mod syntax;
 mod watch;
+mod worktree;
 use command::Runner;
 pub use commit::{CommitDetails, CommitFile, Inspection, read_commit};
+pub use patch::{FilePatch, PatchKind, PatchLine, PatchResult, PatchSource, read_patch};
 pub use service::GitClient;
 use std::{
     collections::{HashMap, HashSet},
     io::Read,
     path::{Path, PathBuf},
 };
+pub use worktree::read_worktree_patch;
 
 pub const PAGE: usize = 50;
 pub const MAX_COMMITS: usize = 300;
@@ -54,6 +59,7 @@ pub struct Snapshot {
 pub enum GitError {
     Missing,
     Command(String),
+    InvalidUtf8,
     Cancelled,
 }
 
