@@ -160,49 +160,19 @@ pub fn rail_button(ui: &mut egui::Ui, id: egui::Id, icon: ActionIcon, label: &st
 
 pub fn paint_shell(painter: &egui::Painter, rect: Rect, agent: crate::model::Agent) {
     use crate::model::Agent;
-    let center = rect.center();
-    let scale = rect.width() / 20.0;
-    let p = |x: f32, y: f32| center + egui::vec2(x, y) * scale;
-    let color = match agent {
-        Agent::Shell => Color32::from_rgb(156, 190, 232),
-        Agent::Bash => Color32::from_rgb(133, 200, 145),
-        _ => Color32::from_gray(210),
+    // Official Microsoft Codicons terminal glyphs, shared by menus and avatars.
+    let (glyph, color) = match agent {
+        Agent::Shell => ("\u{ebc7}", Color32::from_rgb(83, 145, 254)),
+        Agent::Bash => ("\u{ebca}", Color32::from_rgb(133, 200, 145)),
+        _ => ("\u{ebc4}", Color32::from_gray(210)),
     };
-    let stroke = Stroke::new(1.5 * scale, color);
-    if agent == Agent::Bash {
-        painter.add(egui::epaint::CubicBezierShape::from_points_stroke(
-            [p(6.0, -6.0), p(-8.0, -11.0), p(-8.0, 0.0), p(0.0, 0.0)],
-            false,
-            Color32::TRANSPARENT,
-            stroke,
-        ));
-        painter.add(egui::epaint::CubicBezierShape::from_points_stroke(
-            [p(0.0, 0.0), p(9.0, 0.0), p(8.0, 11.0), p(-6.0, 6.0)],
-            false,
-            Color32::TRANSPARENT,
-            stroke,
-        ));
-        painter.line_segment([p(0.0, -9.0), p(0.0, 9.0)], stroke);
-    } else {
-        if agent == Agent::Shell {
-            painter.add(egui::Shape::closed_line(
-                vec![p(-6.5, -7.5), p(9.0, -7.5), p(6.5, 7.5), p(-9.0, 7.5)],
-                stroke,
-            ));
-        } else {
-            painter.rect_stroke(
-                Rect::from_min_max(p(-9.0, -7.5), p(9.0, 7.5)),
-                2,
-                stroke,
-                egui::StrokeKind::Inside,
-            );
-        }
-        painter.add(egui::Shape::line(
-            vec![p(-4.0, -3.5), p(-0.5, 0.0), p(-4.0, 3.5)],
-            stroke,
-        ));
-        painter.line_segment([p(1.5, 3.5), p(5.5, 3.5)], stroke);
-    }
+    painter.text(
+        rect.center(),
+        egui::Align2::CENTER_CENTER,
+        glyph,
+        egui::FontId::new(rect.height(), egui::FontFamily::Name("codicons".into())),
+        color,
+    );
 }
 
 /// Opaque row surfaces also provide the exact background for lifecycle badges.

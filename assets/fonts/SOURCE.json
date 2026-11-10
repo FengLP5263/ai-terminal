@@ -192,8 +192,11 @@
       "file-zip": "U+EAEF",
       "settings": "U+EB52",
       "terminal": "U+EA85",
-      "git-commit": "U+EAFC"
+      "git-commit": "U+EAFC",
+      "terminal-powershell": "U+EBC7",
+      "terminal-bash": "U+EBCA",
+      "terminal-cmd": "U+EBC4"
     },
-    "changes": "Original font, CSS mapping and license bytes; UI uses the listed branch, commit, copy and file-type glyphs."
+    "changes": "Original font, CSS mapping and license bytes; UI uses the listed branch, commit, copy, file-type and terminal glyphs."
   }
 }

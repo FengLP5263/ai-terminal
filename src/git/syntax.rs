@@ -7,7 +7,7 @@ use std::{
 use syntect::{
     easy::HighlightLines,
     highlighting::{Color, StyleModifier, Theme, ThemeItem},
-    parsing::SyntaxSet,
+    parsing::{SyntaxReference, SyntaxSet},
 };
 
 pub const TEXT: [u8; 3] = [225, 225, 225];
@@ -15,6 +15,8 @@ pub const KEY: [u8; 3] = [113, 211, 229];
 pub const STRING: [u8; 3] = [206, 145, 189];
 pub const NUMBER: [u8; 3] = [181, 206, 168];
 pub const KEYWORD: [u8; 3] = [197, 134, 192];
+pub const VARIABLE: [u8; 3] = [156, 220, 254];
+pub const COMMENT: [u8; 3] = [128, 144, 128];
 const MAX_TOKENS: usize = 100_000;
 
 #[derive(Debug, Clone)]
@@ -41,10 +43,11 @@ fn theme() -> &'static Theme {
         let mut theme = Theme::default();
         theme.settings.foreground = Some(rgb(TEXT));
         for (scope,color) in [
-            ("comment", [128, 144, 128]),
+            ("comment", COMMENT),
             ("string", STRING),
             ("constant.numeric", NUMBER),
             ("constant.language, keyword, storage", KEYWORD),
+            ("variable", VARIABLE),
             ("entity.name.function, support.function", [220,220,170]),
             ("entity.name.type, support.type, support.class", [78,201,176]),
             ("punctuation.section, punctuation.definition", [104,183,255]),
@@ -88,24 +91,14 @@ pub fn display_text(text: &str) -> String {
 pub fn prepare(path: &str, lines: &[PatchLine], cancelled: impl Fn() -> bool) -> Presentation {
     static SYNTAXES: OnceLock<SyntaxSet> = OnceLock::new();
     let began = Instant::now();
-    let syntaxes = SYNTAXES.get_or_init(SyntaxSet::load_defaults_nonewlines);
+    let syntaxes = SYNTAXES.get_or_init(two_face::syntax::extra_no_newlines);
     let name = path
         .rsplit(['/', '\\'])
         .next()
         .unwrap_or(path)
         .to_ascii_lowercase();
     let ext = name.rsplit_once('.').map_or(name.as_str(), |(_, ext)| ext);
-    let ext = match ext {
-        "jsonc" | "json5" => "json",
-        "mjs" | "cjs" | "jsx" => "js",
-        "tsx" | "ts" => "js",
-        "mdx" => "md",
-        other => other,
-    };
-    let syntax = syntaxes
-        .find_syntax_by_extension(&name)
-        .or_else(|| syntaxes.find_syntax_by_extension(ext))
-        .unwrap_or_else(|| syntaxes.find_syntax_plain_text());
+    let syntax = syntax_for_path(syntaxes, &name, ext, lines);
     let (mut old, mut new) = (
         HighlightLines::new(syntax, theme()),
         HighlightLines::new(syntax, theme()),
@@ -202,6 +195,46 @@ pub fn prepare(path: &str, lines: &[PatchLine], cancelled: impl Fn() -> bool) ->
     };
     presentation
 }
+fn syntax_for_path<'a>(
+    syntaxes: &'a SyntaxSet,
+    name: &str,
+    ext: &str,
+    lines: &[PatchLine],
+) -> &'a SyntaxReference {
+    let alias = if name.starts_with(".env.") {
+        "env"
+    } else if name.starts_with("dockerfile.") {
+        "Dockerfile"
+    } else {
+        match name {
+            ".bashrc" | ".bash_profile" | ".profile" | ".zshrc" | ".zprofile" | ".envrc" => "sh",
+            _ => match ext {
+                "psm1" | "psd1" => "ps1",
+                "cmd" => "bat",
+                "mjs" | "cjs" | "jsx" => "js",
+                "jsonc" | "json5" => "json",
+                "mdx" => "md",
+                _ => ext,
+            },
+        }
+    };
+    syntaxes
+        .find_syntax_by_extension(name)
+        .or_else(|| syntaxes.find_syntax_by_extension(ext))
+        .or_else(|| syntaxes.find_syntax_by_extension(alias))
+        .or_else(|| {
+            // Shebang recognition is in memory only. Never open another file,
+            // consult project syntax settings or execute the interpreter.
+            lines
+                .iter()
+                .find(|l| is_file_line(l) && l.new == Some(1))
+                .or_else(|| lines.iter().find(|l| is_file_line(l) && l.old == Some(1)))
+                .and_then(|l| {
+                    syntaxes.find_syntax_by_first_line(l.text.trim_start_matches('\u{feff}'))
+                })
+        })
+        .unwrap_or_else(|| syntaxes.find_syntax_plain_text())
+}
 fn gcd(mut a: usize, mut b: usize) -> usize {
     while b != 0 {
         (a, b) = (b, a % b);
@@ -272,5 +305,166 @@ mod tests {
         ];
         let p = prepare("file.js", &code, || false);
         assert_eq!(at(&p.rows[1], &code[1].text, "42"), NUMBER);
+    }
+
+    #[test]
+    fn common_scripts_and_configuration_files_select_real_language_grammars() {
+        let set = two_face::syntax::extra_no_newlines();
+        for (path, extension) in [
+            ("tasks.PS1", "ps1"),
+            ("module.psm1", "psm1"),
+            ("module.psd1", "psd1"),
+            ("setup.cmd", "cmd"),
+            ("setup.bat", "bat"),
+            ("build.sh", "sh"),
+            (".bashrc", "bashrc"),
+            (".zshrc", "zshrc"),
+            ("task.py", "py"),
+            ("app.js", "js"),
+            ("app.mjs", "mjs"),
+            ("app.cjs", "cjs"),
+            ("types.ts", "ts"),
+            ("App.tsx", "tsx"),
+            ("App.jsx", "jsx"),
+            ("Dockerfile", "dockerfile"),
+            ("Dockerfile.dev", "dev"),
+            ("Cargo.toml", "toml"),
+            ("settings.ini", "ini"),
+            (".env", "env"),
+            (".env.production", "production"),
+            ("build.yml", "yml"),
+            ("settings.jsonc", "jsonc"),
+            ("Makefile", "makefile"),
+            ("CMakeLists.txt", "txt"),
+        ] {
+            let syntax = syntax_for_path(&set, &path.to_ascii_lowercase(), extension, &[]);
+            assert_ne!(syntax.name, "Plain Text", "No grammar for {path}");
+            if matches!(extension, "ts" | "tsx") {
+                assert!(
+                    syntax.name.contains("TypeScript"),
+                    "{path}: {}",
+                    syntax.name
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn powershell_distinguishes_keywords_variables_types_commands_strings_and_comments() {
+        let texts = [
+            "# 注释只作为文字显示，不运行脚本",
+            "param([switch]$List, [string]$Item)",
+            "if ($List -and $env:USERPROFILE) {",
+            "    Write-Host \"Hello $Item\"; $count = 42 # trailing comment",
+            "    $literal = 'literal $Item'; $enabled = $true",
+            "}",
+        ];
+        for path in ["test.ps1", "module.psm1", "module.psd1", "TEST.PS1"] {
+            let lines: Vec<_> = texts
+                .iter()
+                .enumerate()
+                .map(|(i, t)| {
+                    line(
+                        PatchKind::Context,
+                        Some(i as u64 + 1),
+                        Some(i as u64 + 1),
+                        t,
+                    )
+                })
+                .collect();
+            let p = prepare(path, &lines, || false);
+            for (i, token, expected) in [
+                (0, "注释", COMMENT),
+                (1, "param", KEYWORD),
+                (1, "List", VARIABLE),
+                (2, "if", KEYWORD),
+                (2, "USERPROFILE", VARIABLE),
+                (3, "Write-Host", [220, 220, 170]),
+                (3, "Hello", STRING),
+                (3, "Item", VARIABLE),
+                (3, "42", NUMBER),
+                (3, "trailing", COMMENT),
+                (4, "literal $Item", STRING),
+            ] {
+                assert_eq!(at(&p.rows[i], texts[i], token), expected, "{path}: {token}");
+            }
+        }
+    }
+
+    #[test]
+    fn powershell_multiline_states_and_diff_versions_stay_independent() {
+        let texts = [
+            "<# block comment",
+            "comment $var",
+            "#>",
+            "$text = @\"",
+            "hello $name",
+            "\"@",
+            "if ($true) { $answer = 42 }",
+        ];
+        let mut lines: Vec<_> = texts
+            .iter()
+            .enumerate()
+            .map(|(i, t)| {
+                line(
+                    PatchKind::Context,
+                    Some(i as u64 + 1),
+                    Some(i as u64 + 1),
+                    t,
+                )
+            })
+            .collect();
+        lines.push(line(
+            PatchKind::Deleted,
+            Some(8),
+            None,
+            "<# deleted unclosed comment",
+        ));
+        lines.push(line(PatchKind::Added, None, Some(8), "$next = 7 # comment"));
+        let p = prepare("test.ps1", &lines, || false);
+        assert_eq!(at(&p.rows[1], texts[1], "comment"), COMMENT);
+        assert_eq!(at(&p.rows[4], texts[4], "hello"), STRING);
+        assert_eq!(at(&p.rows[4], texts[4], "name"), VARIABLE);
+        assert_eq!(at(&p.rows[6], texts[6], "if"), KEYWORD);
+        assert_eq!(at(&p.rows[8], &lines[8].text, "7"), NUMBER);
+        assert_eq!(at(&p.rows[8], &lines[8].text, "comment"), COMMENT);
+        assert_eq!(p.rows[8].indent, 0);
+    }
+
+    #[test]
+    fn other_scripts_shebangs_and_unknown_files_keep_source_and_cancel_promptly() {
+        for (path, text, word) in [
+            ("setup.cmd", "if defined NAME echo hello", "if"),
+            ("setup.bat", "rem comment", "comment"),
+            ("build.sh", "if [ -n \"$HOME\" ]; then", "if"),
+            ("task.py", "def hello(name): # comment", "def"),
+            ("app.ts", "interface User { name: string }", "interface"),
+            (
+                "App.tsx",
+                "export const App = () => <div>Hello</div>;",
+                "export",
+            ),
+            ("Dockerfile.dev", "FROM alpine:3.20", "FROM"),
+            ("Cargo.toml", "name = \"demo\"", "demo"),
+        ] {
+            let lines = vec![line(PatchKind::Added, None, Some(1), text)];
+            let p = prepare(path, &lines, || false);
+            assert_ne!(at(&p.rows[0], text, word), TEXT, "{path}: {word}");
+            assert_eq!(lines[0].text, text);
+        }
+        let lines = vec![
+            line(
+                PatchKind::Context,
+                Some(1),
+                Some(1),
+                "#!/usr/bin/env python3",
+            ),
+            line(PatchKind::Context, Some(2), Some(2), "def hello():"),
+        ];
+        let p = prepare("scripts/runner", &lines, || false);
+        assert_ne!(at(&p.rows[1], &lines[1].text, "def"), TEXT);
+        let p = prepare("file.unknown-type", &lines[1..], || false);
+        assert_eq!(at(&p.rows[0], &lines[1].text, "def"), TEXT);
+        assert!(prepare("file.ps1", &lines, || true).rows.is_empty());
     }
 }

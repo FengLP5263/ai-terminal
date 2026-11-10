@@ -428,7 +428,9 @@ impl App {
             theme: TerminalTheme::default(),
             font: ai_terminal::appearance::terminal_font_for(actual_font, 14.0),
             preferences,
-            settings_open: false,
+            settings_open: !smoke
+                && !idle_benchmark
+                && std::env::args_os().any(|a| a == "--settings"),
             git: if !cfg!(test) && !smoke && !idle_benchmark {
                 Some(ai_terminal::git::GitClient::new(cc.egui_ctx.clone()))
             } else {
@@ -717,7 +719,8 @@ impl App {
     }
     fn manage_floating(&mut self, ctx: &egui::Context) {
         use ai_terminal::floating::{Item, Snapshot};
-        let zoom = ctx.zoom_factor();
+        let zoom = self.preferences.floating_scale;
+        self.floating.set_scale(ctx, zoom);
         let zoom_changed = self.floating_zoom.is_some_and(|old| old != zoom);
         for action in self.floating.actions() {
             // An old child-frame position can be queued while the point scale changes.
@@ -736,7 +739,13 @@ impl App {
                     })
                 });
                 let position = Some(
-                    ai_terminal::floating::centered_geometry(ctx, self.sessions.len(), saved).0,
+                    ai_terminal::floating::centered_geometry_at_scale(
+                        ctx,
+                        self.sessions.len(),
+                        saved,
+                        zoom,
+                    )
+                    .0,
                 );
                 if self.preferences.floating_position_pixels != position {
                     self.preferences.floating_position_pixels = position;
@@ -1182,24 +1191,18 @@ impl App {
             }
         }
         if let Some(id) = self.close_session.clone() {
-            let mut close = false;
-            let mut cancel = false;
-            egui::Window::new(tr(ctx, "关闭会话？", "Close session?"))
-                .collapsible(false)
-                .resizable(false)
-                .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
-                .show(ctx, |ui| {
-                    ui.label(tr(
-                        ctx,
-                        "该会话的运行进程将结束，对话历史仍由 Agent 保留。",
-                        "This session will stop. Conversation history remains with the agent.",
-                    ));
-                    ui.horizontal(|ui| {
-                        close = ui.button(tr(ctx, "关闭会话", "Close session")).clicked();
-                        cancel = ui.button(tr(ctx, "取消", "Cancel")).clicked();
-                    });
-                });
-            if close {
+            let choice = ai_terminal::dialogs::confirm(
+                ctx,
+                "close-session-confirm",
+                tr(ctx, "关闭会话？", "Close session?"),
+                tr(
+                    ctx,
+                    "该会话的运行进程将结束，对话历史仍由 Agent 保留。",
+                    "This session will stop. Conversation history remains with the agent.",
+                ),
+                tr(ctx, "关闭会话", "Close session"),
+            );
+            if choice == Some(true) {
                 if let Some(index) = self.sessions.iter().position(|s| s.spec.id == id) {
                     self.sessions[index].shutdown();
                     self.sessions.remove(index);
@@ -1215,32 +1218,26 @@ impl App {
                 self.dirty = true;
                 self.sync_visibility();
             }
-            if cancel {
+            if choice == Some(false) {
                 self.close_session = None;
             }
         }
         if self.confirm_exit {
-            let mut exit = false;
-            let mut cancel = false;
-            egui::Window::new(tr(ctx, "退出 ai-terminal？", "Quit ai-terminal?"))
-                .collapsible(false)
-                .resizable(false)
-                .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
-                .show(ctx, |ui| {
-                    ui.label(tr(
-                        ctx,
-                        "终端会话将关闭，下次可以恢复对话历史。",
-                        "Terminal sessions will close. You can resume conversations next time.",
-                    ));
-                    ui.horizontal(|ui| {
-                        exit = ui.button(tr(ctx, "退出", "Quit")).clicked();
-                        cancel = ui.button(tr(ctx, "取消", "Cancel")).clicked();
-                    });
-                });
-            if exit {
+            let choice = ai_terminal::dialogs::confirm(
+                ctx,
+                "quit-confirm",
+                tr(ctx, "退出 ai-terminal？", "Quit ai-terminal?"),
+                tr(
+                    ctx,
+                    "终端会话将关闭，下次可以恢复对话历史。",
+                    "Terminal sessions will close. You can resume conversations next time.",
+                ),
+                tr(ctx, "退出", "Quit"),
+            );
+            if choice == Some(true) {
                 self.begin_shutdown(ctx);
             }
-            if cancel {
+            if choice == Some(false) {
                 self.confirm_exit = false;
                 self.terminal_focus_pending = true;
                 self.sync_visibility();
@@ -1459,6 +1456,14 @@ impl eframe::App for App {
         self.renderer.release();
     }
     fn raw_input_hook(&mut self, ctx: &egui::Context, input: &mut egui::RawInput) {
+        if input.viewport_id == ai_terminal::floating::viewport_id()
+            && let Some(scale) = ai_terminal::zoom::input(input, self.preferences.floating_scale)
+        {
+            self.preferences.floating_scale = scale;
+            self.floating.set_scale(ctx, scale);
+            self.preferences_changed(ctx);
+            ctx.request_repaint_of(egui::ViewportId::ROOT);
+        }
         if input.viewport_id == egui::ViewportId::ROOT
             && let Some(scale) = ai_terminal::zoom::input(input, self.preferences.ui_scale)
         {
@@ -2592,6 +2597,69 @@ Send-State 'state=clear'; Wait-Step 5
     }
 
     #[test]
+    fn floating_zoom_keeps_root_scale_and_live_terminal_geometry() {
+        let directory = tempfile::tempdir().unwrap();
+        let ctx = egui::Context::default();
+        let creation = eframe::CreationContext::_new_kittest(ctx.clone());
+        let mut app = App::new(&creation, directory.path().to_owned(), false, false);
+        use_built_helper(&mut app);
+        app.last_directory = Some(directory.path().into());
+        app.new_shell(Agent::Cmd, &ctx);
+        let input = || egui::RawInput {
+            screen_rect: Some(egui::Rect::from_min_size(
+                egui::Pos2::ZERO,
+                egui::vec2(1000.0, 700.0),
+            )),
+            ..Default::default()
+        };
+        let _ = ctx.run_ui(input(), |ui| app.terminal(ui));
+        let pid = app.sessions[0].backend.as_ref().unwrap().pty_id();
+        let before: egui_term::WindowSize = app.sessions[0]
+            .backend
+            .as_mut()
+            .unwrap()
+            .sync()
+            .terminal_size
+            .into();
+        let mut child = input();
+        child.viewport_id = ai_terminal::floating::viewport_id();
+        child.events = vec![egui::Event::MouseWheel {
+            unit: egui::MouseWheelUnit::Line,
+            delta: egui::vec2(0.0, 3.0),
+            modifiers: egui::Modifiers::CTRL,
+            phase: egui::TouchPhase::Move,
+        }];
+        eframe::App::raw_input_hook(&mut app, &ctx, &mut child);
+        assert!(child.events.is_empty());
+        assert!((app.preferences.floating_scale - 1.1).abs() < 0.0001);
+        assert_eq!(app.preferences.ui_scale, 1.0);
+        assert_eq!(ctx.zoom_factor(), 1.0);
+        let _ = ctx.run_ui(input(), |ui| app.terminal(ui));
+        let after: egui_term::WindowSize = app.sessions[0]
+            .backend
+            .as_mut()
+            .unwrap()
+            .sync()
+            .terminal_size
+            .into();
+        assert_eq!(
+            (before.num_cols, before.num_lines),
+            (after.num_cols, after.num_lines)
+        );
+        assert_eq!(app.sessions[0].backend.as_ref().unwrap().pty_id(), pid);
+        app.set_ui_scale(1.5, &ctx);
+        assert!((app.preferences.floating_scale - 1.1).abs() < 0.0001);
+        app.preferences_save_at = Some(Instant::now());
+        app.background_tick(&ctx);
+        let saved = model::load(&directory.path().join("sessions.json"))
+            .unwrap()
+            .ui
+            .normalize();
+        assert_eq!(saved.ui_scale, 1.5);
+        assert!((saved.floating_scale - 1.1).abs() < 0.0001);
+    }
+
+    #[test]
     fn entire_window_zoom_keeps_terminal_attached_to_sidebar_and_right_edge() {
         let directory = tempfile::tempdir().unwrap();
         let ctx = egui::Context::default();
@@ -3154,7 +3222,7 @@ Send-State 'state=clear'; Wait-Step 5
     }
 
     #[test]
-    fn island_zoom_refreshes_and_recenters_while_preserving_vertical_position() {
+    fn main_zoom_keeps_floating_size_and_own_zoom_recenters() {
         let root = tempfile::tempdir().unwrap();
         let ctx = egui::Context::default();
         ctx.set_embed_viewports(false);
@@ -3189,18 +3257,16 @@ Send-State 'state=clear'; Wait-Step 5
             ctx.set_zoom_factor(zoom);
             let out = frame(&mut app);
             let current = app.preferences.floating_position_pixels.unwrap();
-            let centered =
-                ai_terminal::floating::centered_geometry(&ctx, app.sessions.len(), Some(current)).0;
-            assert!(
-                (current[0] - centered[0]).abs() < 0.1,
-                "floating window must remain centered at {zoom}"
+            assert_eq!(
+                current, initial,
+                "main zoom must preserve physical placement"
             );
             assert!(
                 (current[1] - initial[1]).abs() < 0.1,
                 "y position changed at {zoom}"
             );
             let child = &out.viewport_output[&ai_terminal::floating::viewport_id()];
-            assert_eq!(child.builder.inner_size.unwrap().y, 48.0);
+            assert!((child.builder.inner_size.unwrap().y * ctx.zoom_factor() - 48.0).abs() < 0.01);
             assert_eq!(
                 child.repaint_delay,
                 Duration::ZERO,
@@ -3209,6 +3275,26 @@ Send-State 'state=clear'; Wait-Step 5
             // Actual physical resizing is checked by island_zoom_probe on both
             // native monitors; this headless test cannot execute HWND events.
         }
+        for scale in [0.71, 1.42, 2.0] {
+            app.preferences.floating_scale = scale;
+            let out = frame(&mut app);
+            let position = app.preferences.floating_position_pixels.unwrap();
+            let centered = ai_terminal::floating::centered_geometry_at_scale(
+                &ctx,
+                app.sessions.len(),
+                Some(position),
+                scale,
+            )
+            .0;
+            assert!((position[0] - centered[0]).abs() < 0.1);
+            assert!((position[1] - initial[1]).abs() < 0.1);
+            let child = &out.viewport_output[&ai_terminal::floating::viewport_id()];
+            assert!(
+                (child.builder.inner_size.unwrap().y * ctx.zoom_factor() - 48.0 * scale).abs()
+                    < 0.01
+            );
+        }
+        app.preferences.floating_scale = 1.0;
         app.preferences.floating_position_pixels = Some([1_000_000.0, 80.0]);
         app.floating_session_count = None;
         frame(&mut app);

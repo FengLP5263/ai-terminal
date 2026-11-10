@@ -70,3 +70,7 @@ Git 历史详情：`src/git/commit.rs` 用独立的有界请求／结果槽与�
 0.7.0-preview.3：git/syntax.rs 在文件查询线程使用固定 Syntect 5.3.0 默认语法集和项目自有颜色规则，生成仅含源行索引、字节范围／RGB 及缩进的有界展示快照；旧／新解析状态独立，不在 UI 线程扫描全文件。git_ui/diff.rs 虚拟化绘制多色 LayoutJob 和缩进线，正文过滤 Git 元信息。
 
 preview.6：git/worktree.rs 按需读取 HEAD 与当前文件的净差异，与历史文件共用 patch.rs 的解析／限额／后台槽；PatchSource 显式区分 Commit 与 WorkingTree。文件读取不写索引或磁盘缓存，不调用外部驱动；Git 快照事件触发打开的本地文件刷新，UI 帧不触发读取。
+
+0.8.0-preview.2：git/syntax.rs 用锁定 two-face 的 bat 扩展语法与 Oniguruma，替代默认语法及 JS 对 TS 的近似映射；仍只在文件查询后台生成有界快照，不运行脚本、LSP、插件或用户语法设置。chrome::paint_shell 使用既有 Codicons 的标准字形，所有 Shell 入口及头像共用。
+
+0.8.0-preview.3：浮窗按独立比例直接布局，不缩放已经栅格化的图层；Icons 按实际头像物理尺寸请求纹理／Codicons，角标和命中区域使用相同坐标。dialogs.rs 集中表单字号、44 点控件、间距和表面，settings.rs 使用固定字段列与窄屏堆叠；样式只在弹窗内生效，不改变终端文字。

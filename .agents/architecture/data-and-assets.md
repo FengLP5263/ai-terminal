@@ -103,3 +103,9 @@ Syntect 5.3.0 的语法资源随锁定 crate 内嵌；不启用默认主题资�
 preview.6 的工作区文件正文同样只存在于当前有界内存结果，不保存文件副本、索引或差异缓存。PatchSource 为展示内存类型，不改变 sessions.json；没有新增字体、图像或第三方依赖。
 
 0.7.0 的 README 图由 readme_capture（默认／history／diff）和 island_probe 的优化构建生成，八张中英文主界面、Git 历史、只读差异和浮窗 PNG 保持原生字节；SOURCE.json 逐文件记录版本、语言、尺寸与 SHA-256。示例代码、元数据和历史均为固定合成内容，不读取真实用户配置、仓库或会话。
+
+0.8.0 预览为 UiSettings 增加 floating_scale，兼容缺失字段且不改数据根、会话 ID／目录／顺序、字体或进程。配置保存后两种比例独立；不新增字体或图标资产。
+
+0.8.0-preview.2 语法数据来自 Cargo.lock 固定的 two-face 0.5.2+bat-0.26.1，使用完整 Oniguruma 变体，不加载第三方主题。assets/syntaxes/LICENSES.json 从该 crate 的 acknowledgement::listing().for_syntaxes() 导出，保留 66 项完整许可文本；SOURCE.json 记录版本、Cargo 归档校验值、导出命令与 SHA-256。治理／打包核对来源，ZIP 携带 Syntax-LICENSES.json／SYNTAX-SOURCE.json，两者计入源码身份。two-face、onig/onig_sys 自身许可另随依赖清单归档。字体字节未变，来源记录新增 terminal-powershell（U+EBC7）、terminal-bash（U+EBCA）、terminal-cmd（U+EBC4）。
+
+0.8.0-preview.3 不新增字体或图标资产，不修改字体字节或笔画参数；头像缓存按最终像素尺寸命中，保持每个图标至多 12 个尺寸。新表单样式与响应式布局不改变会话配置字段、目录或数据根。

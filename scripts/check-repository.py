@@ -29,6 +29,8 @@ def check():
         if not (ROOT/item).is_file():errors.append('missing: '+item)
     try:project_package.release_notes(tomllib.loads((ROOT/'Cargo.toml').read_text(encoding='utf-8'))['package']['version'])
     except (ValueError,OSError,KeyError) as error:errors.append('release notes: '+str(error))
+    try:project_package.syntax_sources()
+    except (ValueError,OSError,KeyError,StopIteration) as error:errors.append('syntax sources: '+str(error))
     result=subprocess.run(['git','ls-files','--cached','--others','--exclude-standard','-z'],cwd=ROOT,capture_output=True,check=True)
     paths=sorted(set(result.stdout.decode('utf-8').split('\0'))-{''})
     bilingual_errors,bilingual_pairs=check_bilingual.check(paths)
