@@ -123,6 +123,8 @@ pub struct UiSettings {
     pub terminal_font: crate::font_choice::FontChoice,
     pub git_panel_open: bool,
     pub ui_scale: f32,
+    #[serde(default = "legacy_floating_scale")]
+    pub floating_scale: f32,
     pub language: crate::i18n::Language,
     pub floating_enabled: bool,
     pub floating_position: Option<[f32; 2]>,
@@ -138,6 +140,7 @@ impl Default for UiSettings {
             terminal_font: crate::font_choice::FontChoice::default(),
             git_panel_open: false,
             ui_scale: 1.0,
+            floating_scale: 1.0,
             language: crate::i18n::Language::System,
             floating_enabled: false,
             floating_position: None,
@@ -156,6 +159,14 @@ impl UiSettings {
     pub fn normalize(mut self) -> Self {
         self.ui_scale = if self.ui_scale.is_finite() {
             self.ui_scale.clamp(Self::MIN_ZOOM, Self::MAX_ZOOM)
+        } else {
+            1.0
+        };
+        self.floating_scale = if self.floating_scale == 0.0 {
+            // A missing legacy field inherits the old shared size exactly once.
+            self.ui_scale
+        } else if self.floating_scale.is_finite() {
+            self.floating_scale.clamp(Self::MIN_ZOOM, Self::MAX_ZOOM)
         } else {
             1.0
         };
@@ -179,6 +190,10 @@ impl UiSettings {
             .filter(|p| p.iter().all(|v| v.is_finite()));
         self
     }
+}
+
+fn legacy_floating_scale() -> f32 {
+    0.0
 }
 
 /// Move ownership, never clone/restart the live terminal or its Job Object.

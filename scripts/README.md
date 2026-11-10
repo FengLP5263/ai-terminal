@@ -162,3 +162,11 @@ git_probe 的 JSON 样例现带 UTF-8 BOM 与正常中文；沿用现有命令�
 0.7.0-preview.5 的 git_probe 继续使用上述命令，生成 22 张图；Markdown 表格的彩色 emoji 与文本变体在 100%／103%／114%／200% 及 JetBrains Mono／Hack 下复用正式文件视图。仅使用自建仓库和自身 PTY，截图完成后检查正常退出及进程回收。
 
 0.7.0-preview.6 的 git_probe 沿用同一命令生成 26 张图，追加“更改”文件点击及只读新增／修改／二进制视图，核对未跟踪标签、当前文件标记、字体与多档缩放；命令及入口参数不变。
+
+独立浮窗缩放原生核查：`cargo build --offline --locked --release --bins --example floating_scale_probe --example island_probe --example island_hint_probe`，随后运行 `target/release/examples/floating_scale_probe.exe output/<unique-independent-scale>`。生成六组主窗口／浮窗／提示的 18 张图，检查原生尺寸、提示大小、缩放后头像点击与非仓库标题栏；只使用合成元数据和自身 egui 输入，无 PTY、模型或系统输入注入。island_probe 继续验证最小化与关闭／重开，island_hint_probe 验证长提示。命令入口和参数不变，原生动作仅支持 Windows。
+
+语法原生核查（仅 Windows）：`cargo build --offline --locked --release --example git_syntax_probe` 后运行 `target/release/examples/git_syntax_probe.exe output/<unique-syntax-probe>`，用正式只读组件生成 16 类样例、两档比例的 32 张图；不执行脚本或模型。维护语法依赖时，`cargo run --offline --locked --example git_syntax_probe -- --export-notices assets/syntaxes/LICENSES.json` 仅导出上游许可、不启动 GUI，随后更新 SOURCE.json 的版本、Cargo 校验值和文件摘要。既有 Windows／POSIX package／verify-package 自动携带／核验，参数不变。
+
+设置原生核查（Windows）：`cargo build --offline --locked --release --example settings_probe --example floating_scale_probe`，分别运行 `target/release/examples/settings_probe.exe output/<unique-forms>` 与 `target/release/examples/floating_scale_probe.exe output/<unique-pixels>`。前者生成 10 张中英宽窄与确认框图；后者生成 18 张独立缩放图并记录根窗口同尺寸参考头像，用于像素对照。不执行用户任务、修改真实工作区或调用模型；现有 Windows／POSIX 动作参数不变。
+
+Windows 原生设置入口：`ai-terminal.exe --settings`；可组合 `--data-dir <目录>` 用于隔离预览。现有 Windows／POSIX project 动作及参数不变；POSIX 非 Windows 平台仍明确拒绝原生 GUI 动作。

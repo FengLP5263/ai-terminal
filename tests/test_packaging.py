@@ -6,6 +6,8 @@ import shutil
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
+from types import SimpleNamespace
 import zipfile
 
 spec=importlib.util.spec_from_file_location('local_package',Path(__file__).resolve().parents[1]/'scripts/package.py')
@@ -139,6 +141,48 @@ class ArchiveVerification(unittest.TestCase):
             (native/'x64/conpty.dll').write_bytes(b'tampered')
             self.assertNotEqual(original,packaging.source_identity(root))
             with self.assertRaisesRegex(ValueError,'native console identity mismatch'):packaging.native_console_assets(out,root)
+
+    def test_syntax_notices_match_the_locked_bundle_and_reject_tampering(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)/'repo';out=Path(directory)/'package';out.mkdir()
+            base=root/'assets/syntaxes';base.mkdir(parents=True)
+            license_data=b'[{"text":"Original license text"}]'
+            (base/'LICENSES.json').write_bytes(license_data)
+            record={'bundle':'two-face','version':'1.0.0','cargo_archive_sha256':'archive','files':[{'name':'LICENSES.json','bytes':len(license_data),'sha256':hashlib.sha256(license_data).hexdigest()}]}
+            (base/'SOURCE.json').write_text(json.dumps(record),encoding='utf-8')
+            lock='[[package]]\nname = "two-face"\nversion = "1.0.0"\nchecksum = "archive"\n'
+            (root/'Cargo.lock').write_text(lock,encoding='utf-8')
+            result=packaging.syntax_notices(out,root)
+            self.assertEqual(result['version'],'1.0.0')
+            self.assertEqual((out/'Syntax-LICENSES.json').read_bytes(),license_data)
+            (root/'Cargo.lock').write_text(lock.replace('1.0.0','1.0.1'),encoding='utf-8')
+            with self.assertRaisesRegex(ValueError,'syntax bundle identity mismatch'):packaging.syntax_sources(root)
+            (root/'Cargo.lock').write_text(lock,encoding='utf-8')
+            (base/'LICENSES.json').write_bytes(b'tampered')
+            with self.assertRaisesRegex(ValueError,'syntax license identity mismatch'):packaging.syntax_sources(root)
+
+    def test_native_oniguruma_license_is_copied_with_the_rust_wrapper_license(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base=Path(directory)/'onig_sys';base.mkdir();(base/'oniguruma').mkdir()
+            (base/'LICENSE.md').write_bytes(b'Rust wrapper license')
+            (base/'oniguruma/COPYING').write_bytes(b'Original native C license')
+            out=Path(directory)/'package';out.mkdir()
+            metadata={'packages':[{'name':'onig_sys','version':'test','manifest_path':str(base/'Cargo.toml'),'license':'MIT','repository':'https://example.invalid'}]}
+            with patch.object(packaging,'command',return_value=SimpleNamespace(stdout=json.dumps(metadata))):packaging.dependencies(['cargo'],out)
+            self.assertEqual((out/'licenses/onig_sys-test/COPYING').read_bytes(),b'Original native C license')
+            self.assertEqual((out/'licenses/onig_sys-test/LICENSE.md').read_bytes(),b'Rust wrapper license')
+
+    def test_declared_syntax_bundle_requires_the_embedded_grammar_notices(self):
+        with tempfile.TemporaryDirectory() as directory:
+            original=Path(directory)/'original.zip';self.fixture(original)
+            changed=Path(directory)/'missing-notices.zip'
+            with zipfile.ZipFile(original) as source,zipfile.ZipFile(changed,'w') as archive:
+                for name in source.namelist():
+                    data=source.read(name)
+                    if name=='manifest.json':
+                        manifest=json.loads(data);manifest['syntaxes']={'bundle':'two-face'};data=json.dumps(manifest).encode()
+                    archive.writestr(name,data)
+            with self.assertRaisesRegex(ValueError,'syntax license/provenance incomplete'):packaging.verify_archive(changed)
 
     def test_old_license_timestamp_can_be_packaged_and_verified(self):
         with tempfile.TemporaryDirectory() as folder:

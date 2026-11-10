@@ -67,12 +67,18 @@ fn branch_icon(ui: &mut egui::Ui) {
     );
 }
 fn summary_width(ui: &egui::Ui, client: Option<&GitClient>) -> f32 {
+    if client.and_then(|c| c.snapshot.as_ref()).is_none() {
+        return 0.0;
+    }
     let counts = client.and_then(|c| c.snapshot.as_ref()).map_or(0.0, |s| {
         text_width(ui, &format!("+{} −{}", s.added, s.deleted)) + 8.0
     });
     header_font(ui).size + text_width(ui, &branch_label(ui, client)) + counts + 20.0
 }
 pub fn summary(ui: &mut egui::Ui, client: Option<&GitClient>, open: &mut bool) -> egui::Response {
+    if client.and_then(|c| c.snapshot.as_ref()).is_none() {
+        return ui.allocate_response(egui::Vec2::ZERO, egui::Sense::hover());
+    }
     ui.scope(|ui| {
         let font = header_font(ui);
         ui.style_mut().override_font_id = Some(font.clone());
@@ -222,13 +228,15 @@ pub fn header(
     let git_width = summary_width(ui, client)
         .min((right - rect.left() - name_width - gap * 2.0).max(0.0))
         .min(rect.width() * 0.45);
-    right -= git_width;
-    summary(
-        &mut child(ui, "terminal-header-git", right, git_width),
-        client,
-        open,
-    );
-    right -= gap;
+    if git_width > 0.0 {
+        right -= git_width;
+        summary(
+            &mut child(ui, "terminal-header-git", right, git_width),
+            client,
+            open,
+        );
+        right -= gap;
+    }
     let name_width = name_width.min((right - rect.left()).max(0.0));
     crate::ui_text::label_with_font(
         &mut child(ui, "terminal-header-name", rect.left(), name_width),
@@ -332,7 +340,28 @@ impl GitView {
         let locale = i18n::locale(ui.ctx());
         let mut actions = Actions::default();
         ui.horizontal(|ui| {
-            ui.heading("Git");
+            if let Some(snapshot) = snapshot {
+                let controls = text_width(ui, locale.text("读取中…", "Reading…"))
+                    .max(text_width(ui, locale.text("刷新", "Refresh")))
+                    + chrome::CONTROL
+                    + 32.0;
+                let width = (ui.available_width() - controls).max(1.0);
+                ui.add_sized(
+                    [width, chrome::CONTROL],
+                    egui::Label::new(
+                        RichText::new(
+                            snapshot
+                                .root
+                                .file_name()
+                                .unwrap_or(snapshot.root.as_os_str())
+                                .to_string_lossy(),
+                        )
+                        .strong(),
+                    )
+                    .truncate(),
+                )
+                .on_hover_text(snapshot.root.display().to_string());
+            }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 actions.close = chrome::icon_button(
                     ui,
@@ -395,32 +424,9 @@ impl GitView {
             }
             return actions;
         };
-        ui.label(
-            RichText::new(
-                snapshot
-                    .root
-                    .file_name()
-                    .unwrap_or(snapshot.root.as_os_str())
-                    .to_string_lossy(),
-            )
-            .strong(),
-        )
-        .on_hover_text(snapshot.root.display().to_string());
-        ui.horizontal_wrapped(|ui| {
-            branch_icon(ui);
-            ui.label(RichText::new(&snapshot.branch).strong());
-            if snapshot.detached {
-                ui.weak(locale.text("游离 HEAD", "Detached HEAD"));
-            }
-            if snapshot.unborn {
-                ui.weak(locale.text("尚无提交", "No commits yet"));
-            }
-        });
-        ui.horizontal(|ui|{
-            ui.label(RichText::new(format!("+{}",snapshot.added)).color(chrome::COMPLETED));
-            ui.label(RichText::new(format!("−{}",snapshot.deleted)).color(chrome::FAILED));
-            ui.weak(format!("{} {}",snapshot.total_files,locale.text("个文件","files")));
-        }).response.on_hover_text(locale.text("相对 HEAD 的净变化，含暂存、未暂存及未跟踪文本；二进制不计行数。","Net changes against HEAD, including staged, unstaged and untracked text. Binary files have no line counts."));
+        if snapshot.unborn {
+            ui.weak(locale.text("尚无提交", "No commits yet"));
+        }
         if snapshot.partial {
             ui.weak(locale.text(
                 "部分文件未统计，或超过展示上限；总数不完整。",

@@ -75,9 +75,8 @@ pub(super) fn show(ui: &mut egui::Ui, file: FileRow<'_>, id: egui::Id) -> egui::
         galley,
         color,
     );
-    let locale = i18n::locale(ui.ctx());
     let status = if file.status == "??" {
-        locale.text("未跟踪", "Untracked")
+        "U"
     } else {
         file.status.trim()
     };

@@ -79,6 +79,7 @@ impl eframe::App for Probe {
         let monitor = self.monitors[(self.stage + 1) % self.monitors.len()];
         if !self.initialized {
             ctx.set_zoom_factor(ZOOMS[self.stage]);
+            self.bar.set_scale(ctx, ZOOMS[self.stage]);
             if self.stage == 0 {
                 self.position = Some([
                     self.monitors[0][0] as f32 + 80.0,

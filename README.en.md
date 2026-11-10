@@ -32,7 +32,7 @@ Enable the floating bar to see session avatars and status above other windows. C
 
 ![AI Terminal floating session bar](assets/readme/floating.en.png)
 
-> Screenshots use real 0.7.0 native components with synthetic sessions, terminal text, Git metadata and task status. They contain no real user data or private conversations. Click an image for its original resolution.
+> Screenshots use real 0.8.0 native components with synthetic sessions, terminal text, Git metadata and task status. They contain no real user data or private conversations. Click an image for its original resolution.
 
 ## Built for multiple sessions
 
@@ -41,7 +41,7 @@ Enable the floating bar to see session avatars and status above other windows. C
 | **A real terminal** | Open PowerShell, CMD, or Git Bash and run your installed command-line tools directly. |
 | **Agent recognition** | Starting Codex, Claude Code, Qoder CN, Kimi Code, ZCode or TRAE CLI displays the corresponding avatar; other commands still work as ordinary terminal sessions. |
 | **Task status** | See working, needs attention, completed, or failed states for supported Agents in the sidebar and floating bar. Status comes from supported lifecycle notifications and process exits; it is not a universal inference for every CLI. |
-| **Always-on-top bar** | Show only session avatars and status, up to 10 at a time. Drag the avatar area to see more, and click an avatar to return to its session. |
+| **Always-on-top bar** | Show only session avatars and status, up to 10 at a time. Drag the avatar area to see more, and click an avatar to return to its session. Scale it independently in Settings or with Ctrl+wheel over the bar. |
 | **Your workspace** | Drag to reorder, rename or color sessions, collapse the sidebar, and scale the entire interface with Ctrl + mouse wheel. |
 | **Familiar terminal behavior** | Use Chinese text, ANSI colors, and system color emoji; pass clipboard images to Codex, Claude Code or Qoder CN CLI for the CLI to handle. |
 | **Git workspace** | See the current branch and line additions/deletions in the header, with changed files and current-branch history in a collapsible right panel that follows the terminal directory. See [Git panel](docs/git.en.md). |
@@ -62,7 +62,7 @@ Requires an installed Git for Windows. The panel is read-only; staging, committi
 
 Drag the right-side terminal history thumb or click its track to locate earlier output. The terminal retains up to 5,000 history lines, and scrollbar gestures do not send arrow keys to the CLI.
 
-Click a file in Changes to see its net changes against HEAD, combining staged and unstaged edits. Untracked files show full additions and an explicit Untracked label. Click a file under an expanded commit to inspect that commit’s diff. Both views include the first through last lines, old/new line numbers, file-type syntax highlighting, indent guides, color emoji and a current-file indicator. Red/green backgrounds mark changes while code retains its syntax colors; closing returns to the original terminal.
+Click a file in Changes to see its net changes against HEAD, combining staged and unstaged edits. Untracked files show full additions and a green U marker with an Untracked hover explanation. Click a file under an expanded commit to inspect that commit’s diff. Both views include the first through last lines, old/new line numbers, file-type syntax highlighting (including PowerShell, shell, TS/TSX, JSON and Markdown), indent guides, color emoji and a current-file indicator. Red/green backgrounds mark changes while code retains its syntax colors; closing returns to the original terminal.
 
 ![AI Terminal read-only file diff with syntax highlighting, full line numbers and change backgrounds](assets/readme/git-diff.en.png)
 
@@ -185,3 +185,10 @@ Fix false Qoder automatic-permission status, TUI cursor queries and wide-charact
 ## Installer and font settings
 
 Version 0.4.10 adds a per-user installer and five terminal fonts, defaulting to JetBrains Mono while retaining the portable ZIP. Public downloads follow actual release assets. See [installation, upgrades and font selection](docs/installation.en.md).
+
+
+
+
+On Windows, `ai-terminal.exe --settings` opens settings directly; edits apply immediately.
+
+Launch with `ai-terminal.exe --settings` to open Settings directly. Language, font and floating bar changes apply immediately and save automatically.

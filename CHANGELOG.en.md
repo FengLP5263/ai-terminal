@@ -4,6 +4,67 @@
 
 Record user-visible additions, improvements, fixes, and compatibility changes for each release; omit categories that do not apply. Review both languages together, use the same version entry in GitHub Releases, and ship both files in the ZIP. Historical summaries follow existing GitHub release notes and UTC publication dates; development versions without a separate release do not receive invented release dates.
 
+## [0.8.0] - 2026-11-10
+
+### Added
+
+- Separate saved scales for the floating bar and main window. Adjust the bar in Settings, with Ctrl+wheel, Ctrl plus/minus, or Ctrl+0 over the bar. Legacy settings inherit the previous scale once, preserving sessions, directories and fonts.
+- Broader read-only diff syntax highlighting for PowerShell, CMD/Bash, real TS/TSX, Dockerfile, TOML and other common types, distinguishing keywords, variables, strings and comments. Special filenames and extensionless script shebangs are recognized.
+- `--settings` opens Settings at startup.
+
+### Changed
+
+- Settings apply immediately and save automatically, without Done. Appearance/Floating bar groups share consistent typography, control heights, spacing and alignment; narrow windows stack fields and allow scrolling. Rename, close-session and quit confirmations use the same form styling.
+- PowerShell, Bash and CMD use standard Microsoft Codicons avatars consistently across creation menus, the sidebar and floating bar.
+- The Git panel combines the repository name and actions. Branch and change totals appear only in the terminal header; untracked files use green U with a full hover explanation, and non-repository headers hide the Git placeholder.
+- Packages include complete upstream syntax notices and provenance, checking locked versions, Cargo archives and file hashes.
+
+### Fixed
+
+- Floating icons render at their final physical size, removing blur from a second layer scaling pass when main/bar scales differ. Clicks, dragging, status badges and hints follow the independent scale.
+
+### Upgrade notes
+
+- Portable and current-user installer builds retain the existing data location, sessions, working directories and preferences. Fonts need no reconfiguration.
+
+## [0.8.0-preview.3] - 2026-11-10
+
+### Fixed
+
+- Rasterize floating terminal glyphs and agent textures at their final pixel size, removing blur from whole-layer resampling. Clicks, dragging, badges and hints retain independent scaling.
+
+### Changed
+
+- Add `--settings` to open Settings directly. Remove Done from Settings; edits apply immediately and save automatically. Appearance/floating groups share aligned fields, control heights, typography, spacing and dark surfaces, stacking and scrolling on narrow windows.
+- Rename, close-session and quit dialogs share the same form style, with explicit save and confirmation semantics.
+
+## [0.8.0-preview.2] - 2026-11-10
+
+### Added
+
+- Use the two-face 0.5.2+bat-0.26.1 extended syntax set for PowerShell, CMD/Bash, real TS/TSX, Dockerfile, TOML and other common formats. Variables have a distinct color; source text, indentation and red/green diff backgrounds remain intact.
+- Recognize common shell startup files, Dockerfile/environment variants and in-memory shebangs for extensionless scripts. Unknown formats retain plain text.
+
+### Changed
+
+- PowerShell, Bash and CMD use standard Microsoft Codicons terminal avatars consistently in creation menus, the sidebar and floating bar.
+- Package the full upstream syntax license texts and provenance, checking the locked version, Cargo archive identity and file hashes.
+
+## [0.8.0-preview.1] - 2026-11-10
+
+Local preview for independent floating scaling and Git panel acceptance.
+
+### Added
+
+- The floating bar has its own saved scale, adjustable in Settings or with Ctrl+wheel / Ctrl plus/minus and Ctrl+0 over its window. Legacy settings inherit the former shared scale once, then adjust independently.
+- Native bar size, avatars, clicks/dragging and hover hints follow the separate scale. Changing the bar does not resize or restart the main terminal.
+
+### Improved
+
+- Removed the standalone Git title and placed the repository name beside Refresh/Close. Branch and line totals appear only in the terminal header; the panel retains file/history controls.
+- Untracked files use a green U, with an “Untracked (not added to Git)” tooltip that distinguishes merge conflicts.
+- Non-Git directories no longer show a repository placeholder in the terminal header; explicit panel messages and manual refresh remain available.
+
 ## [0.7.0] - 2026-11-10
 
 ### Added

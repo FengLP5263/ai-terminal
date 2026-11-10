@@ -42,6 +42,103 @@ fn saved_position_observations_do_not_reposition_an_existing_floating_window() {
         );
     }
 }
+
+#[test]
+fn old_shared_scale_migrates_once_and_independent_scales_survive_restart() {
+    let old: UiSettings =
+        serde_json::from_str(r#"{"ui_scale":1.5,"floating_enabled":true}"#).unwrap();
+    let mut migrated = old.normalize();
+    assert_eq!(migrated.floating_scale, 1.5);
+    migrated.ui_scale = 0.75;
+    assert_eq!(migrated.normalize().floating_scale, 1.5);
+    migrated.floating_scale = 2.0;
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("sessions.json");
+    let workspace = Workspace {
+        ui: migrated,
+        ..Default::default()
+    };
+    model::save(&file, &workspace).unwrap();
+    let restored = model::load(&file).unwrap().ui.normalize();
+    assert_eq!((restored.ui_scale, restored.floating_scale), (0.75, 2.0));
+    for (value, expected) in [(f32::NAN, 1.0), (0.1, 0.5), (5.0, 2.5)] {
+        assert_eq!(
+            UiSettings {
+                floating_scale: value,
+                ..Default::default()
+            }
+            .normalize()
+            .floating_scale,
+            expected
+        );
+    }
+}
+
+#[test]
+fn floating_geometry_and_scaled_clicks_are_independent_of_main_zoom() {
+    let ctx = egui::Context::default();
+    appearance::setup(&ctx);
+    ctx.set_embed_viewports(false);
+    let icons = Icons::new(&ctx);
+    let bar = floating::FloatingBar::new(icons.clone());
+    let snapshot = Snapshot {
+        items: vec![Item {
+            id: "scaled".into(),
+            name: "Scaled".into(),
+            agent: Agent::Codex,
+            color: None,
+            activity: Activity::Idle,
+            unread: false,
+        }],
+        active: Some("scaled".into()),
+        locale: Locale::En,
+    };
+    for main_scale in [0.71, 1.0, 1.5, 2.0] {
+        ai_terminal::zoom::initialize(&ctx, main_scale);
+        for bar_scale in [0.75, 1.0, 1.42, 2.0] {
+            bar.set_scale(&ctx, bar_scale);
+            let mut input = egui::RawInput::default();
+            input
+                .viewports
+                .insert(floating::viewport_id(), Default::default());
+            let output = ctx.run_ui(input, |_| bar.show(&ctx, Some([100.0, 100.0])));
+            let size = output.viewport_output[&floating::viewport_id()]
+                .builder
+                .inner_size
+                .unwrap();
+            assert!((size.x * main_scale - 96.0 * bar_scale).abs() < 0.01);
+            assert!((size.y * main_scale - 48.0 * bar_scale).abs() < 0.01);
+            let mut action = None;
+            let mut frame = |events| {
+                ctx.run_ui(
+                    egui::RawInput {
+                        screen_rect: Some(Rect::from_min_size(Pos2::ZERO, size)),
+                        events,
+                        focused: true,
+                        ..Default::default()
+                    },
+                    |ui| {
+                        action = floating::body_at_scale(ui, &snapshot, &icons, bar_scale);
+                    },
+                )
+            };
+            frame(vec![]);
+            frame(vec![]);
+            let row = ctx
+                .read_response(egui::Id::new(("floating-session", "scaled")))
+                .unwrap();
+            let pos = row.rect.center();
+            frame(pointer(pos, true));
+            frame(pointer(pos, false));
+            assert_eq!(
+                action,
+                Some(Action::Activate("scaled".into())),
+                "main={main_scale} bar={bar_scale}"
+            );
+            assert_eq!(ctx.zoom_factor(), main_scale);
+        }
+    }
+}
 fn pointer(pos: Pos2, pressed: bool) -> Vec<Event> {
     vec![
         Event::PointerMoved(pos),
@@ -52,6 +149,72 @@ fn pointer(pos: Pos2, pressed: bool) -> Vec<Event> {
             modifiers: Modifiers::NONE,
         },
     ]
+}
+
+#[test]
+fn floating_icons_are_rasterized_at_their_final_physical_size() {
+    for main in [0.71, 1.5] {
+        for own in [1.0, 1.33] {
+            let ctx = egui::Context::default();
+            appearance::setup(&ctx);
+            ai_terminal::zoom::initialize(&ctx, main);
+            let icons = Icons::new(&ctx);
+            let snapshot = Snapshot {
+                items: [Agent::Shell, Agent::Codex]
+                    .into_iter()
+                    .enumerate()
+                    .map(|(i, agent)| Item {
+                        id: i.to_string(),
+                        name: "Crisp".into(),
+                        agent,
+                        color: None,
+                        activity: Activity::Idle,
+                        unread: false,
+                    })
+                    .collect(),
+                active: None,
+                locale: Locale::En,
+            };
+            let ratio = own / main;
+            let mut input = egui::RawInput {
+                screen_rect: Some(Rect::from_min_size(
+                    Pos2::ZERO,
+                    egui::vec2(104.0, 48.0) * ratio,
+                )),
+                ..Default::default()
+            };
+            input
+                .viewports
+                .entry(egui::ViewportId::ROOT)
+                .or_default()
+                .native_pixels_per_point = Some(1.5);
+            let out = ctx.run_ui(input, |ui| {
+                floating::body_at_scale(ui, &snapshot, &icons, own);
+            });
+            let pixels = (ai_terminal::chrome::AVATAR_ICON * own * 1.5).round() as usize;
+            assert!(
+                out.textures_delta
+                    .set
+                    .iter()
+                    .any(|(_, d)| d.image.size() == [pixels, pixels]),
+                "Avatar texture must match final pixels, main={main} floating={own}"
+            );
+            let font = out
+                .shapes
+                .iter()
+                .find_map(|s| match &s.shape {
+                    egui::Shape::Text(t) if t.galley.job.text == "\u{ebc7}" => {
+                        Some(t.galley.job.sections[0].format.font_id.size)
+                    }
+                    _ => None,
+                })
+                .expect("PowerShell glyph");
+            assert!(
+                (font * ctx.pixels_per_point() - pixels as f32).abs() < 0.01,
+                "Glyphs must be shaped for the final size without a scaled text layer"
+            );
+        }
+    }
 }
 fn text_rect(output: &egui::FullOutput, text: &str) -> Option<Rect> {
     fn find(shape: &egui::Shape, text: &str) -> Option<Rect> {
@@ -138,14 +301,110 @@ fn settings_switches_language_through_the_dropdown_and_toggles_the_island() {
     let (out, prefs) = frame(vec![]);
     assert_eq!(prefs.language, Language::En);
     assert!(text_rect(&out, "Interface language").is_some());
-    let pos = text_rect(&out, "Show floating status bar")
-        .unwrap()
-        .center();
+    assert!(text_rect(&out, "Done").is_none());
+    let pos = text_rect(&out, "Enabled").unwrap().center();
     for pressed in [true, false] {
         frame(pointer(pos, pressed));
     }
     let (_, prefs) = frame(vec![]);
     assert!(prefs.floating_enabled);
+    let (out, _) = frame(vec![]);
+    let pos = text_rect(&out, "JetBrains Mono").unwrap().center();
+    for pressed in [true, false] {
+        frame(pointer(pos, pressed));
+    }
+    let (out, _) = frame(vec![]);
+    let pos = text_rect(&out, "Hack").unwrap().center();
+    for pressed in [true, false] {
+        frame(pointer(pos, pressed));
+    }
+    let (out, prefs) = frame(vec![]);
+    assert_eq!(
+        prefs.terminal_font,
+        ai_terminal::font_choice::FontChoice::Hack
+    );
+    assert!(text_rect(&out, "Settings").is_some());
+    assert!(text_rect(&out, "Done").is_none());
+    let value = text_rect(&out, "100%").unwrap();
+    let pos = Pos2::new(value.left() - 64.0, value.center().y);
+    for pressed in [true, false] {
+        frame(pointer(pos, pressed));
+    }
+    let (out, prefs) = frame(vec![]);
+    assert_ne!(
+        prefs.floating_scale, 1.0,
+        "Slider changes apply while the form remains open"
+    );
+    assert!(text_rect(&out, "Settings").is_some());
+}
+
+#[test]
+fn settings_rows_align_and_fit_wide_and_narrow_views_without_changing_global_style() {
+    for locale in [Language::ZhCn, Language::En] {
+        for width in [360.0, 1000.0] {
+            let ctx = egui::Context::default();
+            appearance::setup(&ctx);
+            i18n::apply(&ctx, locale);
+            let original = ctx.style_of(egui::Theme::Dark).text_styles.clone();
+            let mut open = true;
+            let mut prefs = UiSettings {
+                floating_enabled: true,
+                language: locale,
+                ..Default::default()
+            };
+            let mut output = Default::default();
+            for _ in 0..4 {
+                output = ctx.run_ui(
+                    egui::RawInput {
+                        screen_rect: Some(Rect::from_min_size(
+                            Pos2::ZERO,
+                            egui::vec2(width, 900.0),
+                        )),
+                        ..Default::default()
+                    },
+                    |_| {
+                        settings::show(&ctx, &mut open, &mut prefs);
+                    },
+                );
+            }
+            let tr = locale.resolve();
+            let labels = [
+                tr.text("界面语言", "Interface language"),
+                tr.text("终端字体", "Terminal font"),
+                tr.text("置顶状态浮窗", "Always-on-top status bar"),
+                tr.text("浮窗缩放", "Floating bar scale"),
+            ];
+            let rects: Vec<_> = labels
+                .into_iter()
+                .map(|s| text_rect(&output, s).unwrap())
+                .collect();
+            for rect in &rects {
+                assert!(
+                    rect.left() >= 0.0 && rect.right() <= width + 1.0 && rect.bottom() <= 900.0,
+                    "Clipped form label: {rect:?}"
+                );
+                assert!(
+                    (rect.left() - rects[0].left()).abs() < 1.0,
+                    "Labels share a left edge"
+                );
+            }
+            let selected = text_rect(&output, prefs.language.label(tr)).unwrap();
+            let font = text_rect(&output, "JetBrains Mono").unwrap();
+            assert!((selected.left() - font.left()).abs() < 1.0);
+            assert!(font.right() <= width);
+            if width > 800.0 {
+                assert!(font.left() > rects[1].right() + 12.0);
+            } else {
+                assert!(font.top() > rects[1].bottom());
+            }
+            assert!(text_rect(&output, "Done").is_none() && text_rect(&output, "完成").is_none());
+            assert_eq!(
+                ctx.style_of(egui::Theme::Dark).text_styles,
+                original,
+                "Dialog style must not alter terminal typography"
+            );
+        }
+    }
 }
 #[test]
 fn island_clicks_identify_sessions_and_keep_failure_question_and_completion_distinct() {
