@@ -84,3 +84,9 @@ Syntect 5.3.0 embeds grammars from the locked crate; default theme resources are
 preview.6 working-file bodies likewise exist only in the current bounded memory result, with no file copies, index writes or disk diff cache. PatchSource is a presentation-memory type and does not change sessions.json. No fonts, images or third-party dependencies are added.
 
 0.7.0 README images come from optimized readme_capture (default/history/diff) and island_probe. Eight localized workspace/Git-history/read-only-diff/floating PNGs retain native bytes; SOURCE.json records each version, language, dimensions and SHA-256. Code, metadata and history are fixed synthetic content, with no reads of real user configuration, repositories or sessions.
+
+0.8.0 preview adds UiSettings.floating_scale with missing-field compatibility, preserving data roots, session IDs/directories/order, fonts and processes. Both scales save independently, with no new font or icon assets.
+
+0.8.0-preview.2 syntax data comes from Cargo.lock-pinned two-face 0.5.2+bat-0.26.1 using the full Oniguruma variant, without third-party themes. assets/syntaxes/LICENSES.json is exported from the crate acknowledgement::listing().for_syntaxes(), preserving all 66 license texts. SOURCE.json records version, Cargo archive checksum, export command and SHA-256. Governance/packaging check provenance; ZIP includes Syntax-LICENSES.json/SYNTAX-SOURCE.json in its source identity. Licenses for two-face and onig/onig_sys are separately archived with dependencies. Font bytes are unchanged; provenance adds terminal-powershell (U+EBC7), terminal-bash (U+EBCA) and terminal-cmd (U+EBC4).
+
+0.8.0-preview.3 adds no font/icon assets and changes no font bytes or stroke parameters. Avatar caches use final pixel sizes, retaining at most 12 sizes per icon. Form styling/responsive layout changes no workspace fields, directories or data root.

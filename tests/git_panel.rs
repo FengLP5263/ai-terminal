@@ -947,10 +947,13 @@ fn working_file_clicks_open_read_only_source_and_keep_the_current_file_marked() 
     let mut client = GitClient::new(ctx.clone());
     client.snapshot = Some(std::sync::Arc::new(snapshot));
     let mut view = GitView::default();
+    let tick = std::cell::Cell::new(0.0);
     let frame = |view: &mut GitView, client: &GitClient, events| {
+        tick.set(tick.get() + 0.25);
         let mut actions = Actions::default();
         let out = ctx.run_ui(
             egui::RawInput {
+                time: Some(tick.get()),
                 screen_rect: Some(Rect::from_min_size(Pos2::ZERO, egui::vec2(1000.0, 600.0))),
                 events,
                 ..Default::default()
@@ -963,7 +966,7 @@ fn working_file_clicks_open_read_only_source_and_keep_the_current_file_marked() 
     };
     frame(&mut view, &client, vec![]);
     let (out, _) = frame(&mut view, &client, vec![]);
-    assert!(text_rect(&out, "Untracked").is_some());
+    assert!(text_rect(&out, "U").is_some());
     assert!(text_rect(&out, "??").is_none());
     let row = ctx
         .read_response(egui::Id::new(("git-working-file", &path)))
@@ -993,4 +996,56 @@ fn working_file_clicks_open_read_only_source_and_keep_the_current_file_marked() 
     client.patch = None;
     let (out, _) = frame(&mut view, &client, vec![]);
     assert!(!marked(&out));
+    frame(&mut view, &client, vec![Event::PointerMoved(row.center())]);
+    let mut out = frame(&mut view, &client, vec![]).0;
+    for _ in 0..8 {
+        out = frame(&mut view, &client, vec![]).0;
+    }
+    assert!(text_rect(&out, "Status: Untracked (not added to Git)").is_some());
+}
+
+#[test]
+fn panel_has_one_repository_header_and_non_repository_headers_have_no_git_placeholder() {
+    use ai_terminal::{git::GitClient, git_ui};
+    let ctx = egui::Context::default();
+    appearance::setup(&ctx);
+    i18n::apply(&ctx, Language::En);
+    let mut client = GitClient::new(ctx.clone());
+    let mut view = GitView::default();
+    let out = ctx.run_ui(Default::default(), |ui| {
+        view.contents(ui, Some(&fixture()), None, false, false, 50);
+    });
+    assert!(text_rect(&out, "Git").is_none());
+    assert!(text_rect(&out, "feature/native-git").is_none());
+    assert!(text_rect(&out, "+3").is_none());
+    assert!(text_rect(&out, "−1").is_none());
+    let repository = text_rect(&out, "demo").unwrap();
+    let refresh = text_rect(&out, "Refresh").unwrap();
+    assert!((repository.center().y - refresh.center().y).abs() < 4.0);
+    for error in [None, Some(GitError::Missing)] {
+        client.not_repository = error.is_none();
+        client.error = error;
+        let out = ctx.run_ui(
+            egui::RawInput {
+                screen_rect: Some(Rect::from_min_size(Pos2::ZERO, egui::vec2(1000.0, 200.0))),
+                ..Default::default()
+            },
+            |ui| {
+                git_ui::header(
+                    ui,
+                    git_ui::Header {
+                        name: "Shell",
+                        directory: std::path::Path::new("C:/Plain-folder"),
+                        scale: 1.0,
+                        connection: None,
+                    },
+                    Some(&client),
+                    &mut false,
+                );
+            },
+        );
+        assert!(text_rect(&out, "Git repository").is_none());
+        assert!(text_rect(&out, "\u{ec6f}").is_none());
+        assert!(text_rect(&out, "C:/Plain-folder").is_some());
+    }
 }

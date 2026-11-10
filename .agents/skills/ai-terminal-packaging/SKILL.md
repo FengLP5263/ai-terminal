@@ -42,3 +42,5 @@ package 会调用 Cargo release 构建，生成独立版本目录和 ZIP，记�
 
 
 0.4.10 安装版入口为 `project.ps1 installer`，可用 -Path 指向已校验 ZIP；没有 Path 时先构建 ZIP。脏源码／制品仅本地显式 -AllowDirty；生成 EXE、.sha256、.json，记录 ZIP、脚本和完整 NSIS 工具链身份。`verify-installer -Path <json>` 可跨平台只读校验 EXE，不能冒充实际安装或签名验证。-Acceptance／-AcceptanceId 仅用于独立验收身份；原生 smoke 不能运行普通包。系统字体不新增交付字体文件，选项目录保存在 FONT-SOURCE.json；默认家族为 JetBrains Mono，并与运行时及 manifest 保持一致。新动作同步 Windows／POSIX 入口、双语脚本说明及安装文档，不自动提交或发布。
+
+0.8.0-preview.2 的语法许可来自锁定 two-face 的 acknowledgement 数据；升级依赖后用 git_syntax_probe --export-notices 重新导出 assets/syntaxes/LICENSES.json，再更新 SOURCE.json。治理／package 核对锁定版本、Cargo 归档和文件摘要，ZIP 必须携带 Syntax-LICENSES.json 与 SYNTAX-SOURCE.json。Windows／POSIX 动作与参数不变。

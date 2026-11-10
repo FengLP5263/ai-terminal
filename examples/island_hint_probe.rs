@@ -152,6 +152,7 @@ mod windows {
         }
         fn logic(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
             self.bar.update(self.snapshot.clone(), ctx);
+            self.bar.set_scale(ctx, ctx.zoom_factor());
             self.bar.show(ctx, Some([40.0, 650.0]));
             ctx.request_repaint_of(floating::viewport_id());
             ctx.request_repaint_after(Duration::from_millis(100));

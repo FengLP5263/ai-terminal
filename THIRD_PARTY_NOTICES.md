@@ -43,3 +43,5 @@ Git 分支、提交、复制和文件图标采用微软 [VS Code Codicons](https
 ## 文件语法高亮
 
 [Syntect 5.3.0](https://github.com/trishume/syntect/tree/v5.3.0) 使用 MIT 许可证；默认语法集随锁定的 crates.io 归档内嵌，未启用默认主题资源，颜色规则由本项目定义。原始 LICENSE.txt 随制品的 licenses/syntect-5.3.0/ 保存，依赖和校验值由 Cargo.lock／dependencies.json 记录；fancy-regex、bincode、bit-set／bit-vec、fnv 等沿用各自声明与原始许可证。
+
+0.8.0-preview.2 改用 [two-face 0.5.2+bat-0.26.1](https://docs.rs/two-face/0.5.2+bat-0.26.1/two_face/)（MIT OR Apache-2.0）的 bat 扩展语法与 Oniguruma；onig/onig_sys 原始许可随依赖清单归档，不加载主题。各语法原许可见 [LICENSES.json](assets/syntaxes/LICENSES.json)，固定来源／摘要见 [SOURCE.json](assets/syntaxes/SOURCE.json)，ZIP 内为 Syntax-LICENSES.json／SYNTAX-SOURCE.json。Shell 头像复用原有 Codicons 0.0.45 的 terminal-powershell、terminal-bash、terminal-cmd；字体原文与 CC BY 4.0 许可不变。

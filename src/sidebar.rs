@@ -175,7 +175,10 @@ impl Icons {
         };
         let rect = snap_square(rect.center(), rect.width());
         painter.circle_filled(rect.center(), rect.width() / 2.0, Color32::from_gray(29));
-        let icon = snap_square(rect.center(), chrome::AVATAR_ICON);
+        let ppp = painter.pixels_per_point();
+        let avatar_pixels = (rect.width() * ppp).round();
+        let icon_pixels = (avatar_pixels * chrome::AVATAR_ICON / chrome::AVATAR).round();
+        let icon = snap_square(rect.center(), icon_pixels / ppp);
         match agent {
             Agent::Codex
             | Agent::Claude
@@ -221,27 +224,28 @@ fn paint_status_on(
     unread: bool,
     fill: Color32,
 ) {
-    let indicator = avatar.right_bottom() - egui::vec2(2.0, 2.0);
+    let scale = avatar.width() / chrome::AVATAR;
+    let indicator = avatar.right_bottom() - egui::vec2(2.0, 2.0) * scale;
     let surface = fill;
     if activity == Activity::Working {
-        painter.circle_filled(indicator, 5.5, surface);
+        painter.circle_filled(indicator, 5.5 * scale, surface);
         let time = ui.input(|i| i.time as f32);
         let points = (0..13)
             .map(|i| {
                 let a = time * 4.0 + i as f32 / 12.0 * 4.6;
-                indicator + egui::vec2(a.cos(), a.sin()) * 4.0
+                indicator + egui::vec2(a.cos(), a.sin()) * (4.0 * scale)
             })
             .collect();
         painter.add(egui::Shape::line(
             points,
-            Stroke::new(1.75, chrome::WORKING),
+            Stroke::new(1.75 * scale, chrome::WORKING),
         ));
         ui.ctx().request_repaint_after(Duration::from_millis(80));
     } else if activity == Activity::Waiting || unread {
-        painter.circle_filled(indicator, 5.5, surface);
+        painter.circle_filled(indicator, 5.5 * scale, surface);
         painter.circle_filled(
             indicator,
-            3.5,
+            3.5 * scale,
             if activity == Activity::Failed {
                 chrome::FAILED
             } else if activity == Activity::Waiting {

@@ -1,4 +1,6 @@
 #![cfg(windows)]
+#[path = "support/text_console.rs"]
+mod text_console;
 use ai_terminal::appearance;
 use egui_term::{BackendSettings, TerminalBackend, TerminalView};
 use std::{
@@ -10,7 +12,17 @@ fn real_conpty_emoji_modifiers_and_zwj_render_as_color_clusters() {
     let ctx = egui::Context::default();
     appearance::setup(&ctx);
     let (tx, _) = mpsc::channel();
-    let mut terminal=TerminalBackend::new(810,ctx.clone(),tx,BackendSettings {shell:"powershell.exe".into(),args:vec!["-NoLogo".into(),"-NoProfile".into(),"-Command".into(),"[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false); [Console]::Write(([char]27)+'[2J'+([char]27)+'[H'+'👋 👋🏽 ❤️ 👩‍💻 🇨🇳 DONE'); Start-Sleep -Seconds 20".into()],..Default::default()}).unwrap();
+    let mut terminal = TerminalBackend::new(
+        810,
+        ctx.clone(),
+        tx,
+        BackendSettings {
+            shell: text_console::executable().to_string_lossy().into_owned(),
+            args: vec!["emoji".into()],
+            ..Default::default()
+        },
+    )
+    .unwrap();
     let deadline = Instant::now() + Duration::from_secs(12);
     while !terminal.plain_text().contains("DONE") {
         assert!(Instant::now() < deadline);
@@ -72,21 +84,13 @@ fn native_caret_stays_above_glyphs_and_block_cursor_uses_its_real_background() {
         appearance::setup(&ctx);
         let _renderer = egui_term::TextRendererSession::new(&ctx);
         let (tx, _) = mpsc::channel();
-        let script = format!(
-            "[Console]::Write(([char]27)+'[2J'+([char]27)+'[H'+'A'+([char]27)+'[H'+([char]27)+'[{shape} q'); Start-Sleep -Seconds 20"
-        );
         let mut terminal = TerminalBackend::new(
             815,
             ctx.clone(),
             tx,
             BackendSettings {
-                shell: "powershell.exe".into(),
-                args: vec![
-                    "-NoLogo".into(),
-                    "-NoProfile".into(),
-                    "-Command".into(),
-                    script,
-                ],
+                shell: text_console::executable().to_string_lossy().into_owned(),
+                args: vec![format!("caret-{shape}")],
                 ..Default::default()
             },
         )

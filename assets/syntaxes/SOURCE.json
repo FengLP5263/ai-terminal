@@ -1,0 +1,16 @@
+{
+  "bundle": "two-face",
+  "version": "0.5.2+bat-0.26.1",
+  "cargo_archive_sha256": "915be7adc2ff6f4338acbf71f3eda0a146f46003b992a1669c674308610efdac",
+  "repository": "https://codeberg.org/CosmicHarper/two-face",
+  "syntax_origin": "bat 0.26.1 curated syntax set, Oniguruma variant",
+  "extraction": "cargo run --offline --locked --example git_syntax_probe -- --export-notices assets/syntaxes/LICENSES.json",
+  "description": "Decoded, unmodified license text from the pinned crate acknowledgement::listing().for_syntaxes(). No themes are used.",
+  "files": [
+    {
+      "name": "LICENSES.json",
+      "sha256": "a11c333f91c344e29f8017b1fc9ca2e7372ed80eb844adbd800e68ace25c65a7",
+      "bytes": 189971
+    }
+  ]
+}
