@@ -93,3 +93,5 @@ Font comparison can select a system CJK family (default Microsoft YaHei UI); fam
 0.4.9-preview.3: host default fonts are embedded Cascadia Mono (four faces) and system Microsoft YaHei UI. Native rendering parameters remain at their 0.4.8 defaults.
 
 0.4.9-preview.4: TerminalView suppresses ConPTY resize during sizing/invisible/already discarded passes and when raw screen geometry is unknown or invalid. Input processing remains independent, and visible real-window resizing stays enabled. No history copy, polling or idle repaint is added.
+
+0.7.0 preview: add O(1) history-size metadata, clamped local ScrollTo and a fixed-gutter viewport scrollbar. Drag/track gestures are consumed locally, including release outside; no PTY mouse reports. Hide for empty history/alternate screen; preserve 5,000-line bounds, viewport-only cells and event-driven repaint.

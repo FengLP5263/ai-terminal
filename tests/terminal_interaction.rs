@@ -543,6 +543,115 @@ fn pointer_button(pos: egui::Pos2, pressed: bool, modifiers: Modifiers) -> Event
     }
 }
 
+#[test]
+fn scrollbar_drags_real_history_without_pty_input_or_geometry_changes() {
+    let ctx = egui::Context::default();
+    let mut backend = mouse_terminal(&ctx, "scrollbar");
+    frame(&ctx, &mut backend, vec![], false);
+    wait_text(&mut backend, "APP_WHEEL_READY");
+    frame(&ctx, &mut backend, vec![], false);
+    let pid = backend.pty_id();
+    let initial: egui_term::WindowSize = backend.sync().terminal_size.into();
+    let history = backend.last_content().history_size;
+    assert!(
+        history > 300,
+        "fixture must create real ConPTY history: {history}"
+    );
+    let rect: egui::Rect = ctx.data(|d| d.get_temp(egui::Id::new("terminal-test-rect")).unwrap());
+    let top = egui::pos2(rect.right() - 6.0, rect.top() + 2.0);
+    for events in [
+        vec![
+            Event::PointerMoved(top),
+            pointer_button(top, true, Modifiers::NONE),
+        ],
+        vec![Event::PointerMoved(top - egui::vec2(0.0, 30.0))],
+    ] {
+        frame(&ctx, &mut backend, events, false);
+    }
+    assert_eq!(
+        backend.sync().display_offset,
+        history,
+        "drag reaches oldest retained line"
+    );
+    let visible: String = backend
+        .last_content()
+        .cells
+        .iter()
+        .map(|c| c.cell.c)
+        .collect();
+    assert!(
+        visible.contains("HISTORY_LINE_0000"),
+        "oldest content must be visible: {visible}"
+    );
+    let middle = rect.center_top() + egui::vec2(rect.width() * 0.5 - 6.0, rect.height() * 0.5);
+    frame(&ctx, &mut backend, vec![Event::PointerMoved(middle)], false);
+    let offset = backend.sync().display_offset;
+    assert!(
+        offset > history / 4 && offset < history * 3 / 4,
+        "mid-track offset {offset}/{history}"
+    );
+    let bottom = egui::pos2(rect.right() - 6.0, rect.bottom() + 25.0);
+    frame(&ctx, &mut backend, vec![Event::PointerMoved(bottom)], false);
+    frame(
+        &ctx,
+        &mut backend,
+        vec![pointer_button(bottom, false, Modifiers::NONE)],
+        false,
+    );
+    assert_eq!(backend.sync().display_offset, 0);
+    assert!(backend.selectable_content().is_empty());
+    let after: egui_term::WindowSize = backend.last_content().terminal_size.into();
+    assert_eq!(
+        (initial.num_cols, initial.num_lines),
+        (after.num_cols, after.num_lines)
+    );
+    assert_eq!(pid, backend.pty_id());
+    // In SGR all-motion mode, the first received byte must still be our sentinel.
+    backend.process_command(egui_term::BackendCommand::Write(b"z".to_vec()));
+    wait_text(&mut backend, "REPORT_0_7A");
+}
+
+#[test]
+fn scrollbar_keeps_columns_when_history_appears_and_stays_bounded() {
+    let ctx = egui::Context::default();
+    let mut backend = terminal(
+        &ctx,
+        "Start-Sleep -Milliseconds 700; 1..5400 | ForEach-Object {Write-Output ('BOUNDED_LINE_'+$_)}; Write-Output 'HISTORY_READY'; Start-Sleep -Seconds 20",
+    );
+    frame(&ctx, &mut backend, vec![], false);
+    let initial: egui_term::WindowSize = backend.sync().terminal_size.into();
+    assert_eq!(backend.last_content().history_size, 0);
+    wait_text(&mut backend, "HISTORY_READY");
+    frame(&ctx, &mut backend, vec![], false);
+    let after: egui_term::WindowSize = backend.sync().terminal_size.into();
+    assert_eq!(
+        (initial.num_cols, initial.num_lines),
+        (after.num_cols, after.num_lines)
+    );
+    assert_eq!(backend.last_content().history_size, 5000);
+    assert!(
+        backend.last_content().cells.len() <= after.num_cols as usize * after.num_lines as usize
+    );
+    let rect: egui::Rect = ctx.data(|d| d.get_temp(egui::Id::new("terminal-test-rect")).unwrap());
+    let pos = egui::pos2(rect.right() - 6.0, rect.top() + 3.0);
+    frame(
+        &ctx,
+        &mut backend,
+        vec![pointer_button(pos, true, Modifiers::NONE)],
+        false,
+    );
+    frame(
+        &ctx,
+        &mut backend,
+        vec![pointer_button(pos, false, Modifiers::NONE)],
+        false,
+    );
+    assert!(
+        backend.sync().display_offset > 4500,
+        "track click jumps without scrolling every row"
+    );
+}
+
 fn selection_points(ctx: &egui::Context, backend: &TerminalBackend) -> [egui::Pos2; 2] {
     let rect: egui::Rect =
         ctx.data(|data| data.get_temp(egui::Id::new("terminal-test-rect")).unwrap());

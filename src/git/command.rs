@@ -102,6 +102,11 @@ impl Runner {
             ))
         }
     }
+    pub(super) fn cancelled(&self) -> bool {
+        self.cancel.as_ref().is_some_and(|(stop, g, id)| {
+            stop.load(Ordering::Acquire) || g.load(Ordering::Acquire) != *id
+        })
+    }
     pub fn run(&self, dir: &Path, args: &[&str], input: Option<&[u8]>) -> Result<Output, GitError> {
         let mut cmd = Command::new(&self.git);
         cmd.args([
@@ -201,9 +206,7 @@ impl Runner {
             if began.elapsed() > Duration::from_secs(6) {
                 error = Some(GitError::Command("Git query timed out.".into()));
             }
-            if self.cancel.as_ref().is_some_and(|(stop, g, id)| {
-                stop.load(Ordering::Acquire) || g.load(Ordering::Acquire) != *id
-            }) {
+            if self.cancelled() {
                 error = Some(GitError::Cancelled);
             }
             if error.is_some() {

@@ -95,3 +95,11 @@ Kimi Code 使用官方仓库文档所用的 316×316 PNG，ZCode 使用官方仓
 Git 提交详情不持久化：仅保留当前查询与已展开提交的内存数据，至多展示 500 个文件；每条命令仍为 6 秒／2 MiB 上限。复制仅由用户点击写入完整提交 ID；不自动读取剪贴板。复制与文件图标复用既有 Codicons U+EBCC／U+EA7B 原始字形，无新增资产。
 
 0.6.0-preview.2：更改与提交文件共用 git_ui/files.rs，分类图标全部来自既有 Codicons 原始字体；SOURCE.json 列出实际使用的 Markdown、代码、JSON、配置、脚本、媒体、PDF、归档与二进制字形。没有新增字体或图片资产。
+
+0.7.0 预览：历史大小仅为 O(1) viewport 元数据，不复制完整历史。差异只保留一个有界内存结果（20,000 行／每行 4,000 字符，命令输出上限 2 MiB），不保存至工作区或磁盘；无新增字体／图像资产，颜色复用 chrome::COMPLETED／FAILED。
+
+Syntect 5.3.0 的语法资源随锁定 crate 内嵌；不启用默认主题资源，主题颜色为项目代码定义。Cargo.lock 记录归档校验值；MIT 原始 LICENSE.txt 随 dependencies.json 和 licenses/syntect-5.3.0/ 自动归档。展示快照最多保留当前文件 100,000 token（每行至多 256 段），只含字节边界、RGB、源行索引和缩进，不写入工作区。新增 fancy-regex 等依赖的声明与原始许可由制品依赖清单记录。
+
+preview.6 的工作区文件正文同样只存在于当前有界内存结果，不保存文件副本、索引或差异缓存。PatchSource 为展示内存类型，不改变 sessions.json；没有新增字体、图像或第三方依赖。
+
+0.7.0 的 README 图由 readme_capture（默认／history／diff）和 island_probe 的优化构建生成，八张中英文主界面、Git 历史、只读差异和浮窗 PNG 保持原生字节；SOURCE.json 逐文件记录版本、语言、尺寸与 SHA-256。示例代码、元数据和历史均为固定合成内容，不读取真实用户配置、仓库或会话。

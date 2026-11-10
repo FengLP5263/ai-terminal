@@ -70,3 +70,5 @@ Font comparison can select a system CJK family, still Microsoft YaHei UI by defa
 0.4.9-preview.3: the host defaults to four embedded Cascadia Mono faces with Microsoft YaHei UI for CJK. The renderer keeps default parameters without added stem fitting, sharpening or filters.
 
 0.4.9-preview.4: TerminalView suppresses ConPTY resize during sizing/invisible/already discarded passes and when raw screen geometry is unknown or invalid. Input processing remains independent, and visible real-window resizing stays enabled. No history copy, polling or idle repaint is added.
+
+0.7.0 preview: snapshots add O(1) history size and the backend provides clamped absolute local ScrollTo. A fixed-gutter viewport scrollbar consumes drag/track gestures locally, including release outside, without PTY mouse reports. Empty history/alternate screens hide it; 5,000-line retention, viewport-only copying and event-driven repaint remain.

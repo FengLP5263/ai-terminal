@@ -29,6 +29,7 @@ struct Capture {
     git_view: GitView,
     status: Status,
     history: bool,
+    diff: bool,
     output: PathBuf,
     began: Instant,
     requested: bool,
@@ -46,7 +47,7 @@ impl eframe::App for Capture {
     }
     fn logic(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
         if self.captured || self.began.elapsed() > Duration::from_secs(18) {
-            std::fs::write(self.output.join("result.json"),serde_json::to_vec_pretty(&serde_json::json!({"ok":self.captured,"version":env!("CARGO_PKG_VERSION"),"synthetic_metadata":true,"synthetic_git":true,"history":self.history,"example_paths":true,"model_requests":false,"user_profiles":false,"pty_pid":self.backend.pty_id()})).unwrap()).unwrap();
+            std::fs::write(self.output.join("result.json"),serde_json::to_vec_pretty(&serde_json::json!({"ok":self.captured,"version":env!("CARGO_PKG_VERSION"),"synthetic_metadata":true,"synthetic_git":true,"history":self.history,"file_diff":self.diff,"example_paths":true,"model_requests":false,"user_profiles":false,"pty_pid":self.backend.pty_id()})).unwrap()).unwrap();
             ctx.send_viewport_cmd(egui::ViewportCommand::Close);
         }
         ctx.request_repaint_after(Duration::from_millis(80));
@@ -149,29 +150,34 @@ impl eframe::App for Capture {
                     &mut open,
                 );
                 ui.add_space(8.0);
-                let view = TerminalView::new(ui, &mut self.backend)
-                    .set_font(appearance::terminal_font(14.0))
-                    .set_size(ui.available_size())
-                    .set_focus(true);
-                ui.add(view);
+                if let Some(patch) = &self.git.patch {
+                    git_ui::diff::show(ui, patch);
+                } else {
+                    let view = TerminalView::new(ui, &mut self.backend)
+                        .set_font(appearance::terminal_font(14.0))
+                        .set_size(ui.available_size())
+                        .set_focus(true);
+                    ui.add(view);
+                }
             });
         if !self.requested
             && self.began.elapsed() > Duration::from_secs(3)
-            && self
-                .backend
-                .last_content()
-                .cells
-                .iter()
-                .map(|cell| cell.cell.c)
-                // Wide-cell padding is present in the raw grid; compare the
-                // fixed sample without whitespace, for both locales.
-                .filter(|ch| !ch.is_whitespace())
-                .collect::<String>()
-                .contains(if self.snapshot.locale == Locale::En {
-                    "Returntoanysessionandpickupwhereyouleftoff."
-                } else {
-                    "回到任何一个会话，继续你的工作。"
-                })
+            && (self.diff
+                || self
+                    .backend
+                    .last_content()
+                    .cells
+                    .iter()
+                    .map(|cell| cell.cell.c)
+                    // Wide-cell padding is present in the raw grid; compare the
+                    // fixed sample without whitespace, for both locales.
+                    .filter(|ch| !ch.is_whitespace())
+                    .collect::<String>()
+                    .contains(if self.snapshot.locale == Locale::En {
+                        "Returntoanysessionandpickupwhereyouleftoff."
+                    } else {
+                        "回到任何一个会话，继续你的工作。"
+                    }))
         {
             ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::default()));
             self.requested = true;
@@ -188,6 +194,7 @@ fn main() -> eframe::Result {
     );
     let english = std::env::args().nth(2).as_deref() == Some("en");
     let history = std::env::args().nth(3).as_deref() == Some("history");
+    let diff = std::env::args().nth(3).as_deref() == Some("diff");
     let verify = output.clone();
     eframe::run_native(
         "ai-terminal public README capture",
@@ -224,10 +231,11 @@ fn main() -> eframe::Result {
                     "  Release       Build complete, ready for your review",
                     "",
                     "  Stay in the flow",
-                    "  ✓ Branch, changes and history alongside your work",
+                    "  ✓ Branch, history and read-only file diffs",
                     "  ✓ Clear avatars and unread completion badges ✨",
                     "  ✓ Switch sessions without restarting your agents",
                     "",
+                    "  Drag the history scrollbar to find earlier output",
                     "  Ctrl + wheel to zoom · Drag sessions to reorder",
                     "",
                     "Return to any session and pick up where you left off.",
@@ -245,10 +253,11 @@ fn main() -> eframe::Result {
                     "  发布准备    构建已完成，等你回来查看",
                     "",
                     "  保持专注",
-                    "  ✓ 当前分支、文件更改与提交历史，一眼可见",
+                    "  ✓ 当前分支、提交历史与只读文件差异",
                     "  ✓ 清晰的头像与未读完成标记 ✨",
                     "  ✓ 随时切换会话，不用重新启动 Agent",
                     "",
+                    "  拖动右侧历史条，快速定位之前的输出",
                     "  Ctrl + 滚轮缩放 · 拖动会话排序",
                     "",
                     "回到任何一个会话，继续你的工作。",
@@ -259,8 +268,13 @@ fn main() -> eframe::Result {
                 .map(|line| format!("'{}'", line.replace('\'', "''")))
                 .collect::<Vec<_>>()
                 .join("+\"`r`n\"+");
+            let archived = if english {
+                "Earlier task output"
+            } else {
+                "之前的任务输出"
+            };
             let script = format!(
-                "[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false); $e=[char]27; [Console]::Write($e+'[2J'+$e+'[H'+{expression}); [Console]::WriteLine(''); Start-Sleep -Seconds 25"
+                "[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false); for($captureLine=1;$captureLine -le 120;$captureLine++){{[Console]::WriteLine('{archived} '+$captureLine)}}; $e=[char]27; [Console]::Write($e+'[2J'+$e+'[H'+{expression}); [Console]::WriteLine(''); Start-Sleep -Seconds 25"
             );
             let (tx, _) = mpsc::channel();
             let backend = TerminalBackend::new(
@@ -285,7 +299,29 @@ fn main() -> eframe::Result {
             .unwrap();
             let icons = Icons::new(&cc.egui_ctx);
             let mut git = GitClient::new(cc.egui_ctx.clone());
-            let fixture = git_fixture();
+            let mut fixture = git_fixture();
+            if diff {
+                let patch = file_fixture(english);
+                fixture.files[0].added = patch
+                    .lines
+                    .iter()
+                    .filter(|l| l.kind == ai_terminal::git::PatchKind::Added)
+                    .count() as u64;
+                fixture.files[0].deleted = patch
+                    .lines
+                    .iter()
+                    .filter(|l| l.kind == ai_terminal::git::PatchKind::Deleted)
+                    .count() as u64;
+                fixture.added = fixture.files.iter().map(|f| f.added).sum();
+                fixture.deleted = fixture.files.iter().map(|f| f.deleted).sum();
+                git.patch = Some(ai_terminal::git::PatchResult {
+                    source: patch.source.clone(),
+                    path: patch.path.clone(),
+                    data: Some(std::sync::Arc::new(patch)),
+                    error: None,
+                    loading: false,
+                });
+            }
             if history {
                 let commit = &fixture.commits[0];
                 git.inspection = Some(Inspection {
@@ -409,6 +445,7 @@ fn main() -> eframe::Result {
                 git_view,
                 status,
                 history,
+                diff,
                 output,
                 began: Instant::now(),
                 requested: false,
@@ -422,6 +459,69 @@ fn main() -> eframe::Result {
             .unwrap();
     assert_eq!(result["ok"], true);
     Ok(())
+}
+
+fn file_fixture(english: bool) -> ai_terminal::git::FilePatch {
+    use ai_terminal::git::{FilePatch, PatchKind::*, PatchLine, PatchSource, syntax};
+    let sample = [
+        (Context, "import { useState } from 'react';"),
+        (Context, ""),
+        (Context, "export function SignIn() {"),
+        (Context, "  const [email, setEmail] = useState('');"),
+        (Context, "  const [status, setStatus] = useState('idle');"),
+        (Context, ""),
+        (Context, "  async function submit() {"),
+        (Context, "    setStatus('loading');"),
+        (Deleted, "    await signIn(email);"),
+        (Added, "    await signIn(email.trim());"),
+        (Added, "    setStatus('complete');"),
+        (Context, "  }"),
+        (Context, ""),
+        (
+            Context,
+            if english {
+                "  // Ready for review ✅"
+            } else {
+                "  // 可以开始验收了 ✅"
+            },
+        ),
+        (
+            Context,
+            "  return <Form onSubmit={submit} email={email} />;",
+        ),
+        (Context, "}"),
+    ];
+    let (mut old, mut new) = (1, 1);
+    let lines: Vec<_> = sample
+        .into_iter()
+        .map(|(kind, text)| {
+            let line = PatchLine {
+                kind,
+                old: (kind != Added).then_some(old),
+                new: (kind != Deleted).then_some(new),
+                text: text.into(),
+            };
+            if kind != Added {
+                old += 1;
+            }
+            if kind != Deleted {
+                new += 1;
+            }
+            line
+        })
+        .collect();
+    let path = "src/components/SignIn.tsx";
+    let presentation = syntax::prepare(path, &lines, || false);
+    FilePatch {
+        source: PatchSource::WorkingTree,
+        path: path.into(),
+        max_columns: 52,
+        lines,
+        binary: false,
+        partial: false,
+        first_parent: false,
+        presentation,
+    }
 }
 
 fn git_fixture() -> GitSnapshot {

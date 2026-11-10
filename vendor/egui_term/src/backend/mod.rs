@@ -37,6 +37,8 @@ pub type SelectionType = AlacrittySelectionType;
 pub enum BackendCommand {
     Write(Vec<u8>),
     Scroll(i32),
+    /// Absolute local scrollback offset; never forwards mouse input to the PTY.
+    ScrollTo(usize),
     MouseWheel(i32, Modifiers, Point),
     Resize(Size, Size, f32),
     SelectStart(SelectionType, f32, f32),
@@ -199,6 +201,7 @@ impl TerminalBackend {
         let initial_content = RenderableContent {
             cells: vec![],
             display_offset: 0,
+            history_size: 0,
             cursor_point: term.grid().cursor.point,
             selectable_range: None,
             terminal_mode: *term.mode(),
@@ -377,6 +380,14 @@ impl TerminalBackend {
             BackendCommand::Scroll(delta) => {
                 self.scroll(&mut term, delta);
             }
+            BackendCommand::ScrollTo(offset) => {
+                if !term.mode().contains(TermMode::ALT_SCREEN) {
+                    let grid = term.grid();
+                    let target = offset.min(grid.history_size()).min(i32::MAX as usize);
+                    let current = grid.display_offset().min(i32::MAX as usize);
+                    self.scroll(&mut term, target as i32 - current as i32);
+                }
+            }
             BackendCommand::MouseWheel(delta, modifiers, point) => {
                 if modifiers.ctrl || modifiers.command {
                     return;
@@ -476,6 +487,7 @@ impl TerminalBackend {
                 cell: cell.cell.clone(),
             }));
         self.last_content.display_offset = content.display_offset;
+        self.last_content.history_size = terminal.grid().history_size();
         self.last_content.cursor_point = content.cursor.point;
         self.last_content.cursor_shape = content.cursor.shape;
         self.last_content.selectable_range = content.selection;
@@ -735,6 +747,8 @@ pub struct RenderCell {
 pub struct RenderableContent {
     pub cells: Vec<RenderCell>,
     pub display_offset: usize,
+    /// O(1) range metadata; cells still contain only the visible viewport.
+    pub history_size: usize,
     pub cursor_point: Point,
     pub hovered_hyperlink: Option<RangeInclusive<Point>>,
     pub selectable_range: Option<SelectionRange>,
@@ -749,6 +763,7 @@ impl Default for RenderableContent {
         Self {
             cells: vec![],
             display_offset: 0,
+            history_size: 0,
             cursor_point: Point::new(Line(0), Column(0)),
             hovered_hyperlink: None,
             selectable_range: None,

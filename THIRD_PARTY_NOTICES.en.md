@@ -36,3 +36,7 @@ The optional terminal font comes from [JetBrains official v2.304](https://github
 ## Codicons
 
 The Git branch, commit, copy and file icons use the original font and `git-branch` (U+EC6F), `copy` (U+EBCC), `git-commit` (U+EAFC) and `file` (U+EA7B), plus file-type glyphs from Microsoft's official [VS Code Codicons](https://github.com/microsoft/vscode-codicons) `@vscode/codicons` 0.0.45 package, licensed CC BY 4.0. Font, CSS mapping and license bytes are unchanged. See `assets/fonts/SOURCE.json` for provenance/hashes and `assets/fonts/LICENSE-Codicons.txt` for the original license; the ZIP includes `Codicons-LICENSE.txt`. It is only an in-app symbol, with no system font installation or terminal-font option.
+
+## File syntax highlighting
+
+[Syntect 5.3.0](https://github.com/trishume/syntect/tree/v5.3.0) is MIT licensed. Default grammars are embedded from the locked crates.io archive; default theme resources are disabled and colors are project-defined. The original LICENSE.txt is included under licenses/syntect-5.3.0/; Cargo.lock/dependencies.json record dependency identity and checksums. fancy-regex, bincode, bit-set/bit-vec, fnv and other dependencies retain their own declarations and original licenses.

@@ -64,3 +64,9 @@ Windows 预览包通过 GitHub Releases 分发；尚无自动发布服务、云 
 0.4.12 预览：`src/git/` 负责当前活动目录的本地 Git 只读快照、有界后台命令及 Windows 目录通知；`src/git_ui.rs` 提供顶部摘要与右侧可收起面板。分支、文件行数与历史不进入 Agent 状态归约，终端进程不因面板变化重建。
 
 Git 历史详情：`src/git/commit.rs` 用独立的有界请求／结果槽与取消代次读取不可变提交；`git_ui/history.rs` 绘制时间线、交互悬停及展开文件，复用正式字体和 Codicons。详情只由 App::logic 消费，不阻塞 UI 或重建终端。
+
+0.7.0 预览：egui_term 的 view/scrollbar.rs 用 O(1) 历史范围和偏移控制本地滚动，ScrollTo 不传入 PTY。src/git/patch.rs 使用独立有界请求／结果槽读取提交文件差异，git_ui/diff.rs 仅布局可见行；展示差异时停止终端绘制唤醒，保留后台排空和原进程。
+
+0.7.0-preview.3：git/syntax.rs 在文件查询线程使用固定 Syntect 5.3.0 默认语法集和项目自有颜色规则，生成仅含源行索引、字节范围／RGB 及缩进的有界展示快照；旧／新解析状态独立，不在 UI 线程扫描全文件。git_ui/diff.rs 虚拟化绘制多色 LayoutJob 和缩进线，正文过滤 Git 元信息。
+
+preview.6：git/worktree.rs 按需读取 HEAD 与当前文件的净差异，与历史文件共用 patch.rs 的解析／限额／后台槽；PatchSource 显式区分 Commit 与 WorkingTree。文件读取不写索引或磁盘缓存，不调用外部驱动；Git 快照事件触发打开的本地文件刷新，UI 帧不触发读取。

@@ -32,7 +32,7 @@ Enable the floating bar to see session avatars and status above other windows. C
 
 ![AI Terminal floating session bar](assets/readme/floating.en.png)
 
-> Screenshots use real 0.6.0 native components with synthetic sessions, terminal text, Git metadata and task status. They contain no real user data or private conversations. Click an image for its original resolution.
+> Screenshots use real 0.7.0 native components with synthetic sessions, terminal text, Git metadata and task status. They contain no real user data or private conversations. Click an image for its original resolution.
 
 ## Built for multiple sessions
 
@@ -45,6 +45,8 @@ Enable the floating bar to see session avatars and status above other windows. C
 | **Your workspace** | Drag to reorder, rename or color sessions, collapse the sidebar, and scale the entire interface with Ctrl + mouse wheel. |
 | **Familiar terminal behavior** | Use Chinese text, ANSI colors, and system color emoji; pass clipboard images to Codex, Claude Code or Qoder CN CLI for the CLI to handle. |
 | **Git workspace** | See the current branch and line additions/deletions in the header, with changed files and current-branch history in a collapsible right panel that follows the terminal directory. See [Git panel](docs/git.en.md). |
+| **Locate long output** | Drag the terminal history scrollbar or click its track to revisit earlier output, with up to 5,000 history lines. |
+| **Read-only file diffs** | Click a working or committed file to inspect its complete body, syntax colors and red/green change backgrounds. |
 | **Terminal fonts** | Default to JetBrains Mono and switch instantly to Cascadia Mono, Hack or two available Windows fonts in Settings while sessions stay connected and saved choices are preserved. |
 | **Chinese and English** | Follow the system language or choose Simplified Chinese or English in settings. |
 
@@ -57,6 +59,14 @@ Changes shows file status and net line totals against HEAD, combining staged, un
 ![AI Terminal Git history with branch and line totals beside the terminal](assets/readme/git-history.en.png)
 
 Requires an installed Git for Windows. The panel is read-only; staging, committing, pulling and pushing remain terminal operations. See [Git panel details](docs/git.en.md) for binary, content-filter and large-file counting boundaries.
+
+Drag the right-side terminal history thumb or click its track to locate earlier output. The terminal retains up to 5,000 history lines, and scrollbar gestures do not send arrow keys to the CLI.
+
+Click a file in Changes to see its net changes against HEAD, combining staged and unstaged edits. Untracked files show full additions and an explicit Untracked label. Click a file under an expanded commit to inspect that commit’s diff. Both views include the first through last lines, old/new line numbers, file-type syntax highlighting, indent guides, color emoji and a current-file indicator. Red/green backgrounds mark changes while code retains its syntax colors; closing returns to the original terminal.
+
+![AI Terminal read-only file diff with syntax highlighting, full line numbers and change backgrounds](assets/readme/git-diff.en.png)
+
+File views are read-only, without editing. See [Git panel](docs/git.en.md) for encoding, binary, size and linked-file boundaries.
 
 ## Supported Agents
 
