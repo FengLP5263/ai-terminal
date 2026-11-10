@@ -4,6 +4,10 @@ use std::sync::Arc;
 use unicode_segmentation::UnicodeSegmentation;
 
 fn is_emoji(cluster: &str) -> bool {
+    // An explicit text-presentation selector must keep the source font and color.
+    if cluster.contains('\u{fe0e}') {
+        return false;
+    }
     cluster.chars().any(|c| {
         matches!(c as u32,
         0x1f000..=0x1faff | 0x2600..=0x27bf | 0xfe0f | 0x20e3 |
@@ -63,6 +67,82 @@ pub(crate) fn layout_font_rows(
             },
         );
     }
+    finish_layout(ctx, job, has_emoji)
+}
+
+/// Preserve styled source text while reserving complete grapheme slots for color emoji.
+/// Syntax spans may split a ZWJ/variation sequence, so reshape by grapheme before layout.
+pub fn layout_job(ctx: &egui::Context, mut job: egui::text::LayoutJob) -> Arc<Galley> {
+    if !job.text.graphemes(true).any(is_emoji) {
+        return ctx.fonts_mut(|fonts| fonts.layout_job(job));
+    }
+    let emoji_face = ctx.fonts(|fonts| {
+        fonts
+            .families()
+            .contains(&FontFamily::Name("ui-emoji".into()))
+    });
+    let original = std::mem::take(&mut job.sections);
+    let mut section_index = 0;
+    for (start, cluster) in job.text.grapheme_indices(true) {
+        let end = egui::text::ByteIndex(start + cluster.len());
+        let start = egui::text::ByteIndex(start);
+        while section_index < original.len() && original[section_index].byte_range.end <= start {
+            section_index += 1;
+        }
+        let Some(section) = original.get(section_index) else {
+            break;
+        };
+        if is_emoji(cluster) {
+            let mut format = section.format.clone();
+            format.color = Color32::TRANSPARENT;
+            if emoji_face {
+                format.font_id.family = FontFamily::Name("ui-emoji".into());
+            }
+            push_section(
+                &mut job.sections,
+                egui::text::LayoutSection {
+                    leading_space: if start == section.byte_range.start {
+                        section.leading_space
+                    } else {
+                        0.0
+                    },
+                    byte_range: start..end,
+                    format,
+                },
+            );
+        } else {
+            let mut cursor = start;
+            while cursor < end {
+                let section = &original[section_index];
+                let mut part = section.clone();
+                part.byte_range = cursor..end.min(section.byte_range.end);
+                if cursor != section.byte_range.start {
+                    part.leading_space = 0.0;
+                }
+                cursor = part.byte_range.end;
+                push_section(&mut job.sections, part);
+                if cursor < end {
+                    section_index += 1;
+                }
+            }
+        }
+    }
+    finish_layout(ctx, job, true)
+}
+
+fn push_section(sections: &mut Vec<egui::text::LayoutSection>, next: egui::text::LayoutSection) {
+    if let Some(previous) = sections.last_mut()
+        && previous.byte_range.end == next.byte_range.start
+        && next.leading_space == 0.0
+        && previous.format == next.format
+    {
+        previous.byte_range.end = next.byte_range.end;
+    } else {
+        sections.push(next);
+    }
+}
+
+fn finish_layout(ctx: &egui::Context, job: egui::text::LayoutJob, has_emoji: bool) -> Arc<Galley> {
     let mut galley = ctx.fonts_mut(|fonts| fonts.layout_job(job));
     if has_emoji {
         // TextEdit recolors selected glyph vertices. Degenerate only the transparent

@@ -23,6 +23,7 @@ use crate::theme::TerminalTheme;
 use crate::types::Size;
 
 const EGUI_TERM_WIDGET_ID_PREFIX: &str = "egui_term::instance::";
+mod scrollbar;
 
 #[derive(Debug, Clone)]
 enum InputAction {
@@ -39,6 +40,7 @@ pub struct TerminalViewState {
     local_selection_drag: bool,
     pending_primary: Option<Pos2>,
     scroll_pixels: f32,
+    scrollbar: scrollbar::Drag,
     current_mouse_position_on_grid: TerminalGridPoint,
 }
 
@@ -59,8 +61,22 @@ pub struct TerminalView<'a> {
 impl Widget for TerminalView<'_> {
     fn ui(self, ui: &mut egui::Ui) -> Response {
         let (_, rect) = ui.allocate_space(self.size);
-        let layout = ui.interact(rect, self.widget_id, egui::Sense::click_and_drag());
-        let painter = ui.painter_at(rect);
+        // A fixed gutter avoids a ConPTY resize/reflow when history changes.
+        let terminal_rect = Rect::from_min_max(
+            rect.min,
+            egui::pos2(
+                (rect.right() - scrollbar::WIDTH).max(rect.left()),
+                rect.bottom(),
+            ),
+        );
+        let bar_rect = Rect::from_min_max(terminal_rect.right_top(), rect.right_bottom());
+        ui.interact(
+            bar_rect,
+            self.widget_id.with("history-scrollbar"),
+            egui::Sense::drag(),
+        );
+        let layout = ui.interact(terminal_rect, self.widget_id, egui::Sense::click_and_drag());
+        let painter = ui.painter_at(terminal_rect);
 
         let widget_id = self.widget_id;
         let mut state = ui.memory(|m| {
@@ -71,7 +87,7 @@ impl Widget for TerminalView<'_> {
 
         let view = self.focus(&layout, &mut state);
         if view.snapshot_only {
-            view.show(&mut state, &layout, &painter);
+            view.show(&mut state, &layout, &painter, bar_rect, ui);
         } else {
             // Layout-only passes and the initial unknown 10000-point canvas
             // are not real terminal sizes. Keep their geometry out of ConPTY.
@@ -91,12 +107,12 @@ impl Widget for TerminalView<'_> {
             } else {
                 view
             };
-            view.process_input(&layout, &mut state)
-                .show(&mut state, &layout, &painter);
+            view.process_input(&layout, &mut state, bar_rect)
+                .show(&mut state, &layout, &painter, bar_rect, ui);
         }
 
         ui.memory_mut(|m| m.data.insert_temp(widget_id, state));
-        layout
+        Response { rect, ..layout }
     }
 }
 
@@ -224,6 +240,7 @@ impl<'a> TerminalView<'a> {
             state.is_dragged = false;
             state.local_selection_drag = false;
             state.pending_primary = None;
+            state.scrollbar.clear();
         }
         state.input_enabled = self.has_focus;
         self
@@ -239,7 +256,12 @@ impl<'a> TerminalView<'a> {
         self
     }
 
-    fn process_input(self, layout: &Response, state: &mut TerminalViewState) -> Self {
+    fn process_input(
+        self,
+        layout: &Response,
+        state: &mut TerminalViewState,
+        bar_rect: Rect,
+    ) -> Self {
         if !layout.has_focus() || !self.has_focus || !layout.ctx.input(|i| i.focused) {
             return self;
         }
@@ -252,6 +274,7 @@ impl<'a> TerminalView<'a> {
         // Input routing needs current terminal mode and coordinates. Repaints
         // without input take just the single snapshot in `show`.
         self.backend.sync();
+        let geometry = scrollbar::Geometry::new(bar_rect, self.backend.last_content());
         let mut pending_input = Vec::new();
         let ime_composing = !state.preedit.is_empty()
             || events
@@ -259,6 +282,15 @@ impl<'a> TerminalView<'a> {
                 .any(|event| matches!(event,
                     egui::Event::Ime(egui::ImeEvent::Preedit { text, .. } | egui::ImeEvent::Commit(text)) if !text.is_empty()));
         for event in events {
+            let (claimed, offset) = state.scrollbar.event(&event, bar_rect, geometry.as_ref());
+            if claimed {
+                flush_pending_input(self.backend, &mut pending_input);
+                if let Some(offset) = offset {
+                    self.backend
+                        .process_command(BackendCommand::ScrollTo(offset));
+                }
+                continue;
+            }
             // Mouse, clipboard, and modified-key actions can consult terminal
             // state while being interpreted. Send earlier text first.
             let flush_before = match &event {
@@ -367,7 +399,14 @@ impl<'a> TerminalView<'a> {
         self
     }
 
-    fn show(self, state: &mut TerminalViewState, layout: &Response, painter: &Painter) {
+    fn show(
+        self,
+        state: &mut TerminalViewState,
+        layout: &Response,
+        painter: &Painter,
+        bar_rect: Rect,
+        ui: &egui::Ui,
+    ) {
         let (_, baseline) = self.font.metrics(&layout.ctx);
         let scale = layout.ctx.pixels_per_point();
         let snap = |value: f32| (value * scale).round() / scale;
@@ -379,6 +418,11 @@ impl<'a> TerminalView<'a> {
         let origin = Pos2::new(snap(layout.rect.min.x), snap(layout.rect.min.y));
         let cell_height = content.terminal_size.cell_height;
         let cell_width = content.terminal_size.cell_width;
+        if let Some(bar) = scrollbar::Geometry::new(bar_rect, content) {
+            let hot = state.scrollbar.active()
+                || ui.input(|i| i.pointer.hover_pos().is_some_and(|p| bar_rect.contains(p)));
+            bar.paint(&ui.painter_at(bar_rect), hot);
+        }
         let color = |value: Color| {
             let index = match value {
                 Color::Named(name) => Some(name as usize),

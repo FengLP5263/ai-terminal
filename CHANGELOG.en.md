@@ -4,6 +4,108 @@
 
 Record user-visible additions, improvements, fixes, and compatibility changes for each release; omit categories that do not apply. Review both languages together, use the same version entry in GitHub Releases, and ship both files in the ZIP. Historical summaries follow existing GitHub release notes and UTC publication dates; development versions without a separate release do not receive invented release dates.
 
+## [0.7.0] - 2026-11-10
+
+### Added
+
+- A right-side terminal history scrollbar supports thumb dragging and track clicks for long output, retaining the 5,000-line limit and staying hidden on alternate screens.
+- Open committed files or files in Changes in a complete-file read-only diff with old/new line numbers, red/green backgrounds, syntax highlighting, indent guides and native color emoji. The right panel marks the current file; closing returns to the original terminal.
+- Working files show staged and unstaged net changes against HEAD. Untracked/unborn files show full additions, and removed files retain old content. Untracked labels and descriptions distinguish staging and merge conflicts.
+
+### Improved
+
+- JSON, Markdown and common code use file-type syntax colors independently of diff backgrounds. Source indentation/tab stops are preserved; raw @@ ranges and mode rows are hidden, with metadata on title hover.
+- Queries, syntax preparation and cancellation run in the background, with only visible rows laid out. Repeated clicks reuse results; repository events/manual refresh update working files, without added polling or idle repaint.
+- Refreshed both READMEs and native workspace/floating/Git-history screenshots, with a new read-only diff showcase. English examples use English text.
+
+### Fixed
+
+- File views render color emoji as complete graphemes, fixing monochrome outlines and syntax splits inside composite sequences. Explicit text variants retain text presentation.
+- Strict UTF-8 validation and first-line BOM handling report invalid encoding rather than replacing bytes. Already-corrupted historical text is retained faithfully. Slow queries no longer trigger an immediate duplicate fallback refresh.
+
+### Compatibility and verification
+
+- Sessions, directories, ordering, fonts, the default data location and running terminals are preserved. There is no editing, index/configuration write, disk diff cache, external diff, textconv or content-filter execution.
+- Git commands retain 6-second/2-MiB limits; file views show at most 20,000 lines/4,000 characters per line with explicit limit notices. Binary files have no text view; working-file links/junctions are not followed. Recreated staged-deletion paths show complete old/new sides.
+- Compatible features since 0.6.0 raise the minor version to 0.7.0. The user accepted preview.6. Offline regressions, native scale checks, six-terminal smoke and isolated installer upgrades are recorded separately from real model rounds, with no model API requests.
+
+## [0.7.0-preview.6] - 2026-11-10
+
+Local preview for working-file diff acceptance.
+
+### Added
+
+- Files in Changes open a read-only diff of the current file against HEAD, combining staged and unstaged changes. Untracked files and unborn repositories show additions; removed files show deletions. The full-file line numbers, syntax highlighting, color emoji and red/green diff backgrounds are shared, without editing.
+- Working and historical files have distinct source identities and persistent selection indicators; closing returns to the original terminal. The bounded background request/result slot is reused. Repository events or manual refresh results trigger rereads; repeated clicks reuse results, and directory switches cancel stale requests.
+
+### Improved
+
+- `??` now reads “Untracked”, with a tooltip explaining that the file has not been added to Git. Other status descriptions distinguish staged, unstaged and merge conflicts.
+- Reads do not modify files, the index or Git configuration, or execute external diff, textconv or content filters. UTF-8, 2 MiB, 20,000-line and 4,000-character limits remain. Linked/junction files report an error rather than following outside the repository.
+
+## [0.7.0-preview.5] - 2026-11-10
+
+Local preview for continued acceptance of emoji in file bodies.
+
+### Fixed
+
+- Git syntax-highlighted files use the existing Windows native color emoji renderer, fixing monochrome outlines for fire and prohibited signs while preserving Unicode source, syntax colors and diff backgrounds.
+- Skin tones, ZWJ, flags, keycaps and variation sequences retain complete grapheme slots even across syntax-span boundaries. Explicit text variants keep the source font and color instead of forcing color presentation.
+
+## [0.7.0-preview.4] - 2026-11-10
+
+Local preview for continued file-selection and encoding acceptance.
+
+### Fixed
+
+- The active committed file has a persistent gray background and thin blue marker, identified by full commit ID plus path. Hover does not move it; file switches, close and repository changes synchronize it, including loading/error states.
+- Committed files validate UTF-8 strictly rather than silently replacing invalid bytes. UTF-8 BOMs are handled at the first code line, preserving Chinese, accented text and emoji. Invalid UTF-8 has an explicit localized error; already-corrupted but valid UTF-8 history is retained without guessed conversion.
+- The file-title hover describes original UTF-8 text, and truncation messaging clarifies that either the row or per-line limit may apply.
+
+## [0.7.0-preview.3] - 2026-11-10
+
+Local preview for continued file-reading acceptance.
+
+### Added
+
+- Syntect 5.3.0 default grammars color JSON, Markdown and common source code by file type; unknown types fall back to plain text. Source spaces remain intact, tabs use four-column stops, and thin indent guides follow existing indentation without formatting files.
+- Syntax is prepared and cached in the Git file worker with separate old/new parse states. Diff status only changes the existing red/green backgrounds and markers; syntax colors stay consistent. Scrolling still lays out visible rows only, and close/directory changes cancel stale work.
+
+### Changed
+
+- The body shows actual file rows instead of raw hunk ranges (@@) or file modes. Mode metadata is available on the file-title hover.
+- Syntax preparation has a two-second soft budget, 100,000-token cap and 256-span-per-line cap. Errors or exhausted budgets fall back to plain text while retaining complete text within existing read/display limits.
+
+- Start fallback refresh cooldown when a slow Git result is consumed, so a query taking over two seconds does not immediately trigger another read of fresh results.
+
+## [0.7.0-preview.2] - 2026-11-09
+
+Local preview for continued file-diff acceptance.
+
+### Fixed
+
+- Added/deleted code keeps its normal body text color instead of turning green/red. Only row backgrounds and +/− markers use the application green/red; line numbers keep the secondary text color.
+
+- File views include unchanged content from the first through the last line, retaining inline additions/deletions and old/new line numbers. Mode-only commits also show the complete body. Existing read/display limits remain explicit.
+
+## [0.7.0-preview.1] - 2026-11-09
+
+Local preview awaiting hands-on acceptance.
+
+### Added
+
+- A narrow right-side terminal history scrollbar supports thumb dragging and track clicks. The 5,000-line limit and viewport snapshots remain; a fixed gutter avoids CLI reflow when history appears. Scrollbar gestures never reach the terminal application, and alternate screens do not show local history.
+- Click a committed file to open a read-only diff in the main area while retaining the commit panel. Old/new line numbers and the existing application green/red distinguish additions/deletions. Closing returns to the same terminal; background output continues draining.
+- File diffs load on demand in the background and cancel stale requests without mixing in uncommitted content. Root and first-parent merge comparisons match the file list. Binary files have explicit messaging; display is bounded to 20,000 lines and 4,000 characters per line. Queries exceeding six seconds or 2 MiB fail explicitly.
+
+### Compatibility
+
+- No new workspace fields or changes to data directories, session identity, font choices or Agent lifecycle. Compatible features target 0.7.0 under SemVer; the stable 0.6.0 tag and assets remain unchanged.
+
+### Validation scope
+
+- Governance, formatting, Clippy, 235 Rust tests and 20 Python tests pass. Real isolated ConPTY regressions verify scroll positions, mouse-input isolation and terminal preservation; Git tests cover file diffs and bounded reads. Native screenshots and six-terminal smoke evidence are recorded separately and do not claim real Agent model-turn acceptance.
+
 ## [0.6.0] - 2026-11-09
 
 ### Added

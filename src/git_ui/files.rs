@@ -9,6 +9,7 @@ pub(super) struct FileRow<'a> {
     pub deleted: u64,
     pub binary: bool,
     pub omitted: bool,
+    pub selected: bool,
 }
 
 fn icon(path: &str, binary: bool) -> (&'static str, Color32) {
@@ -46,11 +47,26 @@ fn icon(path: &str, binary: bool) -> (&'static str, Color32) {
     }
 }
 
-pub(super) fn show(ui: &mut egui::Ui, file: FileRow<'_>) {
+pub(super) fn show(ui: &mut egui::Ui, file: FileRow<'_>, id: egui::Id) -> egui::Response {
     let font = header_font(ui);
     let height = ui.text_style_height(&egui::TextStyle::Body).max(18.0) + 4.0;
-    let (rect, response) =
+    let (rect, _) =
         ui.allocate_exact_size(egui::vec2(ui.available_width(), height), Sense::hover());
+    let response = ui.interact(rect, id, Sense::click());
+    if file.selected {
+        let selected = rect.expand2(egui::vec2(4.0, 0.0));
+        ui.painter().rect_filled(selected, 2.0, chrome::SELECTED);
+        ui.painter().rect_filled(
+            egui::Rect::from_min_size(
+                selected.left_top() + egui::vec2(0.0, 2.0),
+                egui::vec2(2.0, (rect.height() - 4.0).max(0.0)),
+            ),
+            1.0,
+            chrome::WORKING,
+        );
+    } else if response.hovered() {
+        ui.painter().rect_filled(rect, 2.0, Color32::from_gray(40));
+    }
     let (glyph, color) = icon(file.path, file.binary);
     let icon_font = FontId::new(font.size, FontFamily::Name("codicons".into()));
     let galley = ui.painter().layout_no_wrap(glyph.into(), icon_font, color);
@@ -59,10 +75,15 @@ pub(super) fn show(ui: &mut egui::Ui, file: FileRow<'_>) {
         galley,
         color,
     );
-    let status = file.status;
-    let status_color = if status.contains('D') {
+    let locale = i18n::locale(ui.ctx());
+    let status = if file.status == "??" {
+        locale.text("未跟踪", "Untracked")
+    } else {
+        file.status.trim()
+    };
+    let status_color = if file.status.contains('D') {
         chrome::FAILED
-    } else if status.contains(['A', '?']) {
+    } else if file.status.contains(['A', '?']) {
         chrome::COMPLETED
     } else {
         chrome::WAITING
@@ -97,7 +118,7 @@ pub(super) fn show(ui: &mut egui::Ui, file: FileRow<'_>) {
         ui.weak(format!(
             "{}: {}",
             locale.text("状态", "Status"),
-            file.status
+            status_description(file.status, locale)
         ));
         if file.binary {
             ui.weak(locale.text("二进制", "Binary"));
@@ -109,5 +130,68 @@ pub(super) fn show(ui: &mut egui::Ui, file: FileRow<'_>) {
                 ui.colored_label(chrome::FAILED, format!("−{}", file.deleted));
             });
         }
-    });
+    })
+}
+
+fn status_description(status: &str, locale: i18n::Locale) -> String {
+    if status == "??" {
+        return locale
+            .text("未跟踪（尚未加入 Git）", "Untracked (not added to Git)")
+            .into();
+    }
+    if status.contains('U') || matches!(status, "AA" | "DD") {
+        return locale.text("合并冲突", "Merge conflict").into();
+    }
+    let name = |code| match code {
+        'M' => locale.text("已修改", "Modified"),
+        'A' => locale.text("新增", "Added"),
+        'D' => locale.text("已删除", "Deleted"),
+        'R' => locale.text("已重命名", "Renamed"),
+        'C' => locale.text("已复制", "Copied"),
+        'T' => locale.text("类型变化", "Type changed"),
+        _ => locale.text("未知状态", "Unknown status"),
+    };
+    let codes: Vec<_> = status.chars().collect();
+    if codes.len() == 2 {
+        [
+            (codes[0], locale.text("已暂存", "Staged")),
+            (codes[1], locale.text("未暂存", "Unstaged")),
+        ]
+        .into_iter()
+        .filter(|(code, _)| *code != ' ')
+        .map(|(code, group)| format!("{group}: {}", name(code)))
+        .collect::<Vec<_>>()
+        .join(" · ")
+    } else {
+        codes
+            .first()
+            .map_or_else(String::new, |code| name(*code).into())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn statuses_explain_untracked_staging_and_conflicts_in_both_languages() {
+        assert_eq!(
+            status_description("??", i18n::Locale::ZhCn),
+            "未跟踪（尚未加入 Git）"
+        );
+        assert_eq!(
+            status_description("??", i18n::Locale::En),
+            "Untracked (not added to Git)"
+        );
+        assert_eq!(
+            status_description("MM", i18n::Locale::En),
+            "Staged: Modified · Unstaged: Modified"
+        );
+        assert_eq!(
+            status_description(" M", i18n::Locale::ZhCn),
+            "未暂存: 已修改"
+        );
+        assert_eq!(status_description("A ", i18n::Locale::En), "Staged: Added");
+        assert_eq!(status_description("UU", i18n::Locale::ZhCn), "合并冲突");
+        assert_eq!(status_description("D", i18n::Locale::En), "Deleted");
+    }
 }

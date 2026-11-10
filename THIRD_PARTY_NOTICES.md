@@ -39,3 +39,7 @@ Windows 系统字体只在运行时读取，不随包复制。项目 LICENSE 适
 ## Codicons
 
 Git 分支、提交、复制和文件图标采用微软 [VS Code Codicons](https://github.com/microsoft/vscode-codicons) 官方 `@vscode/codicons` 0.0.45 包的原始字体和 `git-branch`（U+EC6F）、`copy`（U+EBCC）、`git-commit`（U+EAFC）与 `file`（U+EA7B）等分类文件字形，CC BY 4.0。字体、CSS 映射和许可未改动；来源及哈希见 `assets/fonts/SOURCE.json`，原许可为 `assets/fonts/LICENSE-Codicons.txt`，ZIP 随附 `Codicons-LICENSE.txt`。只作为程序内符号使用，不安装系统字体或作为终端字体选项。
+
+## 文件语法高亮
+
+[Syntect 5.3.0](https://github.com/trishume/syntect/tree/v5.3.0) 使用 MIT 许可证；默认语法集随锁定的 crates.io 归档内嵌，未启用默认主题资源，颜色规则由本项目定义。原始 LICENSE.txt 随制品的 licenses/syntect-5.3.0/ 保存，依赖和校验值由 Cargo.lock／dependencies.json 记录；fancy-regex、bincode、bit-set／bit-vec、fnv 等沿用各自声明与原始许可证。

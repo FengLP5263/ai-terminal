@@ -92,3 +92,15 @@ Git 面板核查：`cargo build --offline --locked --release --example git_probe
 Git 历史详情：git_probe 扩展为 12 张图，向自身 egui 注入合成点击以展开真实隔离提交的文件，并捕获中英文悬停卡片；不注入系统输入、不改剪贴板。git_panel 检查完整 ID 的 CopyText 输出、指针移入提示卡片、复制不触发展开、长摘要单行缩略及展开／收起。git_repository 覆盖根／空／合并提交、二进制、中文与重命名、正文、外部程序禁用、重复读取复用及旧目录结果取消；原生截图与自身 PTY 回收另行核对。
 
 preview.2：git_panel 比较更改与展开文件的分类字形，并在 100%／114%／200% 核对图标左缘与提交说明一致、读取状态不移动列表。git_repository 检查重复提示符／焦点式请求复用快照、手动刷新仍有效、监控失效补查限频，以及 Git 日志／锁文件不触发完整重读但真实文件和分支变化仍更新。git_probe 的真实提交样例包含多种文件类型，仍生成 12 张原生 PNG。
+
+0.7.0 预览：history_probe 命令见 scripts/README.md，真实无 profile PowerShell 固定输出、自身 egui 拖动生成 100%／103%／200% 顶部／中间／底部九张图。terminal_interaction 验证 SGR all-motion 下轨道／拖动／区域外松手不发送输入，以及 5000 行上限、viewport-only 快照及历史出现前后列数稳定。git_probe 增至 16 图，点击隔离提交文件并查看差异；git_repository 检查提交字节、字面路径、行号、根／合并、二进制、驱动禁用、限额、复用与取消；git_panel 验证只读、虚拟化、标准红绿背景／标记及代码文字保持正常颜色。file_view 回归核对中间改动前后的首／末行、连续行号及仅权限变化的完整正文。单独核对实际 PNG、正常退出及自身 PTY 回收，不冒充真实 Agent 验收。
+
+preview.3：syntax 单测验证 JSON 键／值／数字／布尔、Markdown 标题、内联／围栏代码、未知类型回退、Tab 停靠及删除注释不污染新版本。git_panel 核对缩进线、语法色与红绿背景独立、正文无 @@／file mode；git_probe 增至 20 图，追加中英文 JSON／Markdown 在 100%／200% 的原生截图。检查实际图像及同一 PTY 正常回收；语法截图不作为 Agent 模型回合验收。
+
+preview.4：file_view 编码回归使用真实隔离 Git 检查 UTF-8 BOM、中文／重音／emoji、已有乱码原样保留及无效字节明确失败；opened_file 回归核对持续指示、悬停不迁移、切换／关闭和相同路径不同提交隔离。git_probe 的 JSON 样例带 UTF-8 BOM 与正常中文，继续生成 20 张图，人工核对中文与持续选中标记；实际用户历史只读核查仅记录字节摘要，不复制正文或修改关联仓库。
+
+preview.5：ui_text 回归检查语法段切开 ZWJ／肤色／变体时的完整槽位、源字节不变、文字配色和显式文本变体；git_panel 检查增删行都产生原生彩色覆盖层。git_probe 增至 22 张图，Markdown 表格包含火焰、禁止标志、组合 emoji 与文本变体，覆盖 100%／103%／114%／200% 和 JetBrains Mono／Hack；必须目视检查原生颜色与基线，并回收自身 PTY。
+
+preview.6：git_repository 以真实隔离 Git 验证暂存＋未暂存的净差异、索引／文件字节不变、未跟踪／无 HEAD／删除后重建、字面中文路径、二进制、无效编码、限额、过滤器禁用、复用与刷新／取消。git_panel 覆盖“未跟踪”标签、点击 WorkingTree 来源、持续选中和只读。git_probe 增至 26 图，追加中英文工作区新增／修改／二进制及 100%／103%／114%／200% 截图；仅操作自己的仓库和 PTY，不运行模型。
+
+0.7.0 README 原生捕获新增 readme_capture 的第三参数 diff：使用固定 TSX 旧／新增行和正式只读文件组件，正文由现有语法准备生成，不查询用户仓库；英文模式所有展示文字使用英文。普通终端样例先写入固定历史，核对右侧滚动条。检查中英文主图、历史、文件差异和浮窗八张 PNG 后原样复制并更新 SOURCE.json；展示内容不能替代真实 Git、滚动交互或模型验收。
