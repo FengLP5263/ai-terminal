@@ -105,118 +105,133 @@ pub fn show(ui: &mut egui::Ui, result: &PatchResult) -> bool {
         if patch.presentation.rows.is_empty() && !patch.binary {
             ui.weak(locale.text("文件内容为空。", "File is empty."));
         }
-        let row_height = ui.text_style_height(&egui::TextStyle::Body).max(font.size) + 5.0;
-        let char_width = ui
-            .painter()
-            .layout_no_wrap("0".into(), font.clone(), chrome::TEXT)
-            .size()
-            .x;
-        let gutter = char_width * 16.0;
-        let width =
-            (gutter + patch.max_columns as f32 * char_width + 20.0).max(ui.available_width());
-        ui.scope(|ui| {
-            ui.spacing_mut().item_spacing.y = 0.0;
-            egui::ScrollArea::both()
-                .id_salt(("git-file-diff", &result.source, &result.path))
-                .auto_shrink([false, false])
-                .show_rows(ui, row_height, patch.presentation.rows.len(), |ui, rows| {
-                    for index in rows {
-                        let row = &patch.presentation.rows[index];
-                        let line = &patch.lines[row.source];
-                        let (rect, _) = ui.allocate_exact_size(
-                            egui::vec2(width, row_height),
-                            egui::Sense::hover(),
-                        );
-                        let (color, marker) = match line.kind {
-                            PatchKind::Added => (chrome::COMPLETED, "+"),
-                            PatchKind::Deleted => (chrome::FAILED, "−"),
-                            _ => (chrome::TEXT, ""),
-                        };
-                        if matches!(line.kind, PatchKind::Added | PatchKind::Deleted) {
-                            ui.painter()
-                                .rect_filled(rect, 0.0, color.gamma_multiply(0.13));
-                        }
-                        let numbers = format!(
+        body(
+            ui,
+            patch,
+            ("git-file-diff", &result.source, &result.path),
+            false,
+        );
+    }
+    close
+}
+
+/// Shared source rendering for diffs and ordinary project documents; only visible rows are laid out.
+pub fn body(
+    ui: &mut egui::Ui,
+    patch: &crate::git::FilePatch,
+    salt: impl std::hash::Hash + std::fmt::Debug,
+    single_numbers: bool,
+) {
+    let font = header_font(ui);
+    ui.style_mut().override_font_id = Some(font.clone());
+    let row_height = ui.text_style_height(&egui::TextStyle::Body).max(font.size) + 5.0;
+    let char_width = ui
+        .painter()
+        .layout_no_wrap("0".into(), font.clone(), chrome::TEXT)
+        .size()
+        .x;
+    let gutter = char_width * if single_numbers { 8.0 } else { 16.0 };
+    let width = (gutter + patch.max_columns as f32 * char_width + 20.0).max(ui.available_width());
+    ui.scope(|ui| {
+        ui.spacing_mut().item_spacing.y = 0.0;
+        egui::ScrollArea::both()
+            .id_salt(salt)
+            .auto_shrink([false, false])
+            .show_rows(ui, row_height, patch.presentation.rows.len(), |ui, rows| {
+                for index in rows {
+                    let row = &patch.presentation.rows[index];
+                    let line = &patch.lines[row.source];
+                    let (rect, _) =
+                        ui.allocate_exact_size(egui::vec2(width, row_height), egui::Sense::hover());
+                    let (color, marker) = match line.kind {
+                        PatchKind::Added => (chrome::COMPLETED, "+"),
+                        PatchKind::Deleted => (chrome::FAILED, "−"),
+                        _ => (chrome::TEXT, ""),
+                    };
+                    if matches!(line.kind, PatchKind::Added | PatchKind::Deleted) {
+                        ui.painter()
+                            .rect_filled(rect, 0.0, color.gamma_multiply(0.13));
+                    }
+                    let numbers = if single_numbers {
+                        format!("{:>6}", line.new.map(|n| n.to_string()).unwrap_or_default())
+                    } else {
+                        format!(
                             "{:>6} {:>6}",
                             line.old.map(|n| n.to_string()).unwrap_or_default(),
-                            line.new.map(|n| n.to_string()).unwrap_or_default(),
-                        );
-                        let origin =
-                            egui::pos2(rect.left(), rect.center().y - row_height * 0.5 + 2.5);
+                            line.new.map(|n| n.to_string()).unwrap_or_default()
+                        )
+                    };
+                    let origin = egui::pos2(rect.left(), rect.center().y - row_height * 0.5 + 2.5);
+                    ui.painter().text(
+                        origin,
+                        egui::Align2::LEFT_TOP,
+                        numbers,
+                        font.clone(),
+                        chrome::SECONDARY,
+                    );
+                    if !marker.is_empty() {
                         ui.painter().text(
-                            origin,
+                            origin + egui::vec2(char_width * 14.0, 0.0),
                             egui::Align2::LEFT_TOP,
-                            numbers,
+                            marker,
                             font.clone(),
-                            chrome::SECONDARY,
+                            color,
                         );
-                        if !marker.is_empty() {
-                            ui.painter().text(
-                                origin + egui::vec2(char_width * 14.0, 0.0),
-                                egui::Align2::LEFT_TOP,
-                                marker,
-                                font.clone(),
-                                color,
-                            );
-                        }
-                        let text_origin = origin + egui::vec2(gutter, 0.0);
-                        for column in
-                            (0..row.indent).step_by(patch.presentation.indent_width.max(1))
-                        {
-                            let x = text_origin.x + column as f32 * char_width;
-                            ui.painter().line_segment(
-                                [egui::pos2(x, rect.top()), egui::pos2(x, rect.bottom())],
-                                egui::Stroke::new(
-                                    1.0 / ui.ctx().pixels_per_point(),
-                                    Color32::from_gray(53),
-                                ),
-                            );
-                        }
-                        let mut job = egui::text::LayoutJob::default();
-                        let mut start = 0;
-                        for token in &row.tokens {
-                            let end = (token.end as usize).min(line.text.len());
-                            if let Some(text) = line.text.get(start..end) {
-                                job.append(
-                                    text,
-                                    0.0,
-                                    egui::TextFormat {
-                                        font_id: font.clone(),
-                                        color: Color32::from_rgb(
-                                            token.color[0],
-                                            token.color[1],
-                                            token.color[2],
-                                        ),
-                                        ..Default::default()
-                                    },
-                                );
-                                start = end;
-                            }
-                        }
-                        if start < line.text.len() || job.text.is_empty() {
+                    }
+                    let text_origin = origin + egui::vec2(gutter, 0.0);
+                    for column in (0..row.indent).step_by(patch.presentation.indent_width.max(1)) {
+                        let x = text_origin.x + column as f32 * char_width;
+                        ui.painter().line_segment(
+                            [egui::pos2(x, rect.top()), egui::pos2(x, rect.bottom())],
+                            egui::Stroke::new(
+                                1.0 / ui.ctx().pixels_per_point(),
+                                Color32::from_gray(53),
+                            ),
+                        );
+                    }
+                    let mut job = egui::text::LayoutJob::default();
+                    let mut start = 0;
+                    for token in &row.tokens {
+                        let end = (token.end as usize).min(line.text.len());
+                        if let Some(text) = line.text.get(start..end) {
                             job.append(
-                                &line.text[start..],
+                                text,
                                 0.0,
                                 egui::TextFormat {
                                     font_id: font.clone(),
-                                    color: chrome::TEXT,
+                                    color: Color32::from_rgb(
+                                        token.color[0],
+                                        token.color[1],
+                                        token.color[2],
+                                    ),
                                     ..Default::default()
                                 },
                             );
+                            start = end;
                         }
-                        let galley = crate::ui_text::layout_job(ui.ctx(), job);
-                        ui.painter()
-                            .galley(text_origin, galley.clone(), chrome::TEXT);
-                        crate::ui_text::paint_emoji(
-                            ui.painter(),
-                            text_origin,
-                            &galley,
-                            font.size,
-                            chrome::TEXT,
+                    }
+                    if start < line.text.len() || job.text.is_empty() {
+                        job.append(
+                            &line.text[start..],
+                            0.0,
+                            egui::TextFormat {
+                                font_id: font.clone(),
+                                color: chrome::TEXT,
+                                ..Default::default()
+                            },
                         );
                     }
-                });
-        });
-    }
-    close
+                    let galley = crate::ui_text::layout_job(ui.ctx(), job);
+                    ui.painter()
+                        .galley(text_origin, galley.clone(), chrome::TEXT);
+                    crate::ui_text::paint_emoji(
+                        ui.painter(),
+                        text_origin,
+                        &galley,
+                        font.size,
+                        chrome::TEXT,
+                    );
+                }
+            });
+    });
 }

@@ -316,6 +316,9 @@ pub struct App {
     git: Option<ai_terminal::git::GitClient>,
     git_view: ai_terminal::git_ui::GitView,
     git_focused: bool,
+    project_files: ai_terminal::project_files::FileClient,
+    project_view: ai_terminal::project_ui::FileView,
+    project_session: Option<String>,
     floating_session_count: Option<usize>,
     floating_zoom: Option<f32>,
     floating: ai_terminal::floating::FloatingBar,
@@ -438,6 +441,9 @@ impl App {
             },
             git_view: Default::default(),
             git_focused: false,
+            project_files: ai_terminal::project_files::FileClient::new(cc.egui_ctx.clone()),
+            project_view: Default::default(),
+            project_session: None,
             floating_session_count: None,
             floating_zoom: None,
             floating,
@@ -575,6 +581,7 @@ impl App {
                     self.can_draw
                         && !self.confirm_exit
                         && self.git.as_ref().is_none_or(|g| g.patch.is_none())
+                        && self.project_files.file.is_none()
                         && self.closing.is_none()
                         && self.active.as_deref() == Some(&s.spec.id),
                 );
@@ -702,6 +709,45 @@ impl App {
                 git.refresh_if_needed();
             }
             git.poll();
+        }
+        let session_changed = self.project_session != self.active;
+        let had_document = self.project_files.file.is_some();
+        if session_changed {
+            self.project_files.set_root(None);
+            self.project_session = self.active.clone();
+        }
+        let project_root = self
+            .git
+            .as_ref()
+            .and_then(|g| g.snapshot.as_ref())
+            .map(|s| s.root.clone())
+            .or_else(|| {
+                if self.git.as_ref().is_some_and(|g| g.loading) && !session_changed {
+                    self.project_files
+                        .root
+                        .as_ref()
+                        .filter(|root| active_directory.is_some_and(|cwd| cwd.starts_with(root)))
+                        .cloned()
+                } else {
+                    None
+                }
+            })
+            .or_else(|| active_directory.map(std::path::Path::to_owned));
+        let root_changed = self.project_files.set_root(project_root.as_deref());
+        self.project_files.poll();
+        if focused && !self.git_focused && !root_changed {
+            if self.preferences.project_files_open {
+                self.project_files.refresh();
+            } else if self.project_files.file.is_some() {
+                self.project_files.reload_file();
+            }
+        }
+        if self.preferences.project_files_open {
+            self.project_files
+                .ensure_directory(std::path::Path::new(""));
+        }
+        if had_document != self.project_files.file.is_some() {
+            self.sync_visibility();
         }
         self.git_focused = focused;
         if had_diff != self.git.as_ref().is_some_and(|g| g.patch.is_some()) {
@@ -1063,13 +1109,15 @@ impl App {
                     && !egui::Popup::is_any_open(&ctx);
                 let session = &self.sessions[index];
                 let was_git_open = self.preferences.git_panel_open;
-                let reset = ai_terminal::git_ui::header(ui, ai_terminal::git_ui::Header {
+                let was_files_open = self.preferences.project_files_open;
+                let reset = ai_terminal::git_ui::header_with_files(ui, ai_terminal::git_ui::Header {
                     name: &session.spec.name,
                     directory: &session.spec.directory,
                     scale: self.preferences.ui_scale,
                     connection: (session.backend.is_some() && !session.display_agent().is_shell()).then_some((session.display_agent(), &session.status)),
-                }, self.git.as_ref(), &mut self.preferences.git_panel_open);
-                if was_git_open != self.preferences.git_panel_open {
+                }, self.git.as_ref(), &mut self.preferences.git_panel_open, &mut self.preferences.project_files_open);
+                if !was_git_open && self.preferences.git_panel_open {self.preferences.project_files_open=false;}
+                if was_git_open != self.preferences.git_panel_open || was_files_open != self.preferences.project_files_open {
                     if self.preferences.git_panel_open && let Some(git) = &mut self.git { git.refresh_if_needed(); }
                     self.preferences_changed(&ctx);
                     ctx.request_repaint();
@@ -1078,6 +1126,12 @@ impl App {
                 if reset {
                     self.set_ui_scale(1.0, &ctx);
                     self.terminal_focus_pending = true;
+                }
+                if let Some(file) = self.project_files.file.as_ref() {
+                    if ai_terminal::project_ui::document(ui,file,self.project_files.root.as_deref()) {
+                        self.project_files.close_file();self.sync_visibility();self.terminal_focus_pending=true;ctx.request_repaint();
+                    }
+                    return;
                 }
                 if let Some(patch) = self.git.as_ref().and_then(|g| g.patch.as_ref()) {
                     if ai_terminal::git_ui::diff::show(ui, patch) {
@@ -1540,9 +1594,24 @@ impl eframe::App for App {
         }
         self.sidebar(ui);
         let was_git_open = self.preferences.git_panel_open;
-        let git_actions =
-            self.git_view
-                .panel(ui, self.git.as_ref(), &mut self.preferences.git_panel_open);
+        let was_files_open = self.preferences.project_files_open;
+        let actions = ai_terminal::project_ui::panel(
+            ui,
+            &mut self.project_files,
+            &mut self.project_view,
+            self.git.as_ref(),
+            &mut self.git_view,
+            &mut self.preferences.git_panel_open,
+            &mut self.preferences.project_files_open,
+        );
+        if let Some(path) = actions.file {
+            self.project_files.open_file(&path);
+            if let Some(git) = &mut self.git {
+                git.close_patch();
+            }
+            self.sync_visibility();
+        }
+        let git_actions = actions.git;
         if git_actions.refresh
             && let Some(git) = &mut self.git
         {
@@ -1562,9 +1631,18 @@ impl eframe::App for App {
             && let Some(git) = &mut self.git
         {
             git.open_file(source, &path);
+            self.project_files.close_file();
             self.sync_visibility();
         }
-        if was_git_open != self.preferences.git_panel_open {
+        if !was_git_open
+            && self.preferences.git_panel_open
+            && let Some(git) = &mut self.git
+        {
+            git.refresh_if_needed();
+        }
+        if was_git_open != self.preferences.git_panel_open
+            || was_files_open != self.preferences.project_files_open
+        {
             self.preferences_changed(&ctx);
         }
         self.terminal(ui);
@@ -2372,6 +2450,119 @@ Send-State 'state=clear'; Wait-Step 5
                 .unwrap()
                 .should_interrupt_composition,
             "focus restoration must not repeat on the next repaint"
+        );
+    }
+
+    #[test]
+    fn project_document_keeps_the_original_pty_draining_and_restores_terminal_input() {
+        let directory = tempfile::tempdir().unwrap();
+        std::fs::write(directory.path().join("readme.md"), "# 文件查看 ❤️\n").unwrap();
+        let ctx = egui::Context::default();
+        let creation = eframe::CreationContext::_new_kittest(ctx.clone());
+        let mut app = App::new(&creation, directory.path().to_owned(), false, false);
+        use_built_helper(&mut app);
+        app.last_directory = Some(directory.path().to_owned());
+        app.new_shell(Agent::Cmd, &ctx);
+        let frame = |app: &mut App, events| {
+            ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1200.0, 700.0),
+                    )),
+                    events,
+                    ..Default::default()
+                },
+                |ui| app.terminal(ui),
+            )
+        };
+        frame(&mut app, vec![]);
+        let pid = app.sessions[0].backend.as_ref().unwrap().pty_id();
+        let id = app.active.clone();
+        app.project_files.set_root(Some(directory.path()));
+        app.project_files
+            .open_file(std::path::Path::new("readme.md"));
+        let until = Instant::now() + Duration::from_secs(8);
+        while app.project_files.file.as_ref().unwrap().loading {
+            app.project_files.poll();
+            assert!(Instant::now() < until);
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        app.sync_visibility();
+        let output = frame(
+            &mut app,
+            vec![egui::Event::Text("SHOULD_NOT_REACH_PROJECT_PTY".into())],
+        );
+        assert!(app.terminal_rect.is_none());
+        app.sessions[0].backend.as_mut().unwrap().process_command(
+            egui_term::BackendCommand::Write(b"echo PROJECT_HIDDEN_OUTPUT\r".to_vec()),
+        );
+        let until = Instant::now() + Duration::from_secs(8);
+        loop {
+            let text = app.sessions[0].backend.as_mut().unwrap().plain_text();
+            if text.contains("PROJECT_HIDDEN_OUTPUT") {
+                assert!(!text.contains("SHOULD_NOT_REACH_PROJECT_PTY"));
+                break;
+            }
+            assert!(Instant::now() < until);
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        let close = output
+            .shapes
+            .iter()
+            .find_map(|s| match &s.shape {
+                egui::Shape::Text(t) if t.galley.job.text == "\u{ea76}" => {
+                    Some(t.pos + egui::vec2(4.0, 4.0))
+                }
+                _ => None,
+            })
+            .unwrap();
+        for pressed in [true, false] {
+            frame(
+                &mut app,
+                vec![
+                    egui::Event::PointerMoved(close),
+                    egui::Event::PointerButton {
+                        pos: close,
+                        button: egui::PointerButton::Primary,
+                        pressed,
+                        modifiers: egui::Modifiers::NONE,
+                    },
+                ],
+            );
+        }
+        assert!(app.project_files.file.is_none());
+        frame(&mut app, vec![]);
+        assert!(app.terminal_rect.is_some());
+        frame(
+            &mut app,
+            vec![
+                egui::Event::Text("echo PROJECT_RETURN_OK".into()),
+                egui::Event::Key {
+                    key: egui::Key::Enter,
+                    physical_key: None,
+                    pressed: true,
+                    repeat: false,
+                    modifiers: egui::Modifiers::NONE,
+                },
+            ],
+        );
+        let until = Instant::now() + Duration::from_secs(8);
+        while !app.sessions[0]
+            .backend
+            .as_mut()
+            .unwrap()
+            .plain_text()
+            .contains("PROJECT_RETURN_OK")
+        {
+            assert!(Instant::now() < until);
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        assert_eq!(app.active, id);
+        assert_eq!(app.sessions[0].backend.as_ref().unwrap().pty_id(), pid);
+        assert_eq!(
+            std::fs::read_to_string(directory.path().join("readme.md")).unwrap(),
+            "# 文件查看 ❤️\n"
         );
     }
 

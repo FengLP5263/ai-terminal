@@ -92,10 +92,12 @@ target/release/examples/readme_capture.exe output/<unique-history-zh> zh history
 target/release/examples/readme_capture.exe output/<unique-history-en> en history
 target/release/examples/readme_capture.exe output/<unique-diff-zh> zh diff
 target/release/examples/readme_capture.exe output/<unique-diff-en> en diff
+target/release/examples/readme_capture.exe output/<unique-files-zh> zh files
+target/release/examples/readme_capture.exe output/<unique-files-en> en files
 target/release/examples/island_probe.exe output/<unique-floating>
 ```
 
-每次使用全新目录；`readme_capture <output> [zh|en] [history|diff]` 默认显示“更改”，第三参数切换“提交历史”或只读文件差异，只向自己的 egui 输入合成点击以展开样例提交；三种模式都输出 workspace.png。复用正式侧栏、字体、顶部摘要、Git 面板和终端组件，仅用固定文本、示例目录及合成 Git／任务状态，不查询用户仓库。`island_probe` 生成中英文浮窗与设置截图。两者不启动 Agent／模型或读取用户 profile，只管理自身窗口和 PTY。核对退出码、result.json、自身 PTY 回收、实际 PNG 和隐私后，将两套 workspace.png、历史模式 workspace.png 及 island-zh.png／island-en.png 原样复制到 assets/readme 对应的 workspace、git-history、git-diff 与 floating 中英文文件，更新 SOURCE.json 的版本、来源、尺寸与 SHA-256。展示样例不能代替真实 Git 或 Agent 验收。
+每次使用全新目录；`readme_capture <output> [zh|en] [history|diff|files]` 默认显示“更改”，第三参数切换“提交历史”、只读文件差异或项目文件树，只向自己的 egui 输入合成点击以展开样例提交；四种模式都输出 workspace.png。复用正式侧栏、字体、顶部摘要、文件／Git 共用面板和终端组件，仅用固定文本、示例目录及合成 Git／任务状态，不查询用户仓库。`island_probe` 生成中英文浮窗与设置截图。两者不启动 Agent／模型或读取用户 profile，只管理自身窗口和 PTY。核对退出码、result.json、自身 PTY 回收、实际 PNG 和隐私后，将两套 workspace.png、历史模式 workspace.png 及 island-zh.png／island-en.png 原样复制到 assets/readme 对应的 workspace、git-history、git-diff、project-files 与 floating 中英文文件，更新 SOURCE.json 的版本、来源、尺寸与 SHA-256。展示样例不能代替真实 Git 或 Agent 验收。
 
 Codex 原生状态／总览与模式图标（仅 Windows）：构建 `cargo build --offline --locked --release --bins --example agents_status_probe`。在已有可信目录运行 `target/release/examples/agents_status_probe.exe codex output/<unique-agents-probe>`，只发送左箭头进入 agents 总览和 Esc 返回，生成三张 PNG 与有限状态 JSON；不发送提示词、不接受项目／hook 信任、不停止用户共享后台。`target/release/examples/agents_status_probe.exe badges output/<unique-badge-probe>` 使用固定 PowerShell 文本，生成 100%／146%／200% 的相邻三角／暂停／emoji 截图。检查 JSON、退出码及实际图像；启动导航不是模型回合。POSIX 原生限制与既有入口一致，没有新增 project 动作。
 
@@ -170,3 +172,7 @@ git_probe 的 JSON 样例现带 UTF-8 BOM 与正常中文；沿用现有命令�
 设置原生核查（Windows）：`cargo build --offline --locked --release --example settings_probe --example floating_scale_probe`，分别运行 `target/release/examples/settings_probe.exe output/<unique-forms>` 与 `target/release/examples/floating_scale_probe.exe output/<unique-pixels>`。前者生成 10 张中英宽窄与确认框图；后者生成 18 张独立缩放图并记录根窗口同尺寸参考头像，用于像素对照。不执行用户任务、修改真实工作区或调用模型；现有 Windows／POSIX 动作参数不变。
 
 Windows 原生设置入口：`ai-terminal.exe --settings`；可组合 `--data-dir <目录>` 用于隔离预览。现有 Windows／POSIX project 动作及参数不变；POSIX 非 Windows 平台仍明确拒绝原生 GUI 动作。
+
+项目文件原生核查（Windows）：`cargo build --offline --locked --release --bins --example project_files_probe` 后运行 `target/release/examples/project_files_probe.exe output/<unique-project-files>`。使用正式文件树／共享面板／只读文档和自建样例，生成中英、多档缩放及异常文件 12 张图；一个真实无 profile PowerShell PTY 在查看期间保持身份，探针 Job 仅回收自身进程。不读用户配置、不执行样例代码或模型。既有 Windows／POSIX 动作与参数不变，非 Windows 原生动作仍明确失败。
+
+0.9.0 README 的 `files` 模式仅在自己的输出目录建立固定示例文件，复用正式文件树和只读正文组件；对外顶部路径固定为示例，不读取用户项目。核对两套 project-files 原生 PNG、当前文件标记、文件夹图标、语法颜色、缩进与 emoji 后原样复制并记录摘要。

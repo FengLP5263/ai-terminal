@@ -110,3 +110,7 @@ preview.6：git_repository 以真实隔离 Git 验证暂存＋未暂存的净差
 0.8.0-preview.2：git::syntax 检查常见语言／特殊文件名、真正 TS/TSX、PowerShell 参数／环境变量／命令／引号／Here-String／多行注释、旧新状态、未知类型及取消。shell_icons 检查三种标准字形与缩放。git_syntax_probe 用正式只读差异组件在 100%／150% 下生成 16 类固定样例的 32 张原生图；不读用户仓库、不执行脚本或模型。许可回归拒绝版本漂移、篡改和 ZIP 缺失许可。目视检查截图，计数不能代替验收。
 
 0.8.0-preview.3：settings_floating 验证头像纹理及标准字形使用最终物理像素，覆盖不同主／浮窗比例与实际点击；检查语言／字体／浮窗滑块即时生效、无完成按钮、宽窄中英列对齐及全局样式不变。floating_scale_probe 的 18 图改含三种 Shell 与三种 Agent，并在根窗口独立绘制同尺寸 Shell 参考图；核对像素差异、尺寸、定位与点击。settings_probe 生成 10 图，覆盖中英、宽窄、150%、浮窗禁用、重命名与两种确认框，不管理真实进程或调用模型。
+
+0.9.0 项目文件核查：`cargo build --offline --locked --release --bins --example project_files_probe`，再运行 `target/release/examples/project_files_probe.exe output/<unique-project-files>`。12 张原生图覆盖文件树、中文／emoji、JSON、Rust、脚本、UTF-16、空／大／二进制／无效编码和返回终端；仅使用自建样例和无 profile PowerShell，Job Object 只回收自身 PTY，不执行查看的代码或请求模型。project_files 回归验证惰性、限额、刷新、取消、过期结果与 junction；project_ui 验证实际文件夹／文件／切换按钮及字体图标；App 回归验证文档下输入隔离、后台排空及原 PID／输入恢复。截图与真实用户验收分别记录。
+
+0.9.0 公开截图新增 `readme_capture <output> [zh|en] files`，在自己的输出目录建立固定示例，复用正式文件／Git 共用面板和只读正文；顶部使用固定示例路径，不读取用户项目。逐张核查中英文项目文件、主界面、Git 历史、差异和浮窗十张 PNG、当前文件标记、文件夹图标、语法与 emoji，原样复制并更新摘要。

@@ -160,6 +160,24 @@ pub fn header(
     client: Option<&GitClient>,
     open: &mut bool,
 ) -> bool {
+    header_inner(ui, header, client, open, None)
+}
+pub fn header_with_files(
+    ui: &mut egui::Ui,
+    header: Header<'_>,
+    client: Option<&GitClient>,
+    open: &mut bool,
+    files: &mut bool,
+) -> bool {
+    header_inner(ui, header, client, open, Some(files))
+}
+fn header_inner(
+    ui: &mut egui::Ui,
+    header: Header<'_>,
+    client: Option<&GitClient>,
+    open: &mut bool,
+    files: Option<&mut bool>,
+) -> bool {
     let (rect, _) = ui.allocate_exact_size(
         egui::vec2(ui.available_width(), chrome::CONTROL),
         egui::Sense::hover(),
@@ -200,6 +218,24 @@ pub fn header(
         ))
         .clicked();
     right -= gap;
+    if let Some(files) = files {
+        right -= chrome::CONTROL;
+        let mut button_ui = child(ui, "terminal-header-files", right, chrome::CONTROL);
+        if crate::project_ui::icon_button(
+            &mut button_ui,
+            crate::project_ui::PROJECT_FILES_ICON,
+            i18n::tr(ui.ctx(), "项目文件", "Project files"),
+            *files,
+        )
+        .clicked()
+        {
+            *files = !*files;
+            if *files {
+                *open = false;
+            }
+        }
+        right -= gap;
+    }
     if let Some((agent, status)) = header.connection
         && rect.width() > 540.0
     {
@@ -336,53 +372,93 @@ impl GitView {
         not_repository: bool,
         limit: usize,
     ) -> Actions {
+        self.contents_inner(ui, snapshot, error, loading, not_repository, limit, true)
+    }
+    pub fn contents_without_header(
+        &mut self,
+        ui: &mut egui::Ui,
+        client: Option<&GitClient>,
+    ) -> Actions {
+        self.inspection = client.and_then(|c| c.inspection.clone());
+        let open_file = client
+            .and_then(|c| c.patch.as_ref())
+            .map(|p| (p.source.clone(), p.path.clone()));
+        self.open_file = open_file;
+        if let Some(data) = self.inspection.as_ref().and_then(|i| i.data.as_ref())
+            && self.selected.as_deref() == Some(data.id.as_str())
+        {
+            self.expanded_details = Some(data.clone());
+        }
+        self.contents_inner(
+            ui,
+            client.and_then(|c| c.snapshot.as_deref()),
+            client.and_then(|c| c.error.as_ref()),
+            client.is_some_and(|c| c.loading),
+            client.is_some_and(|c| c.not_repository),
+            client.map_or(50, |c| c.limit),
+            false,
+        )
+    }
+    #[allow(clippy::too_many_arguments)]
+    fn contents_inner(
+        &mut self,
+        ui: &mut egui::Ui,
+        snapshot: Option<&Snapshot>,
+        error: Option<&GitError>,
+        loading: bool,
+        not_repository: bool,
+        limit: usize,
+        with_header: bool,
+    ) -> Actions {
         ui.style_mut().override_font_id = Some(header_font(ui));
         let locale = i18n::locale(ui.ctx());
         let mut actions = Actions::default();
-        ui.horizontal(|ui| {
-            if let Some(snapshot) = snapshot {
-                let controls = text_width(ui, locale.text("读取中…", "Reading…"))
-                    .max(text_width(ui, locale.text("刷新", "Refresh")))
-                    + chrome::CONTROL
-                    + 32.0;
-                let width = (ui.available_width() - controls).max(1.0);
-                ui.add_sized(
-                    [width, chrome::CONTROL],
-                    egui::Label::new(
-                        RichText::new(
-                            snapshot
-                                .root
-                                .file_name()
-                                .unwrap_or(snapshot.root.as_os_str())
-                                .to_string_lossy(),
+        if with_header {
+            ui.horizontal(|ui| {
+                if let Some(snapshot) = snapshot {
+                    let controls = text_width(ui, locale.text("读取中…", "Reading…"))
+                        .max(text_width(ui, locale.text("刷新", "Refresh")))
+                        + chrome::CONTROL
+                        + 32.0;
+                    let width = (ui.available_width() - controls).max(1.0);
+                    ui.add_sized(
+                        [width, chrome::CONTROL],
+                        egui::Label::new(
+                            RichText::new(
+                                snapshot
+                                    .root
+                                    .file_name()
+                                    .unwrap_or(snapshot.root.as_os_str())
+                                    .to_string_lossy(),
+                            )
+                            .strong(),
                         )
-                        .strong(),
+                        .truncate(),
                     )
-                    .truncate(),
-                )
-                .on_hover_text(snapshot.root.display().to_string());
-            }
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                actions.close = chrome::icon_button(
-                    ui,
-                    egui::Id::new("git-close"),
-                    chrome::ActionIcon::Close,
-                    locale.text("收起 Git 面板", "Close Git panel"),
-                )
-                .clicked();
-                actions.refresh = ui
-                    .add_enabled(
-                        !loading,
-                        egui::Button::new(if loading {
-                            locale.text("读取中…", "Reading…")
-                        } else {
-                            locale.text("刷新", "Refresh")
-                        }),
+                    .on_hover_text(snapshot.root.display().to_string());
+                }
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    actions.close = chrome::icon_button(
+                        ui,
+                        egui::Id::new("git-close"),
+                        chrome::ActionIcon::Close,
+                        locale.text("收起 Git 面板", "Close Git panel"),
                     )
-                    .on_hover_text(locale.text("读取本地仓库", "Read local repository"))
                     .clicked();
+                    actions.refresh = ui
+                        .add_enabled(
+                            !loading,
+                            egui::Button::new(if loading {
+                                locale.text("读取中…", "Reading…")
+                            } else {
+                                locale.text("刷新", "Refresh")
+                            }),
+                        )
+                        .on_hover_text(locale.text("读取本地仓库", "Read local repository"))
+                        .clicked();
+                });
             });
-        });
+        }
         if let Some(error) = error {
             let message = match error {
                 GitError::Missing => locale

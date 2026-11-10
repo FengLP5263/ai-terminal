@@ -26,3 +26,8 @@ pub mod i18n;
 pub mod settings;
 
 pub mod integration;
+
+pub mod file_icons;
+pub mod project_files;
+
+pub mod project_ui;

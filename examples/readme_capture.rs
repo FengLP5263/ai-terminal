@@ -1,5 +1,8 @@
 //! Public workspace capture using the production sidebar and terminal.
 //! Synthetic metadata and fixed console text only; no Agent/model/user profile.
+#[path = "../src/platform.rs"]
+#[allow(dead_code)]
+mod platform;
 use ai_terminal::{
     appearance,
     floating::{Item, Snapshot},
@@ -10,6 +13,8 @@ use ai_terminal::{
     git_ui::{self, GitView},
     i18n::{self, Language, Locale},
     model::{Agent, SessionColor},
+    project_files::FileClient,
+    project_ui::{self, FileView},
     sidebar::{self, Entry, Icons},
     status::{Activity, Status},
 };
@@ -22,7 +27,13 @@ use std::{
 
 struct Capture {
     renderer: egui_term::TextRendererSession,
+    _job: platform::ProcessJob,
     backend: TerminalBackend,
+    files_client: FileClient,
+    files_view: FileView,
+    files_root: PathBuf,
+    files: bool,
+    files_started: bool,
     icons: Icons,
     snapshot: Snapshot,
     git: GitClient,
@@ -46,8 +57,18 @@ impl eframe::App for Capture {
         self.renderer.release();
     }
     fn logic(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
+        self.files_client.poll();
+        if self.files && !self.files_started && self.began.elapsed() > Duration::from_millis(700) {
+            for path in ["src", "src/components", "docs", "tests"] {
+                self.files_view
+                    .expand(std::path::Path::new(path), &mut self.files_client);
+            }
+            self.files_client
+                .open_file(std::path::Path::new("src/components/SignIn.tsx"));
+            self.files_started = true;
+        }
         if self.captured || self.began.elapsed() > Duration::from_secs(18) {
-            std::fs::write(self.output.join("result.json"),serde_json::to_vec_pretty(&serde_json::json!({"ok":self.captured,"version":env!("CARGO_PKG_VERSION"),"synthetic_metadata":true,"synthetic_git":true,"history":self.history,"file_diff":self.diff,"example_paths":true,"model_requests":false,"user_profiles":false,"pty_pid":self.backend.pty_id()})).unwrap()).unwrap();
+            std::fs::write(self.output.join("result.json"),serde_json::to_vec_pretty(&serde_json::json!({"ok":self.captured,"version":env!("CARGO_PKG_VERSION"),"synthetic_metadata":true,"synthetic_git":true,"history":self.history,"file_diff":self.diff,"project_files":self.files,"example_paths":true,"model_requests":false,"user_profiles":false,"pty_pid":self.backend.pty_id()})).unwrap()).unwrap();
             ctx.send_viewport_cmd(egui::ViewportCommand::Close);
         }
         ctx.request_repaint_after(Duration::from_millis(80));
@@ -129,8 +150,17 @@ impl eframe::App for Capture {
             })
             .collect();
         sidebar::show(ui, &entries, Some("readme-0"), false, 238.0, &self.icons);
-        let mut open = true;
-        self.git_view.panel(ui, Some(&self.git), &mut open);
+        let mut open = !self.files;
+        let mut files_open = self.files;
+        project_ui::panel(
+            ui,
+            &mut self.files_client,
+            &mut self.files_view,
+            Some(&self.git),
+            &mut self.git_view,
+            &mut open,
+            &mut files_open,
+        );
         egui::CentralPanel::default()
             .frame(
                 egui::Frame::new()
@@ -138,7 +168,7 @@ impl eframe::App for Capture {
                     .inner_margin(12),
             )
             .show(ui, |ui| {
-                git_ui::header(
+                git_ui::header_with_files(
                     ui,
                     git_ui::Header {
                         name: &self.snapshot.items[0].name,
@@ -148,9 +178,12 @@ impl eframe::App for Capture {
                     },
                     Some(&self.git),
                     &mut open,
+                    &mut files_open,
                 );
                 ui.add_space(8.0);
-                if let Some(patch) = &self.git.patch {
+                if let Some(file) = &self.files_client.file {
+                    project_ui::document(ui, file, Some(&self.files_root));
+                } else if let Some(patch) = &self.git.patch {
                     git_ui::diff::show(ui, patch);
                 } else {
                     let view = TerminalView::new(ui, &mut self.backend)
@@ -162,7 +195,15 @@ impl eframe::App for Capture {
             });
         if !self.requested
             && self.began.elapsed() > Duration::from_secs(3)
+            && (!self.files
+                || (self.files_started
+                    && self
+                        .files_client
+                        .file
+                        .as_ref()
+                        .is_some_and(|f| f.data.is_some())))
             && (self.diff
+                || self.files
                 || self
                     .backend
                     .last_content()
@@ -195,6 +236,7 @@ fn main() -> eframe::Result {
     let english = std::env::args().nth(2).as_deref() == Some("en");
     let history = std::env::args().nth(3).as_deref() == Some("history");
     let diff = std::env::args().nth(3).as_deref() == Some("diff");
+    let files = std::env::args().nth(3).as_deref() == Some("files");
     let verify = output.clone();
     eframe::run_native(
         "ai-terminal public README capture",
@@ -297,6 +339,37 @@ fn main() -> eframe::Result {
                 },
             )
             .unwrap();
+            let job = platform::ProcessJob::attach(backend.pty_id()).unwrap();
+            let files_root = output.join("web-app");
+            std::fs::create_dir_all(files_root.join("src/components")).unwrap();
+            std::fs::create_dir_all(files_root.join("docs")).unwrap();
+            std::fs::create_dir_all(files_root.join("tests")).unwrap();
+            let fixture_text = file_fixture(english)
+                .lines
+                .into_iter()
+                .filter(|line| line.kind != ai_terminal::git::PatchKind::Deleted)
+                .map(|line| line.text + "\n")
+                .collect::<String>();
+            for (path, text) in [
+                ("src/components/SignIn.tsx", fixture_text.as_str()),
+                (
+                    "README.md",
+                    "# Web app ✨\n\nA sample project for the native file browser.\n",
+                ),
+                (
+                    "package.json",
+                    "{\n  \"name\": \"web-app\",\n  \"version\": \"1.0.0\"\n}\n",
+                ),
+                (
+                    "docs/sign-in.md",
+                    "# Sign-in flow\n\nReview the form and confirmation state.\n",
+                ),
+                ("tests/sign-in.spec.ts", "// Sign-in test fixture\n"),
+            ] {
+                std::fs::write(files_root.join(path), text).unwrap();
+            }
+            let mut files_client = FileClient::new(cc.egui_ctx.clone());
+            files_client.set_root(Some(&files_root));
             let icons = Icons::new(&cc.egui_ctx);
             let mut git = GitClient::new(cc.egui_ctx.clone());
             let mut fixture = git_fixture();
@@ -438,7 +511,13 @@ fn main() -> eframe::Result {
             };
             Ok(Box::new(Capture {
                 renderer: egui_term::TextRendererSession::new(&cc.egui_ctx),
+                _job: job,
                 backend,
+                files_client,
+                files_view: FileView::default(),
+                files_root,
+                files,
+                files_started: false,
                 icons,
                 snapshot,
                 git,

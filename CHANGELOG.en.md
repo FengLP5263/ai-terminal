@@ -4,6 +4,42 @@
 
 Record user-visible additions, improvements, fixes, and compatibility changes for each release; omit categories that do not apply. Review both languages together, use the same version entry in GitHub Releases, and ship both files in the ZIP. Historical summaries follow existing GitHub release notes and UTC publication dates; development versions without a separate release do not receive invented release dates.
 
+## [0.9.0] - 2026-11-10
+
+### Added
+
+- A project file tree shares the collapsible, resizable right panel with Git. Open it from the folder button; folders load on demand and sort first, with refresh and collapse-all actions. Ordinary directories are supported too.
+- Click a file to read its full content with line numbers, file-type syntax colors, indentation guides and color emoji. UTF-8 with or without BOM and UTF-16 with BOM are supported; the open file stays marked.
+- The header entry, tab and directories use standard Codicons folder icons. File-type icons are shared with Git and follow the application's font, size and zoom.
+
+### Compatibility and boundaries
+
+- Closing a file returns to the original terminal, keeping its process and background output connected. Bounded background work handles directory reads and syntax preparation on demand; file bodies and directory snapshots are not persisted.
+- Preview limits are 2 MiB, 20,000 lines and 4,000 characters per line; directories show up to 1,000 entries each, with at most 64 expanded directories cached. Size, permission, encoding, binary and link boundaries have explicit messages; links and Windows junctions are not followed automatically.
+- The new `ui.project_files_open` preference defaults to off for old configurations. Upgrades preserve sessions, working directories, fonts, zoom and existing Git preferences.
+
+## [0.9.0-preview.2] - 2026-11-10
+
+### Fixed
+
+- The Project files header entry and Files tab now share the standard Codicons folder glyph to represent project-directory browsing.
+
+## [0.9.0-preview.1] - 2026-11-10
+
+Local preview awaiting project-file browsing acceptance.
+
+### Added
+
+- A project file tree shares the collapsible right panel with Git, opened by a standard header icon. Folders load lazily and sort first; refresh, collapse all and ordinary folders are supported.
+- Click files to view full contents read-only, with a single line-number column, syntax colors, indent guides and color emoji. UTF-8/BOM and BOM-marked UTF-16 are supported. The current file stays marked; closing returns to the original terminal.
+- Icons use Microsoft Codicons, sharing file-type glyphs with Git and inheriting app font, size and zoom.
+
+### Compatibility and limits
+
+- Bounded background work handles directory reads and syntax preparation with on-demand refresh. Existing terminal processes/output remain; file bodies and directory snapshots are not persisted.
+- Previews are limited to 2 MiB, 20,000 lines and 4,000 characters per line. Each directory has at most 1,000 entries, with 64 expanded directories cached. Limits, access errors, invalid encodings, binary files and links are explicit; links and Windows junctions are not followed automatically.
+- The new `ui.project_files_open` preference defaults off for legacy settings, preserving Git preferences, sessions, directories and fonts.
+
 ## [0.8.0] - 2026-11-10
 
 ### Added
