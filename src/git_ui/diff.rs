@@ -8,8 +8,27 @@ pub fn show(ui: &mut egui::Ui, result: &PatchResult) -> bool {
     let locale = i18n::locale(ui.ctx());
     let font = header_font(ui);
     ui.style_mut().override_font_id = Some(font.clone());
-    let mut close = false;
-    ui.horizontal(|ui| {
+    let close;
+    let (row, _) = ui.allocate_exact_size(
+        egui::vec2(ui.available_width(), chrome::CONTROL),
+        egui::Sense::hover(),
+    );
+    {
+        let mut header = ui.new_child(
+            egui::UiBuilder::new()
+                .id_salt("git-diff-header")
+                .max_rect(row)
+                .layout(egui::Layout::right_to_left(egui::Align::Center)),
+        );
+        let ui = &mut header;
+        close = chrome::icon_button(
+            ui,
+            Id::new("git-diff-close"),
+            chrome::ActionIcon::Close,
+            locale.text("返回终端", "Return to terminal"),
+        )
+        .clicked();
+        ui.colored_label(chrome::SECONDARY, locale.text("只读", "Read only"));
         let (mut short, description) = match &result.source {
             crate::git::PatchSource::Commit(id) => {
                 (id.chars().take(7).collect::<String>(), id.clone())
@@ -27,47 +46,47 @@ pub fn show(ui: &mut egui::Ui, result: &PatchResult) -> bool {
         if result.loading {
             short.push_str(" …");
         }
-        let read_only = locale.text("只读", "Read only");
-        let controls = super::text_width(ui, &short)
-            + super::text_width(ui, read_only)
-            + chrome::CONTROL
-            + 3.0 * ui.spacing().item_spacing.x;
-        let path_width = (ui.available_width() - controls).max(0.0);
-        ui.add_sized(
-            egui::vec2(path_width, chrome::CONTROL),
-            egui::Label::new(RichText::new(display_text(&result.path, 2000)).strong())
-                .truncate()
-                .halign(egui::Align::LEFT),
-        )
-        .on_hover_ui(|ui| {
-            ui.label(&result.path);
-            if let Some(patch) = &result.data {
-                if !patch.binary {
-                    ui.weak(
-                        locale.text("UTF-8 · 按提交原文显示", "UTF-8 · Original committed text"),
-                    );
-                }
-                for line in patch
-                    .lines
-                    .iter()
-                    .filter(|l| l.kind == PatchKind::Note)
-                    .take(6)
-                {
-                    ui.weak(display_text(&line.text, 300));
-                }
-            }
-        });
         ui.colored_label(chrome::COMPLETED, short)
             .on_hover_text(description);
-        ui.colored_label(chrome::SECONDARY, read_only);
-        close = chrome::icon_button(
-            ui,
-            Id::new("git-diff-close"),
-            chrome::ActionIcon::Close,
-            locale.text("返回终端", "Return to terminal"),
-        )
-        .clicked();
-    });
+        let width = ui.available_width().max(0.0);
+        ui.allocate_ui_with_layout(
+            egui::vec2(width, chrome::CONTROL),
+            egui::Layout::left_to_right(egui::Align::Center),
+            |ui| {
+                ui.set_width(width);
+                crate::file_icons::icon(
+                    &result.path,
+                    result.data.as_ref().is_some_and(|p| p.binary),
+                )
+                .show(ui, font.size);
+                ui.add(
+                    egui::Label::new(RichText::new(display_text(&result.path, 2000)).strong())
+                        .truncate(),
+                )
+                .on_hover_ui(|ui| {
+                    ui.label(&result.path);
+                    if let Some(patch) = &result.data {
+                        if !patch.binary {
+                            ui.weak(
+                                locale.text(
+                                    "UTF-8 · 按提交原文显示",
+                                    "UTF-8 · Original committed text",
+                                ),
+                            );
+                        }
+                        for line in patch
+                            .lines
+                            .iter()
+                            .filter(|l| l.kind == PatchKind::Note)
+                            .take(6)
+                        {
+                            ui.weak(display_text(&line.text, 300));
+                        }
+                    }
+                });
+            },
+        );
+    }
     ui.separator();
     if result.loading && result.data.is_none() {
         ui.weak(locale.text("正在读取文件差异…", "Reading file diff…"));

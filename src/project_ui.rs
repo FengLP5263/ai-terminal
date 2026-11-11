@@ -31,7 +31,60 @@ pub fn icon_button(ui: &mut egui::Ui, glyph: &str, label: &str, selected: bool) 
     )
     .on_hover_text(label)
 }
-fn tab(ui: &mut egui::Ui, glyph: &str, label: &str, selected: bool) -> egui::Response {
+pub fn project_name(root: &Path) -> std::borrow::Cow<'_, str> {
+    root.file_name()
+        .unwrap_or(root.as_os_str())
+        .to_string_lossy()
+}
+pub fn project_button(
+    ui: &mut egui::Ui,
+    root: &Path,
+    width: f32,
+    selected: bool,
+) -> egui::Response {
+    let font = font(ui);
+    let name = project_name(root);
+    let response = ui.add_sized(
+        [width, chrome::CONTROL],
+        egui::Button::new("").selected(selected).frame(false),
+    );
+    response.widget_info(|| {
+        egui::WidgetInfo::labeled(egui::WidgetType::Button, ui.is_enabled(), name.as_ref())
+    });
+    let painter = ui
+        .painter()
+        .with_clip_rect(response.rect.intersect(ui.clip_rect()));
+    let color = ui
+        .style()
+        .interact_selectable(&response, selected)
+        .text_color();
+    let left = response.rect.left() + 6.0;
+    painter.text(
+        egui::pos2(left, response.rect.center().y),
+        egui::Align2::LEFT_CENTER,
+        PROJECT_FILES_ICON,
+        glyph_font(font.size),
+        color,
+    );
+    let left = left + font.size + 6.0;
+    let galley = crate::ui_text::layout_font_rows(
+        ui.ctx(),
+        &name,
+        font.clone(),
+        color,
+        (response.rect.right() - left - 6.0).max(1.0),
+        1,
+    );
+    let pos = egui::pos2(left, response.rect.center().y - galley.size().y / 2.0);
+    painter.galley(pos, galley.clone(), color);
+    crate::ui_text::paint_emoji(&painter, pos, &galley, font.size, color);
+    response.on_hover_text(format!(
+        "{}\n{}",
+        i18n::tr(ui.ctx(), "浏览项目文件", "Browse project files"),
+        root.display()
+    ))
+}
+fn tab(ui: &mut egui::Ui, glyph: &str, label: &str, selected: bool, width: f32) -> egui::Response {
     let font = font(ui);
     let mut text = egui::text::LayoutJob::default();
     text.append(
@@ -52,7 +105,11 @@ fn tab(ui: &mut egui::Ui, glyph: &str, label: &str, selected: bool) -> egui::Res
             ..Default::default()
         },
     );
-    ui.selectable_label(selected, text)
+    ui.add_sized(
+        [width, chrome::CONTROL],
+        egui::Button::selectable(selected, text).truncate(),
+    )
+    .on_hover_text(label)
 }
 pub fn error_message(error: &FileError, locale: i18n::Locale) -> String {
     match error {
@@ -197,13 +254,18 @@ impl FileView {
                                 egui::Sense::click(),
                             );
                             let response = response.on_hover_text(format!(
-                                "{}{}",
+                                "{}{}{}",
                                 client.root.as_ref().unwrap().join(&entry.path).display(),
                                 if entry.kind == EntryKind::Link {
                                     locale.text(
                                         "\n链接（不自动跟随）",
                                         "\nLink (not followed automatically)",
                                     )
+                                } else {
+                                    ""
+                                },
+                                if entry.ignored {
+                                    locale.text("\n已被 Git 忽略", "\nIgnored by Git")
                                 } else {
                                     ""
                                 }
@@ -243,25 +305,41 @@ impl FileView {
                                 );
                             }
                             left += font.size + 4.0;
-                            let (glyph, color) = match entry.kind {
-                                EntryKind::Directory => (
-                                    if self.expanded.contains(&entry.path) {
+                            match entry.kind {
+                                EntryKind::Directory | EntryKind::Link => {
+                                    let glyph = if entry.kind == EntryKind::Link {
+                                        "\u{eaee}"
+                                    } else if self.expanded.contains(&entry.path) {
                                         "\u{eaf7}"
                                     } else {
                                         "\u{ea83}"
-                                    },
-                                    chrome::WORKING,
-                                ),
-                                EntryKind::Link => ("\u{eaee}", chrome::SECONDARY),
-                                _ => file_icons::icon(&entry.name, false),
-                            };
-                            ui.painter().text(
-                                egui::pos2(left, center),
-                                egui::Align2::LEFT_CENTER,
-                                glyph,
-                                glyph_font(font.size),
-                                color,
-                            );
+                                    };
+                                    ui.painter().text(
+                                        egui::pos2(left, center),
+                                        egui::Align2::LEFT_CENTER,
+                                        glyph,
+                                        glyph_font(font.size),
+                                        if entry.ignored || entry.kind == EntryKind::Link {
+                                            chrome::SECONDARY
+                                        } else {
+                                            chrome::WORKING
+                                        },
+                                    );
+                                }
+                                _ => {
+                                    let mut icon = file_icons::icon(&entry.name, false);
+                                    if entry.ignored {
+                                        icon.color = chrome::SECONDARY;
+                                    }
+                                    icon.paint(
+                                        ui,
+                                        egui::Rect::from_center_size(
+                                            egui::pos2(left + font.size / 2.0, center),
+                                            egui::Vec2::splat(font.size),
+                                        ),
+                                    );
+                                }
+                            }
                             left += font.size + 7.0;
                             let bounds =
                                 egui::Rect::from_min_max(egui::pos2(left, rect.top()), rect.max);
@@ -276,7 +354,11 @@ impl FileView {
                                 &mut text_ui,
                                 &entry.name,
                                 font.clone(),
-                                chrome::TEXT,
+                                if entry.ignored {
+                                    chrome::SECONDARY
+                                } else {
+                                    chrome::TEXT
+                                },
                                 bounds.width().max(0.0),
                             );
                             if response.clicked() {
@@ -348,90 +430,85 @@ pub fn panel(
         .show(ui, |ui| {
             ui.style_mut().override_font_id = Some(font(ui));
             let locale = i18n::locale(ui.ctx());
-            ui.horizontal(|ui| {
-                if tab(
-                    ui,
-                    PROJECT_FILES_ICON,
-                    locale.text("文件", "Files"),
-                    *files_open,
-                )
-                .clicked()
-                {
-                    *files_open = true;
-                    *git_open = false;
-                }
-                if tab(ui, "\u{ec6f}", "Git", *git_open).clicked() {
-                    *git_open = true;
-                    *files_open = false;
-                }
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if icon_button(
+            ui.scope(|ui| {
+                ui.spacing_mut().item_spacing.x = 4.0;
+                ui.spacing_mut().button_padding.x = 4.0;
+                ui.horizontal(|ui| {
+                    let controls = 3.0;
+                    let available =
+                        (ui.available_width() - controls * (chrome::CONTROL + 4.0) - 8.0).max(0.0);
+                    let font = font(ui);
+                    let files_label = locale.text("文件", "Files");
+                    let file_width = font.size
+                        + ui.painter()
+                            .layout_no_wrap(files_label.into(), font.clone(), chrome::TEXT)
+                            .size()
+                            .x
+                        + 18.0;
+                    let git_width = font.size
+                        + ui.painter()
+                            .layout_no_wrap("Git".into(), font, chrome::TEXT)
+                            .size()
+                            .x
+                        + 18.0;
+                    let fraction = (available / (file_width + git_width)).min(1.0);
+                    if tab(
                         ui,
-                        "\u{ea76}",
-                        locale.text("收起面板", "Close panel"),
-                        false,
+                        PROJECT_FILES_ICON,
+                        files_label,
+                        *files_open,
+                        file_width * fraction,
                     )
                     .clicked()
                     {
+                        *files_open = true;
                         *git_open = false;
+                    }
+                    if tab(ui, "\u{ec6f}", "Git", *git_open, git_width * fraction).clicked() {
+                        *git_open = true;
                         *files_open = false;
                     }
-                    if icon_button(ui, "\u{eb37}", locale.text("刷新", "Refresh"), false).clicked()
-                    {
-                        if *files_open {
-                            client.refresh();
-                        } else {
-                            result.git.refresh = true;
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if icon_button(
+                            ui,
+                            "\u{ea76}",
+                            locale.text("收起面板", "Close panel"),
+                            false,
+                        )
+                        .clicked()
+                        {
+                            *git_open = false;
+                            *files_open = false;
                         }
-                    }
+                        if icon_button(ui, "\u{eb37}", locale.text("刷新", "Refresh"), false)
+                            .clicked()
+                        {
+                            if *files_open {
+                                client.refresh();
+                            } else {
+                                result.git.refresh = true;
+                            }
+                        }
+                        if *files_open
+                            && icon_button(
+                                ui,
+                                "\u{eac5}",
+                                locale.text("全部收起", "Collapse all folders"),
+                                false,
+                            )
+                            .clicked()
+                        {
+                            view.collapse_all(client);
+                        }
+                    });
                 });
             });
             if !*files_open && !*git_open {
                 return;
             }
-            ui.horizontal(|ui| {
-                let root = if *files_open {
-                    client.root.as_deref()
-                } else {
-                    git.and_then(|g| g.snapshot.as_ref())
-                        .map(|s| s.root.as_path())
-                        .or(client.root.as_deref())
-                };
-                if let Some(root) = root {
-                    let width = (ui.available_width()
-                        - if *files_open {
-                            chrome::CONTROL + 8.0
-                        } else {
-                            0.0
-                        })
-                    .max(1.0);
-                    ui.add_sized(
-                        [width, chrome::CONTROL],
-                        egui::Label::new(
-                            RichText::new(
-                                root.file_name()
-                                    .unwrap_or(root.as_os_str())
-                                    .to_string_lossy(),
-                            )
-                            .strong(),
-                        )
-                        .truncate(),
-                    )
-                    .on_hover_text(root.display().to_string());
-                }
-                if *files_open
-                    && icon_button(
-                        ui,
-                        "\u{eac5}",
-                        locale.text("全部收起", "Collapse all folders"),
-                        false,
-                    )
-                    .clicked()
-                {
-                    view.collapse_all(client);
-                }
-            });
-            ui.separator();
+            if *files_open {
+                ui.separator();
+            }
             if *files_open {
                 result.file = view.contents(ui, client);
             } else {
@@ -456,40 +533,52 @@ pub fn document(ui: &mut egui::Ui, state: &FileState, root: Option<&Path>) -> bo
     let locale = i18n::locale(ui.ctx());
     let font = font(ui);
     ui.style_mut().override_font_id = Some(font.clone());
-    let mut close = false;
-    ui.horizontal(|ui| {
-        let (glyph, color) = file_icons::icon(&state.path.to_string_lossy(), false);
-        ui.label(
-            RichText::new(glyph)
-                .font(glyph_font(font.size))
-                .color(color),
+    let close;
+    let (row, _) = ui.allocate_exact_size(
+        egui::vec2(ui.available_width(), chrome::CONTROL),
+        egui::Sense::hover(),
+    );
+    {
+        let mut header = ui.new_child(
+            egui::UiBuilder::new()
+                .id_salt("project-document-header")
+                .max_rect(row)
+                .layout(egui::Layout::right_to_left(egui::Align::Center)),
         );
-        let width = (ui.available_width() - chrome::CONTROL - 100.0).max(1.0);
-        ui.add_sized(
-            [width, chrome::CONTROL],
-            egui::Label::new(
-                RichText::new(state.path.to_string_lossy().replace('\\', "/")).strong(),
-            )
-            .truncate(),
+        let ui = &mut header;
+        close = chrome::icon_button(
+            ui,
+            egui::Id::new("project-document-close"),
+            chrome::ActionIcon::Close,
+            locale.text("返回终端", "Return to terminal"),
         )
-        .on_hover_text(
-            root.map(|r| r.join(&state.path))
-                .unwrap_or_else(|| state.path.clone())
-                .display()
-                .to_string(),
-        );
+        .clicked();
+        ui.weak(locale.text("只读", "Read only"));
         if state.loading {
             ui.label("…");
         }
-        ui.weak(locale.text("只读", "Read only"));
-        close = icon_button(
-            ui,
-            "\u{ea76}",
-            locale.text("返回终端", "Return to terminal"),
-            false,
-        )
-        .clicked();
-    });
+        let width = ui.available_width().max(0.0);
+        ui.allocate_ui_with_layout(
+            egui::vec2(width, chrome::CONTROL),
+            egui::Layout::left_to_right(egui::Align::Center),
+            |ui| {
+                ui.set_width(width);
+                file_icons::icon(&state.path.to_string_lossy(), false).show(ui, font.size);
+                ui.add(
+                    egui::Label::new(
+                        RichText::new(state.path.to_string_lossy().replace('\\', "/")).strong(),
+                    )
+                    .truncate(),
+                )
+                .on_hover_text(
+                    root.map(|r| r.join(&state.path))
+                        .unwrap_or_else(|| state.path.clone())
+                        .display()
+                        .to_string(),
+                );
+            },
+        );
+    }
     ui.separator();
     if let Some(error) = &state.error {
         ui.colored_label(chrome::WAITING, error_message(error, locale));

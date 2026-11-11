@@ -20,6 +20,10 @@ const CASES: &[(Language, [f32; 2], f32, u8, bool)] = &[
     (Language::En, [900.0, 650.0], 1.0, 1, true),
     (Language::ZhCn, [900.0, 650.0], 1.0, 2, true),
     (Language::En, [900.0, 650.0], 1.0, 3, true),
+    (Language::ZhCn, [900.0, 650.0], 1.0, 3, true),
+    (Language::En, [900.0, 650.0], 1.0, 2, true),
+    (Language::ZhCn, [900.0, 650.0], 1.33, 3, true),
+    (Language::En, [900.0, 650.0], 1.5, 3, true),
 ];
 struct Probe {
     renderer: egui_term::TextRendererSession,

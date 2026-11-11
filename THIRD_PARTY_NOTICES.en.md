@@ -42,3 +42,9 @@ The Git branch, commit, copy and file icons use the original font and `git-branc
 [Syntect 5.3.0](https://github.com/trishume/syntect/tree/v5.3.0) is MIT licensed. Default grammars are embedded from the locked crates.io archive; default theme resources are disabled and colors are project-defined. The original LICENSE.txt is included under licenses/syntect-5.3.0/; Cargo.lock/dependencies.json record dependency identity and checksums. fancy-regex, bincode, bit-set/bit-vec, fnv and other dependencies retain their own declarations and original licenses.
 
 0.8.0-preview.2 uses the [two-face 0.5.2+bat-0.26.1](https://docs.rs/two-face/0.5.2+bat-0.26.1/two_face/) (MIT OR Apache-2.0) bat syntax set with Oniguruma. Original onig/onig_sys licenses are archived with dependencies; no themes are loaded. Individual syntax licenses are in [LICENSES.json](assets/syntaxes/LICENSES.json), with pinned provenance/hashes in [SOURCE.json](assets/syntaxes/SOURCE.json). ZIP copies are Syntax-LICENSES.json/SYNTAX-SOURCE.json. Shell avatars reuse terminal-powershell, terminal-bash and terminal-cmd from existing Codicons 0.0.45; original font bytes and CC BY 4.0 license are unchanged.
+
+## Outline file-type icons
+
+File types use original outline SVGs from [Tabler Icons](https://github.com/tabler/tabler-icons), licensed MIT, with only runtime UI tinting. See [SOURCE.json](assets/file-icons/SOURCE.json) and the original [LICENSE.txt](assets/file-icons/LICENSE.txt) for the pinned commit and per-file SHA-256. ZIPs include `Tabler-Icons-LICENSE.txt` and `FILE-ICONS-SOURCE.json`.
+
+Local SVG rasterization uses resvg/usvg 0.45.1 (Apache-2.0 OR MIT) and tiny-skia 0.11.4 (BSD-3-Clause), pinned in Cargo.lock with original licenses archived in the dependency inventory. Text, system fonts and raster-image features are disabled. Only embedded icons are rendered; project SVGs and browser runtimes are not loaded.

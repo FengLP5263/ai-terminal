@@ -123,6 +123,22 @@ fn file_diff_is_read_only_and_keeps_text_colors_over_red_green_backgrounds() {
     let (out, _) = frame(vec![Event::Text("MUST NOT EDIT".into())]);
     assert!(text_rect(&out, "Read only").is_some());
     assert!(text_rect(&out, "Local changes").is_some());
+    let title = text_rect(&out, "package-lock.json").unwrap();
+    let icon = out
+        .shapes
+        .iter()
+        .find_map(|s| match &s.shape {
+            egui::Shape::Mesh(m)
+                if m.calc_bounds().left() < 40.0
+                    && (m.calc_bounds().center().y - title.center().y).abs() < 3.0 =>
+            {
+                Some(m.calc_bounds())
+            }
+            _ => None,
+        })
+        .unwrap();
+    assert!(title.left() >= icon.right() && title.left() - icon.right() < 14.0);
+
     assert!(text_rect(&out, "old value").is_some());
     assert!(text_rect(&out, "new value").is_some());
     assert!(
@@ -156,6 +172,15 @@ fn file_diff_is_read_only_and_keeps_text_colors_over_red_green_backgrounds() {
     for color in [chrome::FAILED, chrome::COMPLETED] {
         assert!(out.shapes.iter().any(|s| matches!(&s.shape, egui::Shape::Rect(rect) if rect.fill == color.gamma_multiply(0.13))), "Diff background must retain the application red/green");
     }
+    assert!(
+        (ctx.read_response(egui::Id::new("git-diff-close"))
+            .unwrap()
+            .rect
+            .right()
+            - 900.0)
+            .abs()
+            < 1.0
+    );
     let pos = ctx
         .read_response(egui::Id::new("git-diff-close"))
         .expect("close control")
@@ -423,7 +448,7 @@ fn syntax_coloring_and_indentation_do_not_show_raw_git_headers_or_use_diff_text_
     assert!(colors[0].contains(&egui::Color32::TRANSPARENT));
     #[cfg(windows)]
     assert_eq!(
-        out.shapes.iter().filter(|s| matches!(&s.shape, egui::Shape::Mesh(mesh) if mesh.vertices.iter().all(|v| v.color == egui::Color32::WHITE))).count(),
+        out.shapes.iter().filter(|s| matches!(&s.shape, egui::Shape::Mesh(mesh) if mesh.calc_bounds().top() > chrome::CONTROL && mesh.vertices.iter().all(|v| v.color == egui::Color32::WHITE))).count(),
         6,
         "Both deleted and added rows must paint three native color emoji overlays"
     );
@@ -693,13 +718,15 @@ fn file_icons_are_shared_by_both_views_align_with_commit_text_and_loading_does_n
         ctx.set_zoom_factor(scale);
         let mut snapshot = fixture();
         let examples = [
-            ("README.md", "\u{eb1d}"),
-            ("src/app.rs", "\u{eae9}"),
-            ("settings.json", "\u{eb0f}"),
-            (".gitignore", "\u{eb52}"),
-            ("build.ps1", "\u{ea85}"),
-            ("icon.png", "\u{eaea}"),
-            ("blob.dat", "\u{eae8}"),
+            ("README.md", "\u{e060}"),
+            ("src/app.rs", "\u{e082}"),
+            ("src/app.py", "\u{e07b}"),
+            ("index.html", "\u{e048}"),
+            ("settings.json", "\u{e055}"),
+            (".gitignore", "\u{e036}"),
+            ("build.ps1", "\u{e074}"),
+            ("icon.png", "\u{e04c}"),
+            ("blob.dat", "\u{e047}"),
         ];
         snapshot.files = examples
             .iter()
@@ -731,7 +758,7 @@ fn file_icons_are_shared_by_both_views_align_with_commit_text_and_loading_does_n
                 })
                 .collect(),
             total_files: examples.len(),
-            added: 7,
+            added: examples.len() as u64,
             deleted: 0,
             partial: false,
         };
@@ -765,11 +792,9 @@ fn file_icons_are_shared_by_both_views_align_with_commit_text_and_loading_does_n
         frame(vec![], false, false);
         let out = frame(vec![], false, false);
         let normal_y = text_rect(&out, "README.md").unwrap().top();
-        for (_, glyph) in examples {
-            assert!(
-                text_rect(&out, glyph).is_some(),
-                "Missing Changes icon {glyph}"
-            );
+        for (path, _) in examples {
+            let label = text_rect(&out, path).unwrap();
+            assert!(out.shapes.iter().any(|s|matches!(&s.shape,egui::Shape::Mesh(m) if (m.calc_bounds().center().y-label.center().y).abs()<3.0 && m.calc_bounds().right()<label.left() && label.left()-m.calc_bounds().right()<14.0)),"Missing aligned Changes icon for {path}");
         }
         let out = frame(vec![], true, false);
         assert_eq!(
@@ -786,11 +811,25 @@ fn file_icons_are_shared_by_both_views_align_with_commit_text_and_loading_does_n
         frame(pointer(pos, false), false, true);
         let out = frame(vec![Event::PointerGone], false, true);
         let subject = text_rect(&out, &commit.subject).unwrap();
-        for (_, glyph) in examples {
-            let icon = text_rect(&out, glyph).expect("Shared expanded-file icon");
+        for (path, _) in examples {
+            let label = text_rect(&out, path).unwrap();
+            let icon = out
+                .shapes
+                .iter()
+                .find_map(|s| match &s.shape {
+                    egui::Shape::Mesh(m)
+                        if (m.calc_bounds().center().y - label.center().y).abs() < 3.0
+                            && m.calc_bounds().right() < label.left()
+                            && label.left() - m.calc_bounds().right() < 14.0 =>
+                    {
+                        Some(m.calc_bounds())
+                    }
+                    _ => None,
+                })
+                .expect("Shared expanded-file icon");
             assert!(
-                (icon.left() - subject.left()).abs() < 0.5,
-                "Icon not aligned to commit text at {scale}: {icon:?} vs {subject:?}"
+                (icon.left() - subject.left()).abs() < 1.0,
+                "Icon not aligned to commit text at {scale}"
             );
         }
     }

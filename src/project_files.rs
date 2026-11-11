@@ -45,6 +45,8 @@ pub struct Entry {
     pub path: PathBuf,
     pub name: String,
     pub kind: EntryKind,
+    /// A positive Git check-ignore result; missing Git/query failures leave it unmarked.
+    pub ignored: bool,
 }
 #[derive(Clone, Debug, Default)]
 pub struct Listing {
@@ -110,7 +112,7 @@ pub fn read_directory(
     let full = resolve(root, path)?;
     let began = Instant::now();
     let mut listing = Listing::default();
-    for entry in fs::read_dir(full)? {
+    for entry in fs::read_dir(&full)? {
         if cancelled() {
             return Err(FileError::Cancelled);
         }
@@ -130,7 +132,37 @@ pub fn read_directory(
             path: path.join(entry.file_name()),
             name: entry.file_name().to_string_lossy().into_owned(),
             kind,
+            ignored: false,
         });
+    }
+    let names = listing
+        .entries
+        .iter()
+        .filter_map(|entry| {
+            entry.path.file_name()?.to_str().map(|name| {
+                if entry.kind == EntryKind::Directory {
+                    format!("{name}/")
+                } else {
+                    name.to_owned()
+                }
+            })
+        })
+        .collect::<Vec<_>>();
+    match crate::git::ignored_names(&full, &names, &cancelled) {
+        Ok(ignored) => {
+            for entry in &mut listing.entries {
+                entry.ignored = entry
+                    .path
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .is_some_and(|name| ignored.contains(name));
+            }
+        }
+        Err(crate::git::GitError::Cancelled) => return Err(FileError::Cancelled),
+        Err(_) => {}
+    }
+    if cancelled() {
+        return Err(FileError::Cancelled);
     }
     listing.entries.sort_by_cached_key(|entry| {
         (
@@ -281,7 +313,7 @@ struct Shared {
     ticket: AtomicU64,
 }
 
-/// One worker and bounded queues/cache; no recursive indexing, timer, file-body persistence or CLI.
+/// One worker and bounded queues/cache; no recursive indexing, timer or file-body persistence.
 pub struct FileClient {
     pub root: Option<PathBuf>,
     pub directories: BTreeMap<PathBuf, DirectoryState>,
@@ -527,6 +559,7 @@ mod tests {
                 path: "folder/stale.txt".into(),
                 name: "stale.txt".into(),
                 kind: EntryKind::File,
+                ignored: false,
             }],
             partial: false,
         };

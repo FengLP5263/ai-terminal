@@ -114,3 +114,15 @@ preview.6：git_repository 以真实隔离 Git 验证暂存＋未暂存的净差
 0.9.0 项目文件核查：`cargo build --offline --locked --release --bins --example project_files_probe`，再运行 `target/release/examples/project_files_probe.exe output/<unique-project-files>`。12 张原生图覆盖文件树、中文／emoji、JSON、Rust、脚本、UTF-16、空／大／二进制／无效编码和返回终端；仅使用自建样例和无 profile PowerShell，Job Object 只回收自身 PTY，不执行查看的代码或请求模型。project_files 回归验证惰性、限额、刷新、取消、过期结果与 junction；project_ui 验证实际文件夹／文件／切换按钮及字体图标；App 回归验证文档下输入隔离、后台排空及原 PID／输入恢复。截图与真实用户验收分别记录。
 
 0.9.0 公开截图新增 `readme_capture <output> [zh|en] files`，在自己的输出目录建立固定示例，复用正式文件／Git 共用面板和只读正文；顶部使用固定示例路径，不读取用户项目。逐张核查中英文项目文件、主界面、Git 历史、差异和浮窗十张 PNG、当前文件标记、文件夹图标、语法与 emoji，原样复制并更新摘要。
+
+0.9.1-preview.3：运行 file_icons_probe（命令见 scripts/README.md）核对三字体／三比例的 Seti 原生矩阵，另用 readme_capture files／history 核查文件树、Git 行和标题。离线回归覆盖语言区分、文件名优先、大小写、未知／二进制回退、全部声明字形存在及许可证随包。合成名字不代表真实项目／模型验收。
+
+0.9.1-preview.4 复用 file_icons_probe 的三字体／三比例矩阵和 readme_capture 的正式视图截图。补 SVG 可渲染／非空、尺寸缓存上限／颜色隔离、文件标题相邻左对齐、顶部状态顺序及许可／来源防篡改回归。原生截图与模型调用分开，探针不启动模型。
+
+0.10.0 预览：settings_floating 检查透明度旧字段默认、边界／非有限值、保存恢复、设置未关闭时生效、复用既有 deferred 回调更新底板 alpha、头像不透明和点击区域不变。floating_opacity_probe 命令见 scripts/README.md：固定 100%／50%／20% 不透明度及中英文设置，生成 8 张真实 PNG；检查透明通道、同一原生 HWND／几何和透明时的合成头像点击，不注入系统输入或调用模型。project_ui／git_panel 验证右边缘操作布局，缩放后先等待布局稳定再读取上一帧响应。
+
+0.10.0-preview.2：floating_opacity_probe 在自身置顶白色底板内读取桌面合成像素，补充 4 张 desktop PNG，共 12 张；必须验证白色参照、0%／50%／80% 透明度的桌面 RGB 变化、头像桌面颜色保持、合成状态重建恢复和原有 HWND／几何／点击。只验证 framebuffer alpha 不足以通过。readme_capture 文件样例含灰色 .gitignore。启动可供用户试用的预览时，必须显式传 `--data-dir`，核对保存目录及版本，不能仅凭进程存活或未实现的环境变量声称隔离成功。
+
+0.10.0-preview.3：project_files 使用真实隔离 Git 覆盖嵌套／例外／全局／info-exclude 和已跟踪文件，project_ui 验证灰色条目仍可展开、只读查看。floating_opacity_probe 在 136% 下捕获浅色及灰色底板和窗外 16 像素，检查客户区与 framebuffer 合成差异、窗外无描边／阴影、同一 HWND／几何和透明点击；继续产生 12 张 PNG。readme_capture files 的自建仓库加入忽略文件及文件夹。必须目视检查原生 PNG，不把合成输入当作真实鼠标拖动。
+
+0.10.0-preview.5：settings_probe 增至 14 张原生图，补齐中英文关闭／退出和 133%／150% 退出确认；检查紧凑文字层级、按钮与宽窄布局。继续运行 dialogs、settings_floating 的真实控件交互回归，确认取消／退出选择、中文 emoji、即时保存与全局样式隔离。

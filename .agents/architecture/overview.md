@@ -76,3 +76,17 @@ preview.6：git/worktree.rs 按需读取 HEAD 与当前文件的净差异，与�
 0.8.0-preview.3：浮窗按独立比例直接布局，不缩放已经栅格化的图层；Icons 按实际头像物理尺寸请求纹理／Codicons，角标和命中区域使用相同坐标。dialogs.rs 集中表单字号、44 点控件、间距和表面，settings.rs 使用固定字段列与窄屏堆叠；样式只在弹窗内生效，不改变终端文字。
 
 0.9.0 预览：project_files.rs 提供单个后台文件浏览线程、最多 64 项目录缓存及最新文件请求／结果；project_ui.rs 共用右侧“文件 / Git”面板，惰性文件树只绘制可见行。普通文件与 Git 差异共用 git_ui::diff::body、语法准备、缩进线和 emoji，file_icons.rs 统一标准 Codicons 类型图标。
+
+0.9.1-preview.3：file_icons.rs 用文件名／扩展名映射到内嵌 Seti 字形与上游配色，所有文件行和只读标题共用，目录／操作继续使用 Codicons。不引入依赖、文件扫描、配置读取或 SVG 运行时。
+
+0.9.1-preview.4：file_icons.rs 共用 Tabler SVG、按类型／颜色隔离的有界解析／纹理缓存和最终像素栅格化。只使用内嵌图标，不处理用户 SVG，不引入浏览器。普通文件／差异标题的图标与名称左对齐；顶部排列为 Git、项目、状态、缩放。
+
+0.10.0 预览：浮窗底板透明度通过 FloatingBar 的共享标量状态立即更新；复用现有透明原生视口、设置自动保存和条件唤醒，不新增窗口或定时器。
+
+0.10.0-preview.2 将浮窗透明合成策略收在 floating_native 自有窗口生命周期中；只在创建和合成通知时应用，不增加轮询。文件忽略图标沿用 Tabler file-off，运行时改为中性灰。
+
+0.10.0-preview.3：project_files 的后台目录读取复用 Git Runner，以 NUL 分隔的名称批量执行 check-ignore；Entry.ignored 仅保存当前缓存中的肯定结果，project_ui 共用灰色名称／图标与说明。floating_native 只为自有胶囊关闭系统非客户区绘制与边距，应用继续绘制圆角。
+
+0.10.0-preview.4：顶部顺序调整为项目、Git、状态、缩放，预留两项入口宽度后从右向左分配空间。
+
+0.10.0-preview.5：dialogs.rs 集中桌面弹窗的 18／16／14／12 字号层级和 36 点控件高度，settings.rs 共用标题及辅助文字常量；样式仍局限于弹窗。

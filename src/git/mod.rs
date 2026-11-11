@@ -1,5 +1,7 @@
 //! Local read-only Git snapshots. No model access, credentials, writes, or network.
 mod command;
+mod ignore;
+pub(crate) use ignore::ignored_names;
 mod commit;
 mod patch;
 mod service;

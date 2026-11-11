@@ -67,6 +67,10 @@ def check():
     for name,expected in source['files'].items():
         data=(ROOT/'assets/fonts'/name).read_bytes()
         if len(data)!=expected['bytes'] or hashlib.sha256(data).hexdigest()!=expected['sha256']:errors.append('font identity mismatch: '+name)
+    file_icons=json.loads((ROOT/'assets/file-icons/SOURCE.json').read_text(encoding='utf-8'))
+    for name,expected in file_icons['files'].items():
+        data=(ROOT/'assets/file-icons'/name).read_bytes()
+        if Path(name).name!=name or len(data)!=expected['bytes'] or hashlib.sha256(data).hexdigest()!=expected['sha256']:errors.append('file icon identity mismatch: '+name)
     icon_source=json.loads((ROOT/'assets/icons/SOURCE.json').read_text(encoding='utf-8'))
     for expected in icon_source['files']:
         data=(ROOT/'assets/icons'/expected['name']).read_bytes()

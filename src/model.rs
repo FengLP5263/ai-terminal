@@ -126,6 +126,7 @@ pub struct UiSettings {
     pub ui_scale: f32,
     #[serde(default = "legacy_floating_scale")]
     pub floating_scale: f32,
+    pub floating_opacity: f32,
     pub language: crate::i18n::Language,
     pub floating_enabled: bool,
     pub floating_position: Option<[f32; 2]>,
@@ -143,6 +144,7 @@ impl Default for UiSettings {
             project_files_open: false,
             ui_scale: 1.0,
             floating_scale: 1.0,
+            floating_opacity: 1.0,
             language: crate::i18n::Language::System,
             floating_enabled: false,
             floating_position: None,
@@ -156,6 +158,14 @@ impl UiSettings {
     pub const MAX_SIDEBAR_WIDTH: f32 = 420.0;
     pub const MIN_ZOOM: f32 = 0.5;
     pub const MAX_ZOOM: f32 = 2.5;
+    pub const MIN_FLOATING_OPACITY: f32 = 0.2;
+    pub fn normalize_floating_opacity(value: f32) -> f32 {
+        if value.is_finite() {
+            value.clamp(Self::MIN_FLOATING_OPACITY, 1.0)
+        } else {
+            1.0
+        }
+    }
     pub const MIN_FONT: f32 = 8.0;
     pub const MAX_FONT: f32 = 32.0;
     pub fn normalize(mut self) -> Self {
@@ -175,6 +185,7 @@ impl UiSettings {
         } else {
             1.0
         };
+        self.floating_opacity = Self::normalize_floating_opacity(self.floating_opacity);
         self.sidebar_width = if self.sidebar_width.is_finite() {
             self.sidebar_width
                 .clamp(Self::MIN_SIDEBAR_WIDTH, Self::MAX_SIDEBAR_WIDTH)
