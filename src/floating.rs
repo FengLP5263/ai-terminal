@@ -46,6 +46,7 @@ pub struct FloatingBar {
     placement_request: Arc<Mutex<Option<[f32; 2]>>>,
     hint: Arc<Mutex<Option<HoverHint>>>,
     scale: Arc<Mutex<f32>>,
+    opacity: Arc<Mutex<f32>>,
 }
 impl FloatingBar {
     pub fn new(icons: Icons) -> Self {
@@ -58,6 +59,7 @@ impl FloatingBar {
             placement_request: Arc::new(Mutex::new(None)),
             hint: Arc::new(Mutex::new(None)),
             scale: Arc::new(Mutex::new(1.0)),
+            opacity: Arc::new(Mutex::new(1.0)),
         }
     }
     pub fn update(&self, snapshot: Snapshot, ctx: &egui::Context) {
@@ -82,6 +84,14 @@ impl FloatingBar {
         let mut current = self.scale.lock().unwrap();
         if *current != scale {
             *current = scale;
+            ctx.request_repaint_of(viewport_id());
+        }
+    }
+    pub fn set_opacity(&self, ctx: &egui::Context, opacity: f32) {
+        let opacity = crate::model::UiSettings::normalize_floating_opacity(opacity);
+        let mut current = self.opacity.lock().unwrap();
+        if *current != opacity {
+            *current = opacity;
             ctx.request_repaint_of(viewport_id());
         }
     }
@@ -136,6 +146,7 @@ impl FloatingBar {
             ]);
         }
         let scale_state = self.scale.clone();
+        let opacity_state = self.opacity.clone();
         ctx.show_viewport_deferred(viewport_id(), builder, move |ui, _| {
             let scale = *scale_state.lock().unwrap();
             let requested = placement_request.lock().unwrap().take();
@@ -160,7 +171,8 @@ impl FloatingBar {
                     .map(|r| (r.min * ui.ctx().pixels_per_point()).to_array())
             };
             let snapshot = snapshot.lock().unwrap().clone();
-            let (action, hint) = scaled_body(ui, &snapshot, &icons, scale);
+            let opacity = *opacity_state.lock().unwrap();
+            let (action, hint) = scaled_body(ui, &snapshot, &icons, scale, opacity);
             let mut current_hint = hover.lock().unwrap();
             if *current_hint != hint {
                 *current_hint = hint;
@@ -203,7 +215,7 @@ pub fn status_color(activity: Activity) -> Color32 {
     }
 }
 pub fn body(ui: &mut egui::Ui, snapshot: &Snapshot, icons: &Icons) -> Option<Action> {
-    body_with_hint(ui, snapshot, icons, 1.0).0
+    body_with_hint(ui, snapshot, icons, 1.0, 1.0).0
 }
 /// Project base geometry into shared-context points, without scaling a paint layer.
 pub fn content_transform(ctx: &egui::Context, scale: f32) -> egui::emath::TSTransform {
@@ -215,15 +227,16 @@ pub fn body_at_scale(
     icons: &Icons,
     scale: f32,
 ) -> Option<Action> {
-    scaled_body(ui, snapshot, icons, scale).0
+    scaled_body(ui, snapshot, icons, scale, 1.0).0
 }
 fn scaled_body(
     ui: &mut egui::Ui,
     snapshot: &Snapshot,
     icons: &Icons,
     scale: f32,
+    opacity: f32,
 ) -> (Option<Action>, Option<HoverHint>) {
-    body_with_hint(ui, snapshot, icons, scale / ui.ctx().zoom_factor())
+    body_with_hint(ui, snapshot, icons, scale / ui.ctx().zoom_factor(), opacity)
 }
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct HoverHint {
@@ -235,6 +248,7 @@ fn body_with_hint(
     snapshot: &Snapshot,
     icons: &Icons,
     scale: f32,
+    opacity: f32,
 ) -> (Option<Action>, Option<HoverHint>) {
     let mut hint = None;
     let mut action = None;
@@ -249,8 +263,11 @@ fn body_with_hint(
         style.spacing.item_spacing *= scale;
         style.spacing.button_padding *= scale;
         let rail = ui.max_rect();
-        ui.painter()
-            .rect_filled(rail, (12.0 * scale).round() as u8, Color32::from_gray(8));
+        ui.painter().rect_filled(
+            rail,
+            (12.0 * scale).round() as u8,
+            Color32::from_gray(8).gamma_multiply(opacity),
+        );
         // The bare edges move the window; avatars remain dedicated to scrolling and clicks.
         let edges = [
             Rect::from_min_max(rail.min, Pos2::new(rail.right(), rail.top() + 4.0 * scale)),
@@ -559,7 +576,7 @@ mod hint_tests {
                         ..Default::default()
                     },
                     |ui| {
-                        hint = body_with_hint(ui, &snapshot, &icons, 1.0).1;
+                        hint = body_with_hint(ui, &snapshot, &icons, 1.0, 1.0).1;
                     },
                 );
             }

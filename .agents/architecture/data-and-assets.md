@@ -113,3 +113,13 @@ preview.6 的工作区文件正文同样只存在于当前有界内存结果，�
 0.9.0 预览只新增项目文件面板布尔偏好，不保存文件正文、目录快照或最近文件。目录每级最多 1,000 项，最多 64 个展开目录；文本最多 2 MiB、20,000 行、每行 4,000 字符。支持 UTF-8／BOM 和带 BOM 的 UTF-16，错误明确；拒绝跟随符号链接／junction。Codicons 字节不变，仅扩展 SOURCE.json 中已使用字形的登记。详见 docs/files.md。
 
 0.9.0 的公开 README 图使用 readme_capture 的默认／history／diff／files 模式和 island_probe，共十张中英文原生 PNG。文件树样例仅写入自身输出目录，顶部固定示例路径；不读取用户项目。原样复制并逐文件记录来源、版本、尺寸与摘要，不覆盖历史 Agent 头像的来源版本。
+
+0.9.1-preview.3：文件类型图标改用 Seti UI 1.11.0 的原始 Seti.ttf（MIT），固定提交、原始 LESS 映射／配色／关联参考与 SHA-256 见 assets/fonts/SOURCE.json。file-icons 族仅供文件树、Git 文件行及只读标题使用，保留 Codicons 目录／操作符号。appearance 统一注册，随字号和最终 DPI 直接栅格化，不改终端字体或用户数据；helper 不加载。ZIP 携带 Seti-LICENSE.txt 并核验其声明。
+
+Seti 按官方 VS Code 文件图标的 150% 尺寸规范校准图标族的显示比例；布局槽和继承字号不变，不启用新的笔画拟合或改变终端字体。
+
+0.9.1-preview.4 以 Tabler 原始描边 SVG 替代 Seti 字体，来源、许可和 SHA-256 在 assets/file-icons/SOURCE.json。原始几何不变，只替换 currentColor；SVG 作为编译期资源，resvg 在最终物理像素尺寸栅格化，并按类型／颜色缓存解析结果与至多 8 个纹理尺寸（4–256 像素）。移除 Seti 字体注册和资产，不改变终端字体；ZIP 新增 FILE-ICONS-SOURCE.json／Tabler-Icons-LICENSE.txt，旧包仍可校验。
+
+0.10.0 预览仅新增 ui.floating_opacity 浮窗底板偏好，配置原子保存与旧格式加载路径不变；不新增字体、图片或第三方依赖。原生透明度探针只使用合成元数据，PNG、alpha／几何证据保存在忽略的 output 中，不读取用户会话。
+
+0.10.0-preview.3 的 ignored 标记仅随有界目录缓存存在，不保存到用户设置或读取文件正文；不新增资产或依赖。边缘探针保留 136% 浮窗比例、浅色／灰色底板及窗外 16 像素的原生桌面截图，核对逐像素合成与窗外残影。

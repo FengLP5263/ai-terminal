@@ -268,3 +268,131 @@ fn links_outside_the_project_are_visible_but_never_traversed() {
         Err(FileError::Link)
     ));
 }
+
+fn repo_git(root: &Path, args: &[&str]) {
+    let git = ai_terminal::discovery::CliSearch::current()
+        .git()
+        .expect("Git required for ignore regression");
+    let out = std::process::Command::new(git)
+        .current_dir(root)
+        .args(args)
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+}
+#[test]
+fn ignore_annotations_follow_git_rules_negation_index_and_exclude_sources() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path().join("项目 with space");
+    fs::create_dir(&root).unwrap();
+    repo_git(&root, &["init", "-q"]);
+    for dir in ["build", "nested", "private", "cache"] {
+        fs::create_dir(root.join(dir)).unwrap();
+    }
+    for name in [
+        "drop.log",
+        "keep.log",
+        "tracked.log",
+        "你好.cache",
+        "nested/drop.tmp",
+        "nested/keep.tmp",
+        "build/generated.txt",
+        "build/tracked.txt",
+    ] {
+        fs::write(root.join(name), "fixture").unwrap();
+    }
+    repo_git(&root, &["add", "tracked.log", "build/tracked.txt"]);
+    fs::write(
+        root.join(".gitignore"),
+        "*.log\n!keep.log\nbuild/\ncache/\n",
+    )
+    .unwrap();
+    fs::write(root.join("nested/.gitignore"), "*.tmp\n!keep.tmp\n").unwrap();
+    fs::write(root.join(".git/info/exclude"), "private/\n").unwrap();
+    let global = temp.path().join("global-ignore");
+    fs::write(&global, "*.cache\n").unwrap();
+    repo_git(
+        &root,
+        &["config", "core.excludesFile", global.to_str().unwrap()],
+    );
+    let check = |dir: &str, expected: &[(&str, bool)]| {
+        let listing = files::read_directory(&root, Path::new(dir), || false).unwrap();
+        for (name, ignored) in expected {
+            assert_eq!(
+                listing
+                    .entries
+                    .iter()
+                    .find(|e| e.name == *name)
+                    .unwrap()
+                    .ignored,
+                *ignored,
+                "{dir}/{name}"
+            );
+        }
+    };
+    check(
+        "",
+        &[
+            ("drop.log", true),
+            ("keep.log", false),
+            ("tracked.log", false),
+            ("你好.cache", true),
+            // Git preserves a directory that already contains tracked entries.
+            ("build", false),
+            ("cache", true),
+            ("private", true),
+            ("nested", false),
+            (".gitignore", false),
+        ],
+    );
+    check("nested", &[("drop.tmp", true), ("keep.tmp", false)]);
+    check("build", &[("generated.txt", true), ("tracked.txt", false)]);
+}
+#[test]
+fn ignore_annotations_refresh_lazily_and_plain_directories_stay_browsable() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path();
+    fs::write(root.join("item.txt"), "fixture").unwrap();
+    fs::write(root.join(".gitignore"), "item.txt\n").unwrap();
+    assert!(
+        !files::read_directory(root, Path::new(""), || false)
+            .unwrap()
+            .entries
+            .iter()
+            .any(|e| e.ignored)
+    );
+    repo_git(root, &["init", "-q"]);
+    let mut client = FileClient::new(egui::Context::default());
+    client.set_root(Some(root));
+    client.ensure_directory(Path::new(""));
+    wait(&mut client, |c| c.directories[Path::new("")].data.is_some());
+    assert!(
+        client.directories[Path::new("")]
+            .data
+            .as_ref()
+            .unwrap()
+            .entries
+            .iter()
+            .find(|e| e.name == "item.txt")
+            .unwrap()
+            .ignored
+    );
+    fs::write(root.join(".gitignore"), "other.txt\n").unwrap();
+    client.refresh();
+    wait(&mut client, |c| !c.directories[Path::new("")].loading);
+    assert!(
+        !client.directories[Path::new("")]
+            .data
+            .as_ref()
+            .unwrap()
+            .entries
+            .iter()
+            .find(|e| e.name == "item.txt")
+            .unwrap()
+            .ignored
+    );
+}

@@ -168,15 +168,23 @@ pub fn header_with_files(
     client: Option<&GitClient>,
     open: &mut bool,
     files: &mut bool,
+    project: Option<&std::path::Path>,
 ) -> bool {
-    header_inner(ui, header, client, open, Some(files))
+    let root = project
+        .or_else(|| {
+            client
+                .and_then(|g| g.snapshot.as_ref())
+                .map(|s| s.root.as_path())
+        })
+        .unwrap_or(header.directory);
+    header_inner(ui, header, client, open, Some((files, root)))
 }
 fn header_inner(
     ui: &mut egui::Ui,
     header: Header<'_>,
     client: Option<&GitClient>,
     open: &mut bool,
-    files: Option<&mut bool>,
+    files: Option<(&mut bool, &std::path::Path)>,
 ) -> bool {
     let (rect, _) = ui.allocate_exact_size(
         egui::vec2(ui.available_width(), chrome::CONTROL),
@@ -218,24 +226,6 @@ fn header_inner(
         ))
         .clicked();
     right -= gap;
-    if let Some(files) = files {
-        right -= chrome::CONTROL;
-        let mut button_ui = child(ui, "terminal-header-files", right, chrome::CONTROL);
-        if crate::project_ui::icon_button(
-            &mut button_ui,
-            crate::project_ui::PROJECT_FILES_ICON,
-            i18n::tr(ui.ctx(), "项目文件", "Project files"),
-            *files,
-        )
-        .clicked()
-        {
-            *files = !*files;
-            if *files {
-                *open = false;
-            }
-        }
-        right -= gap;
-    }
     if let Some((agent, status)) = header.connection
         && rect.width() > 540.0
     {
@@ -249,6 +239,12 @@ fn header_inner(
         );
         right -= gap;
     }
+    let files_width = files.as_ref().map_or(0.0, |(_, root)| {
+        let label = crate::project_ui::project_name(root);
+        (text_width(ui, &label) + font.size + 24.0)
+            .min(rect.width() * 0.28)
+            .min(240.0)
+    });
     let name_width = crate::ui_text::layout_font_rows(
         ui.ctx(),
         header.name,
@@ -262,7 +258,18 @@ fn header_inner(
     .min(rect.width() * 0.24)
     .min(220.0);
     let git_width = summary_width(ui, client)
-        .min((right - rect.left() - name_width - gap * 2.0).max(0.0))
+        .min(
+            (right
+                - rect.left()
+                - name_width
+                - gap * 2.0
+                - if files.is_some() {
+                    files_width + gap
+                } else {
+                    0.0
+                })
+            .max(0.0),
+        )
         .min(rect.width() * 0.45);
     if git_width > 0.0 {
         right -= git_width;
@@ -271,6 +278,18 @@ fn header_inner(
             client,
             open,
         );
+        right -= gap;
+    }
+    if let Some((files, root)) = files {
+        let width = files_width;
+        right -= width;
+        let mut button_ui = child(ui, "terminal-header-files", right, width);
+        if crate::project_ui::project_button(&mut button_ui, root, width, *files).clicked() {
+            *files = !*files;
+            if *files {
+                *open = false;
+            }
+        }
         right -= gap;
     }
     let name_width = name_width.min((right - rect.left()).max(0.0));
@@ -509,7 +528,9 @@ impl GitView {
                 "Some files are excluded or exceed display limits; totals are partial.",
             ));
         }
-        ui.separator();
+        if with_header {
+            ui.separator();
+        }
         ui.horizontal(|ui| {
             ui.selectable_value(
                 &mut self.history,

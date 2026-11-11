@@ -139,6 +139,7 @@ impl eframe::App for Probe {
                 None,
                 &mut false,
                 &mut true,
+                None,
             );
         });
         let actions = project_ui::panel(

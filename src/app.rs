@@ -767,6 +767,8 @@ impl App {
         use ai_terminal::floating::{Item, Snapshot};
         let zoom = self.preferences.floating_scale;
         self.floating.set_scale(ctx, zoom);
+        self.floating
+            .set_opacity(ctx, self.preferences.floating_opacity);
         let zoom_changed = self.floating_zoom.is_some_and(|old| old != zoom);
         for action in self.floating.actions() {
             // An old child-frame position can be queued while the point scale changes.
@@ -1115,7 +1117,7 @@ impl App {
                     directory: &session.spec.directory,
                     scale: self.preferences.ui_scale,
                     connection: (session.backend.is_some() && !session.display_agent().is_shell()).then_some((session.display_agent(), &session.status)),
-                }, self.git.as_ref(), &mut self.preferences.git_panel_open, &mut self.preferences.project_files_open);
+                }, self.git.as_ref(), &mut self.preferences.git_panel_open, &mut self.preferences.project_files_open, self.project_files.root.as_deref());
                 if !was_git_open && self.preferences.git_panel_open {self.preferences.project_files_open=false;}
                 if was_git_open != self.preferences.git_panel_open || was_files_open != self.preferences.project_files_open {
                     if self.preferences.git_panel_open && let Some(git) = &mut self.git { git.refresh_if_needed(); }
@@ -2489,7 +2491,7 @@ Send-State 'state=clear'; Wait-Step 5
             std::thread::sleep(Duration::from_millis(10));
         }
         app.sync_visibility();
-        let output = frame(
+        frame(
             &mut app,
             vec![egui::Event::Text("SHOULD_NOT_REACH_PROJECT_PTY".into())],
         );
@@ -2507,16 +2509,11 @@ Send-State 'state=clear'; Wait-Step 5
             assert!(Instant::now() < until);
             std::thread::sleep(Duration::from_millis(20));
         }
-        let close = output
-            .shapes
-            .iter()
-            .find_map(|s| match &s.shape {
-                egui::Shape::Text(t) if t.galley.job.text == "\u{ea76}" => {
-                    Some(t.pos + egui::vec2(4.0, 4.0))
-                }
-                _ => None,
-            })
-            .unwrap();
+        let close = ctx
+            .read_response(egui::Id::new("project-document-close"))
+            .expect("Document close control")
+            .rect
+            .center();
         for pressed in [true, false] {
             frame(
                 &mut app,

@@ -336,6 +336,17 @@ fn settings_switches_language_through_the_dropdown_and_toggles_the_island() {
         "Slider changes apply while the form remains open"
     );
     assert!(text_rect(&out, "Settings").is_some());
+    let value = text_rect(&out, "0%").expect("Transparency percentage");
+    let pos = Pos2::new(value.left() - 64.0, value.center().y);
+    for pressed in [true, false] {
+        frame(pointer(pos, pressed));
+    }
+    let (out, prefs) = frame(vec![]);
+    assert!(
+        prefs.floating_opacity < 1.0,
+        "Transparency applies while Settings is open"
+    );
+    assert!(text_rect(&out, "Settings").is_some());
 }
 
 #[test]
@@ -373,6 +384,7 @@ fn settings_rows_align_and_fit_wide_and_narrow_views_without_changing_global_sty
                 tr.text("终端字体", "Terminal font"),
                 tr.text("置顶状态浮窗", "Always-on-top status bar"),
                 tr.text("浮窗缩放", "Floating bar scale"),
+                tr.text("背景透明度", "Background transparency"),
             ];
             let rects: Vec<_> = labels
                 .into_iter()
@@ -768,4 +780,115 @@ fn floating_result_dot_disappears_when_the_session_is_read() {
         );
         assert_eq!(snapshot.items[0].activity, activity);
     }
+}
+
+#[test]
+fn floating_opacity_defaults_clamps_and_survives_restart_independently() {
+    let old: UiSettings =
+        serde_json::from_str(r#"{"ui_scale":1.33,"floating_enabled":true}"#).unwrap();
+    assert_eq!(old.normalize().floating_opacity, 1.0);
+    for (value, expected) in [
+        (f32::NAN, 1.0),
+        (f32::INFINITY, 1.0),
+        (-2.0, 0.2),
+        (0.0, 0.2),
+        (0.5, 0.5),
+        (2.0, 1.0),
+    ] {
+        assert_eq!(
+            UiSettings {
+                floating_opacity: value,
+                ..old
+            }
+            .normalize()
+            .floating_opacity,
+            expected
+        );
+    }
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join("sessions.json");
+    let workspace = Workspace {
+        ui: UiSettings {
+            floating_opacity: 0.5,
+            floating_scale: 0.75,
+            ..old
+        },
+        ..Default::default()
+    };
+    model::save(&path, &workspace).unwrap();
+    let restored = model::load(&path).unwrap();
+    assert_eq!(restored.ui, workspace.ui);
+}
+
+#[test]
+fn live_floating_opacity_updates_background_preserves_avatars_and_click_targets() {
+    let ctx = egui::Context::default();
+    appearance::setup(&ctx);
+    ctx.set_embed_viewports(false);
+    let bar = floating::FloatingBar::new(Icons::new(&ctx));
+    bar.update(
+        Snapshot {
+            items: vec![Item {
+                id: "opacity".into(),
+                name: "Status".into(),
+                agent: Agent::Codex,
+                color: None,
+                activity: Activity::Idle,
+                unread: false,
+            }],
+            ..Default::default()
+        },
+        &ctx,
+    );
+    let output = ctx.run_ui(egui::RawInput::default(), |_| {
+        bar.show(&ctx, Some([100.0, 80.0]))
+    });
+    // Reuse the same deferred callback, as an already-open native window does.
+    let callback = output.viewport_output[&floating::viewport_id()]
+        .viewport_ui_cb
+        .clone()
+        .unwrap();
+    let frame = |events| {
+        let mut target = None;
+        let output = ctx.run_ui(
+            egui::RawInput {
+                viewport_id: floating::viewport_id(),
+                viewports: [
+                    (egui::ViewportId::ROOT, Default::default()),
+                    (floating::viewport_id(), Default::default()),
+                ]
+                .into_iter()
+                .collect(),
+                screen_rect: Some(Rect::from_min_size(Pos2::ZERO, egui::vec2(96.0, 48.0))),
+                events,
+                ..Default::default()
+            },
+            |ui| {
+                callback(ui);
+                target = ui
+                    .ctx()
+                    .read_response(egui::Id::new(("floating-session", "opacity")))
+                    .map(|r| r.rect);
+            },
+        );
+        (output, target.unwrap())
+    };
+    let mut target = None;
+    for opacity in [1.0, 0.5, 0.2, 1.0] {
+        bar.set_opacity(&ctx, opacity);
+        frame(vec![]);
+        let (out, rect) = frame(vec![]);
+        assert_eq!(
+            *target.get_or_insert(rect),
+            rect,
+            "Opacity must not move hit targets"
+        );
+        assert!(out.shapes.iter().any(|s|matches!(&s.shape,egui::Shape::Rect(r) if r.rect.width()>90.0 && (i32::from(r.fill.a())-(255.0*opacity).round() as i32).abs()<=1)));
+        assert!(out.shapes.iter().any(|s|matches!(&s.shape,egui::Shape::Mesh(m) if rect.contains(m.calc_bounds().center()) && m.vertices.iter().all(|v|v.color.a()==255))),"Avatars must remain opaque");
+        for pressed in [true, false] {
+            frame(pointer(rect.center(), pressed));
+        }
+        assert!(bar.actions().contains(&Action::Activate("opacity".into())));
+    }
+    assert_eq!(ctx.zoom_factor(), 1.0);
 }

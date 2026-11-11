@@ -5,8 +5,12 @@
 mod windows {
     use windows_sys::Win32::{
         Foundation::{HWND, LPARAM, RECT},
-        Graphics::Gdi::{
-            GetMonitorInfoW, MONITOR_DEFAULTTONEAREST, MONITORINFO, MonitorFromWindow,
+        Graphics::{
+            Dwm::{DWM_BB_BLURREGION, DWM_BB_ENABLE, DWM_BLURBEHIND, DwmEnableBlurBehindWindow},
+            Gdi::{
+                CreateRectRgn, DeleteObject, GetMonitorInfoW, MONITOR_DEFAULTTONEAREST,
+                MONITORINFO, MonitorFromWindow,
+            },
         },
         System::Threading::GetCurrentThreadId,
         UI::{HiDpi::GetDpiForWindow, Shell::*, WindowsAndMessaging::*},
@@ -62,6 +66,7 @@ mod windows {
                 }
                 return None;
             }
+            enable_alpha(hwnd);
             post(hwnd, data);
             data
         };
@@ -83,6 +88,61 @@ mod windows {
         let mut rect = RECT::default();
         (unsafe { GetWindowRect(hwnd, &mut rect) } != 0)
             .then_some([rect.left as f32, rect.top as f32])
+    }
+
+    // A WGL configuration may be conservatively marked opaque by glutin-winit.
+    // Its framebuffer still has alpha, but DWM must opt in after the actual HWND exists.
+    fn enable_alpha(hwnd: HWND) {
+        use windows_sys::Win32::Graphics::Dwm::{
+            DWMNCRP_DISABLED, DWMWA_BORDER_COLOR, DWMWA_NCRENDERING_POLICY,
+            DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_DONOTROUND, DwmSetWindowAttribute,
+        };
+        let policy = DWMNCRP_DISABLED;
+        let corners = DWMWCP_DONOTROUND;
+        let border = 0xffff_fffe_u32; // DWMWA_COLOR_NONE (Windows 11).
+        unsafe {
+            DwmSetWindowAttribute(
+                hwnd,
+                DWMWA_NCRENDERING_POLICY as u32,
+                (&policy as *const i32).cast(),
+                4,
+            );
+            DwmSetWindowAttribute(
+                hwnd,
+                DWMWA_WINDOW_CORNER_PREFERENCE as u32,
+                (&corners as *const i32).cast(),
+                4,
+            );
+            DwmSetWindowAttribute(
+                hwnd,
+                DWMWA_BORDER_COLOR as u32,
+                (&border as *const u32).cast(),
+                4,
+            );
+        }
+        let region = unsafe { CreateRectRgn(0, 0, -1, -1) };
+        if region.is_null() {
+            return;
+        }
+        let blur = DWM_BLURBEHIND {
+            dwFlags: DWM_BB_ENABLE | DWM_BB_BLURREGION,
+            fEnable: 1,
+            hRgnBlur: region,
+            fTransitionOnMaximized: 0,
+        };
+        unsafe {
+            DwmEnableBlurBehindWindow(hwnd, &blur);
+            DeleteObject(region);
+            SetWindowPos(
+                hwnd,
+                std::ptr::null_mut(),
+                0,
+                0,
+                0,
+                0,
+                SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE,
+            );
+        }
     }
 
     fn state(hwnd: HWND) -> Option<*mut Geometry> {
@@ -193,6 +253,10 @@ mod windows {
                 return DefSubclassProc(hwnd, message, wparam, lparam);
             }
         }
+        // This capsule has no non-client frame. Bypass winit's shadow-only 1px inset.
+        if message == WM_NCCALCSIZE {
+            return 0;
+        }
         if message == APPLY {
             apply(hwnd, data);
             return 0;
@@ -204,6 +268,14 @@ mod windows {
         }
         // Winit must adopt the new DPI before we reconcile the actual client size.
         let result = unsafe { DefSubclassProc(hwnd, message, wparam, lparam) };
+        if message == WM_DWMCOMPOSITIONCHANGED {
+            enable_alpha(hwnd);
+            unsafe {
+                (*data)
+                    .ctx
+                    .request_repaint_of(crate::floating::viewport_id())
+            };
+        }
         if matches!(message, WM_DPICHANGED | WM_SIZE | WM_EXITSIZEMOVE) {
             post(hwnd, data);
         }

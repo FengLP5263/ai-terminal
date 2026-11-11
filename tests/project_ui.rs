@@ -15,7 +15,7 @@ fn text_rect(output: &egui::FullOutput, value: &str) -> Option<Rect> {
     fn find(shape: &egui::Shape, value: &str) -> Option<Rect> {
         match shape {
             egui::Shape::Text(text) if text.galley.job.text == value => {
-                Some(Rect::from_min_size(text.pos, text.galley.size()))
+                Some(text.galley.rect.translate(text.pos.to_vec2()))
             }
             egui::Shape::Vec(shapes) => shapes.iter().find_map(|s| find(s, value)),
             _ => None,
@@ -42,6 +42,7 @@ struct Fixture {
     git: GitView,
     files_open: bool,
     git_open: bool,
+    document_right: f32,
 }
 impl Fixture {
     fn new() -> Self {
@@ -64,6 +65,7 @@ impl Fixture {
             git: Default::default(),
             files_open: true,
             git_open: false,
+            document_right: 0.0,
         }
     }
     fn frame(&mut self, events: Vec<Event>, width: f32) -> egui::FullOutput {
@@ -87,6 +89,7 @@ impl Fixture {
                 )
                 .file;
                 if let Some(file) = &self.client.file {
+                    self.document_right = ui.available_rect_before_wrap().right();
                     close = project_ui::document(ui, file, self.client.root.as_deref());
                 } else {
                     ui.label("TERMINAL");
@@ -143,17 +146,12 @@ fn folder_click_loads_children_and_file_click_opens_a_read_only_document() {
         std::fs::read_to_string(f.root.path().join("src/app.rs")).unwrap(),
         "// 示例 ❤️\nfn main() {}\n"
     );
-    let close = output
-        .shapes
-        .iter()
-        .filter_map(|s| match &s.shape {
-            egui::Shape::Text(t) if t.galley.job.text == "\u{ea76}" && t.pos.x < 850.0 => {
-                Some(t.pos + egui::vec2(4.0, 4.0))
-            }
-            _ => None,
-        })
-        .next()
-        .unwrap();
+    let close = f
+        .ctx
+        .read_response(egui::Id::new("project-document-close"))
+        .unwrap()
+        .rect
+        .center();
     f.click(close, 1200.0);
     assert!(f.client.file.is_none());
 }
@@ -190,6 +188,7 @@ fn panel_tabs_are_exclusive_and_the_files_entry_exists_outside_git() {
                     None,
                     &mut git_open,
                     &mut files_open,
+                    None,
                 );
             },
         )
@@ -210,13 +209,97 @@ fn panel_tabs_are_exclusive_and_the_files_entry_exists_outside_git() {
     }
     assert!(files_open && !git_open);
 }
+
 #[test]
-fn files_use_shared_codicons_and_inherited_font_without_scaling_a_painted_layer() {
+fn ignored_rows_are_muted_and_remain_expandable_and_readable() {
+    let mut f = Fixture::new();
+    let git = ai_terminal::discovery::CliSearch::current().git().unwrap();
+    assert!(
+        std::process::Command::new(git)
+            .args(["init", "-q"])
+            .current_dir(f.root.path())
+            .status()
+            .unwrap()
+            .success()
+    );
+    std::fs::write(f.root.path().join(".gitignore"), "src/\n").unwrap();
+    f.client.refresh();
+    wait(&mut f.client, |c| !c.directories[Path::new("")].loading);
+    let output = f.frame(vec![], 1200.0);
+    fn color(output: &egui::FullOutput, name: &str) -> egui::Color32 {
+        fn find(shape: &egui::Shape, name: &str) -> Option<egui::Color32> {
+            match shape {
+                egui::Shape::Text(text) if text.galley.job.text == name => {
+                    Some(text.galley.job.sections[0].format.color)
+                }
+                egui::Shape::Vec(shapes) => shapes.iter().find_map(|s| find(s, name)),
+                _ => None,
+            }
+        }
+        output
+            .shapes
+            .iter()
+            .find_map(|s| find(&s.shape, name))
+            .unwrap()
+    }
+    assert_eq!(color(&output, "src"), ai_terminal::chrome::SECONDARY);
+    assert_ne!(color(&output, "src"), color(&output, "package.json"));
+    let folder_y = text_rect(&output, "src").unwrap().center().y;
+    let folder_icon = output.shapes.iter().find_map(|shape| match &shape.shape {
+        egui::Shape::Text(text)
+            if text.galley.job.text == "\u{ea83}"
+                && (text.galley.rect.translate(text.pos.to_vec2()).center().y - folder_y).abs()
+                    < 2.0 =>
+        {
+            Some(text.galley.job.sections[0].format.color)
+        }
+        _ => None,
+    });
+    assert_eq!(folder_icon, Some(ai_terminal::chrome::SECONDARY));
+    f.click(text_rect(&output, "src").unwrap().center(), 1200.0);
+    wait(&mut f.client, |c| {
+        c.directories
+            .get(Path::new("src"))
+            .is_some_and(|s| s.data.is_some())
+    });
+    let output = f.frame(vec![], 1200.0);
+    assert_eq!(color(&output, "app.rs"), ai_terminal::chrome::SECONDARY);
+    f.click(text_rect(&output, "app.rs").unwrap().center(), 1200.0);
+    wait(&mut f.client, |c| {
+        c.file.as_ref().is_some_and(|s| s.data.is_some())
+    });
+    let output = f.frame(vec![], 1200.0);
+    assert!(text_rect(&output, "src/app.rs").is_some());
+    assert!(text_rect(&output, "Read only").is_some());
+}
+#[test]
+fn files_use_shared_type_icons_and_inherited_font_without_scaling_a_painted_layer() {
     let mut f = Fixture::new();
     for zoom in [0.71, 1.0, 1.5, 2.0] {
         f.ctx.set_zoom_factor(zoom);
         f.frame(vec![], 520.0);
         let output = f.frame(vec![], 520.0);
+        let root_name = f.root.path().file_name().unwrap().to_string_lossy();
+        assert!(
+            text_rect(&output, &root_name).is_none(),
+            "The panel repeats the project name"
+        );
+        let tabs = text_rect(&output, "\u{ea83} Files").unwrap();
+        let collapse = text_rect(&output, "\u{eac5}").unwrap();
+        let refresh = text_rect(&output, "\u{eb37}").unwrap();
+        let close = text_rect(&output, "\u{ea76}").unwrap();
+        assert!((tabs.center().y - collapse.center().y).abs() < 2.0);
+        assert!((collapse.center().y - refresh.center().y).abs() < 2.0);
+        assert!((refresh.center().y - close.center().y).abs() < 2.0);
+        assert!(
+            tabs.right() <= collapse.left()
+                && collapse.right() <= refresh.left()
+                && refresh.right() <= close.left()
+        );
+        assert!(
+            text_rect(&output, "src").unwrap().top() < 80.0,
+            "A redundant row separates the toolbar and tree"
+        );
         let texts = output
             .shapes
             .iter()
@@ -232,18 +315,22 @@ fn files_use_shared_codicons_and_inherited_font_without_scaling_a_painted_layer(
             .iter()
             .find(|t| t.galley.job.text == "package.json")
             .unwrap();
-        let icon = texts
+        let file_rect = text_rect(&output, "package.json").unwrap();
+        let icon = output
+            .shapes
             .iter()
-            .find(|t| t.galley.job.text == "\u{eb0f}")
+            .find_map(|s| match &s.shape {
+                egui::Shape::Mesh(mesh)
+                    if (mesh.calc_bounds().center().y - file_rect.center().y).abs() < 2.0
+                        && mesh.calc_bounds().right() < file_rect.left() =>
+                {
+                    Some(mesh.calc_bounds())
+                }
+                _ => None,
+            })
             .unwrap();
-        assert_eq!(
-            file.galley.job.sections[0].format.font_id.size,
-            icon.galley.job.sections[0].format.font_id.size
-        );
-        assert_eq!(
-            icon.galley.job.sections[0].format.font_id.family,
-            egui::FontFamily::Name("codicons".into())
-        );
+        assert!((icon.width() - file.galley.job.sections[0].format.font_id.size).abs() < 1.0);
+        assert!(file_rect.left() - icon.right() < 12.0);
         assert!(
             text_rect(&output, "\u{ec6f} Git").unwrap().right()
                 < text_rect(&output, "\u{ea76}").unwrap().left()
@@ -262,4 +349,133 @@ fn old_settings_keep_git_preference_and_new_file_panel_round_trips() {
     let saved: ai_terminal::model::UiSettings =
         serde_json::from_str(&serde_json::to_string(&new).unwrap()).unwrap();
     assert_eq!(saved, new);
+}
+
+#[test]
+fn named_project_entry_uses_the_tree_root_and_opens_when_its_text_is_clicked() {
+    let ctx = egui::Context::default();
+    appearance::setup(&ctx);
+    i18n::apply(&ctx, Language::En);
+    let project = Path::new("C:/Workspace/项目文件 ❤️ long project name");
+    let directory = project.join("src");
+    let status = ai_terminal::status::Status::default();
+    for (width, zoom) in [(320.0, 1.0), (540.0, 1.33), (1100.0, 2.0)] {
+        ctx.set_zoom_factor(zoom);
+        let mut git_open = true;
+        let mut files_open = false;
+        let mut frame = |events| {
+            ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(Rect::from_min_size(Pos2::ZERO, egui::vec2(width, 200.0))),
+                    events,
+                    ..Default::default()
+                },
+                |ui| {
+                    ai_terminal::git_ui::header_with_files(
+                        ui,
+                        ai_terminal::git_ui::Header {
+                            name: "Shell",
+                            directory: &directory,
+                            scale: zoom,
+                            connection: Some((ai_terminal::model::Agent::Codex, &status)),
+                        },
+                        None,
+                        &mut git_open,
+                        &mut files_open,
+                        Some(project),
+                    );
+                    ui.label("TERMINAL");
+                },
+            )
+        };
+        frame(vec![]);
+        let output = frame(vec![]);
+        let label = text_rect(&output, project.file_name().unwrap().to_str().unwrap()).unwrap();
+        let scale = text_rect(&output, &format!("{:.0}%", zoom * 100.0)).unwrap();
+        assert!(label.right() <= scale.left() && label.top() < 40.0);
+        if width > 540.0 {
+            let state = text_rect(
+                &output,
+                ai_terminal::i18n::activity(ai_terminal::i18n::Locale::En, status.activity),
+            )
+            .unwrap();
+            assert!(
+                label.right() <= state.left() && state.right() <= scale.left(),
+                "Expected folder, status, zoom order"
+            );
+        }
+        assert!(text_rect(&output, "TERMINAL").unwrap().top() < 50.0);
+        for pressed in [true, false] {
+            frame(vec![
+                Event::PointerMoved(label.center()),
+                Event::PointerButton {
+                    pos: label.center(),
+                    button: PointerButton::Primary,
+                    pressed,
+                    modifiers: Modifiers::NONE,
+                },
+            ]);
+        }
+        assert!(files_open && !git_open);
+    }
+}
+
+#[test]
+fn read_only_title_keeps_the_icon_next_to_the_left_aligned_filename() {
+    let mut f = Fixture::new();
+    f.client.open_file(Path::new("src/app.rs"));
+    wait(&mut f.client, |c| {
+        c.file.as_ref().is_some_and(|s| s.data.is_some())
+    });
+    for (width, zoom) in [(900.0, 1.0), (1200.0, 1.33), (1600.0, 2.0)] {
+        f.ctx.set_zoom_factor(zoom);
+        // read_response uses the preceding pass; settle the DPI and width transition.
+        f.frame(vec![], width);
+        f.frame(vec![], width);
+        let output = f.frame(vec![], width);
+        let title = text_rect(&output, "src/app.rs").unwrap();
+        let close = f
+            .ctx
+            .read_response(egui::Id::new("project-document-close"))
+            .unwrap()
+            .rect;
+        assert!(
+            (close.right() - f.document_right).abs() < 1.0,
+            "Close must align with the content edge: width={width} zoom={zoom} close={close:?} right={}",
+            f.document_right
+        );
+        let read_only = text_rect(&output, "Read only").unwrap();
+        assert!(read_only.right() <= close.left() + 1.0 && close.left() - read_only.right() < 10.0);
+
+        let icon = output
+            .shapes
+            .iter()
+            .find_map(|s| match &s.shape {
+                egui::Shape::Mesh(m)
+                    if (m.calc_bounds().center().y - title.center().y).abs() < 3.0
+                        && m.calc_bounds().left() < 40.0 =>
+                {
+                    Some(m.calc_bounds())
+                }
+                _ => None,
+            })
+            .unwrap_or_else(|| {
+                panic!(
+                    "Missing title icon: width={width} zoom={zoom} title={title:?} meshes={:?}",
+                    output
+                        .shapes
+                        .iter()
+                        .filter_map(|s| if let egui::Shape::Mesh(m) = &s.shape {
+                            Some(m.calc_bounds())
+                        } else {
+                            None
+                        })
+                        .collect::<Vec<_>>()
+                )
+            });
+        assert!(
+            title.left() >= icon.right() && title.left() - icon.right() < 14.0,
+            "Title separated from its icon"
+        );
+    }
 }

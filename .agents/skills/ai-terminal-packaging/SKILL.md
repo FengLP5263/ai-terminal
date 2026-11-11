@@ -44,3 +44,9 @@ package 会调用 Cargo release 构建，生成独立版本目录和 ZIP，记�
 0.4.10 安装版入口为 `project.ps1 installer`，可用 -Path 指向已校验 ZIP；没有 Path 时先构建 ZIP。脏源码／制品仅本地显式 -AllowDirty；生成 EXE、.sha256、.json，记录 ZIP、脚本和完整 NSIS 工具链身份。`verify-installer -Path <json>` 可跨平台只读校验 EXE，不能冒充实际安装或签名验证。-Acceptance／-AcceptanceId 仅用于独立验收身份；原生 smoke 不能运行普通包。系统字体不新增交付字体文件，选项目录保存在 FONT-SOURCE.json；默认家族为 JetBrains Mono，并与运行时及 manifest 保持一致。新动作同步 Windows／POSIX 入口、双语脚本说明及安装文档，不自动提交或发布。
 
 0.8.0-preview.2 的语法许可来自锁定 two-face 的 acknowledgement 数据；升级依赖后用 git_syntax_probe --export-notices 重新导出 assets/syntaxes/LICENSES.json，再更新 SOURCE.json。治理／package 核对锁定版本、Cargo 归档和文件摘要，ZIP 必须携带 Syntax-LICENSES.json 与 SYNTAX-SOURCE.json。Windows／POSIX 动作与参数不变。
+
+0.9.1-preview.3 的 Seti.ttf、字形映射、配色与关联参考保持上游原始字节和固定提交，SOURCE.json 逐文件核验。package 新增 Seti-LICENSE.txt，并列入 fonts.licenses；回读验证不能省略新许可。Windows／POSIX 动作与参数不变。
+
+0.9.1-preview.4 改用 Tabler SVG，package/governance 校验 assets/file-icons/SOURCE.json 全部文件，源码身份覆盖该目录。新包声明 file_icons，并强制携带 FILE-ICONS-SOURCE.json／Tabler-Icons-LICENSE.txt；旧包兼容保持。resvg/usvg/tiny-skia 许可按锁定依赖归档。
+
+可供用户试用的本地 ZIP 从独立目录中的实际包启动；复制会话元数据到唯一 output 目录，使用 `ai-terminal.exe --data-dir <目录> --settings`。不依赖 AI_TERMINAL_DATA_DIR。核对程序在指定目录保存了规范化设置，记录源副本摘要和新进程；不关闭用户正在使用的旧程序。

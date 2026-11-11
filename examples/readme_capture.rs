@@ -179,6 +179,7 @@ impl eframe::App for Capture {
                     Some(&self.git),
                     &mut open,
                     &mut files_open,
+                    None,
                 );
                 ui.add_space(8.0);
                 if let Some(file) = &self.files_client.file {
@@ -344,6 +345,7 @@ fn main() -> eframe::Result {
             std::fs::create_dir_all(files_root.join("src/components")).unwrap();
             std::fs::create_dir_all(files_root.join("docs")).unwrap();
             std::fs::create_dir_all(files_root.join("tests")).unwrap();
+            std::fs::create_dir_all(files_root.join("build")).unwrap();
             let fixture_text = file_fixture(english)
                 .lines
                 .into_iter()
@@ -365,9 +367,27 @@ fn main() -> eframe::Result {
                     "# Sign-in flow\n\nReview the form and confirmation state.\n",
                 ),
                 ("tests/sign-in.spec.ts", "// Sign-in test fixture\n"),
+                (".gitignore", "target/\nbuild/\n*.log\n"),
+                ("debug.log", "Local build log\n"),
+                ("build/output.txt", "Generated fixture\n"),
+                ("analyze.py", "# Python fixture\nprint(42)\n"),
+                ("index.html", "<!doctype html>\n<title>Sample</title>\n"),
+                ("style.css", "body { color: white; }\n"),
             ] {
                 std::fs::write(files_root.join(path), text).unwrap();
             }
+            // Only this owned display fixture is initialized; no user repository is queried.
+            let git = ai_terminal::discovery::CliSearch::current()
+                .git()
+                .expect("Git fixture");
+            let mut init = std::process::Command::new(git);
+            init.args(["init", "-q"]).current_dir(&files_root);
+            #[cfg(windows)]
+            {
+                use std::os::windows::process::CommandExt;
+                init.creation_flags(0x08000000);
+            }
+            assert!(init.status().unwrap().success());
             let mut files_client = FileClient::new(cc.egui_ctx.clone());
             files_client.set_root(Some(&files_root));
             let icons = Icons::new(&cc.egui_ctx);
@@ -416,9 +436,9 @@ fn main() -> eframe::Result {
                                 binary: false,
                             })
                             .collect(),
-                        total_files: 3,
-                        added: 42,
-                        deleted: 11,
+                        total_files: fixture.total_files,
+                        added: fixture.added,
+                        deleted: fixture.deleted,
                         partial: false,
                     })),
                 });
@@ -611,13 +631,16 @@ fn git_fixture() -> GitSnapshot {
         branch: "feature/sign-in".into(),
         detached: false,
         unborn: false,
-        added: 42,
-        deleted: 11,
-        total_files: 3,
+        added: 57,
+        deleted: 14,
+        total_files: 6,
         files: [
             ("src/components/SignIn.tsx", ' ', 'M', 24, 6),
             ("tests/sign-in.spec.ts", 'M', ' ', 12, 5),
             ("docs/sign-in.md", '?', '?', 6, 0),
+            ("analyze.py", ' ', 'M', 4, 1),
+            ("index.html", ' ', 'M', 8, 2),
+            ("style.css", ' ', 'M', 3, 0),
         ]
         .into_iter()
         .map(|(path, index, worktree, added, deleted)| FileChange {

@@ -176,3 +176,15 @@ Windows 原生设置入口：`ai-terminal.exe --settings`；可组合 `--data-di
 项目文件原生核查（Windows）：`cargo build --offline --locked --release --bins --example project_files_probe` 后运行 `target/release/examples/project_files_probe.exe output/<unique-project-files>`。使用正式文件树／共享面板／只读文档和自建样例，生成中英、多档缩放及异常文件 12 张图；一个真实无 profile PowerShell PTY 在查看期间保持身份，探针 Job 仅回收自身进程。不读用户配置、不执行样例代码或模型。既有 Windows／POSIX 动作与参数不变，非 Windows 原生动作仍明确失败。
 
 0.9.0 README 的 `files` 模式仅在自己的输出目录建立固定示例文件，复用正式文件树和只读正文组件；对外顶部路径固定为示例，不读取用户项目。核对两套 project-files 原生 PNG、当前文件标记、文件夹图标、语法颜色、缩进与 emoji 后原样复制并记录摘要。
+
+0.9.1-preview.3 包内新增原始 Seti 文件图标字体的 MIT 许可 `Seti-LICENSE.txt`；font_notices 校验来源中所有文件的摘要，并把该许可纳入 manifest 的 fonts.licenses，ZIP 回读要求完整。Windows／POSIX 动作与参数不变。
+
+文件图标原生核查（Windows）：构建 `cargo build --offline --locked --release --example file_icons_probe`，运行 `target/release/examples/file_icons_probe.exe output/<unique-file-icons>`。使用正式 Seti 映射和字体，按 JetBrains Mono／Hack／Cascadia Mono 与 100%／133%／200% 捕获三张 36 类型图标矩阵，核对 Python／HTML 等形状、配色、对齐和缩放清晰度。固定文件名，不启动 PTY／Agent／模型、不读用户配置；正常退出、result.json 与原生 PNG 都需核查。readme_capture 的 files／history 模式另验证正式文件树与 Git 行的共享映射。
+
+0.9.1-preview.4 的 file_icons_probe 使用相同命令生成 Tabler 描边图标矩阵；readme_capture files／history／diff 核对标题左对齐、各文件视图一致性及 Git→项目→状态→缩放的顺序。SVG／MIT 原文与来源按 assets/file-icons/SOURCE.json 核验，ZIP 包含 FILE-ICONS-SOURCE.json 和 Tabler-Icons-LICENSE.txt。Windows／POSIX 动作与参数不变。
+
+浮窗背景透明度核查：`cargo build --offline --locked --release --example floating_opacity_probe`，随后 `target/release/examples/floating_opacity_probe.exe output/<unique-opacity-check>`。输出中英文设置、100%／50%／20% 不透明度及桌面合成的 12 张原生 PNG；result.json 同时核对底板 alpha、白色参照上的真实桌面 RGB、头像颜色、合成重建恢复、HWND／位置／尺寸不变，以及最透明状态下合成点击生效。仅创建自身窗口，不启动 PTY／Agent、不注入系统输入。
+
+0.10.0-preview.3 沿用 floating_opacity_probe 命令和 12 张截图，在 136% 比例下补查灰色底板、圆角逐像素合成及窗外 16 像素无系统描边／阴影。readme_capture files 使用自建 Git 仓库展示淡化的忽略文件及文件夹，不能代替真实用户仓库验收。
+
+0.10.0-preview.5 沿用 settings_probe 的命令，现生成 14 张原生 PNG，包含中英文确认框及 133%／150% 退出确认；只绘制样例，不结束真实会话。
