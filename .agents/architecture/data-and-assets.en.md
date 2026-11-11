@@ -104,3 +104,5 @@ The Seti family normalizes its visual scale to the official VS Code file-icon si
 0.10.0 preview adds only the ui.floating_opacity background preference, retaining atomic saves and legacy loading. No fonts, images or third-party dependencies are added. The native transparency probe uses synthetic metadata only and stores PNG/alpha/geometry evidence under ignored output, without reading user sessions.
 
 The 0.10.0-preview.3 ignored flag lives only in the bounded directory cache; it is not persisted to user settings and does not require file contents. No assets or dependencies are added. Edge evidence uses a 136% floating scale, light/gray backdrops and native desktop captures extending 16 pixels outside the window, checking per-pixel composition and any exterior halo.
+
+For the 0.10.0 release, .gitattributes marks assets/file-icons SVGs and the MIT license as -text to preserve upstream bytes across Windows core.autocrlf conversions. Source hashes must remain valid after commits and branch checkouts.

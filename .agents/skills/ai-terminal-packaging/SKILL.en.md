@@ -39,3 +39,5 @@ Include the 0.4.9 local alacritty_terminal/vte manifests and Rust sources in sou
 0.9.1-preview.4 uses Tabler SVGs. package/governance verifies every file in assets/file-icons/SOURCE.json, and source identity covers the directory. New packages declare file_icons and require FILE-ICONS-SOURCE.json/Tabler-Icons-LICENSE.txt; old-package compatibility remains. Locked resvg/usvg/tiny-skia licenses are archived with dependencies.
 
 Launch user-review ZIPs from their actual extracted package with session metadata copied into a unique output directory, using `ai-terminal.exe --data-dir <directory> --settings`. Do not rely on AI_TERMINAL_DATA_DIR. Verify normalized settings were saved in that directory, record the source-copy hash and new process, and retain running user applications.
+
+Keep Tabler originals under .gitattributes -text rules: SVGs and LICENSE.txt must still match SOURCE.json byte-for-byte after Windows branch checkouts. Restore original bytes from hash-verified Git blobs after automatic line-ending conversion; do not change hashes to accept transformed assets.

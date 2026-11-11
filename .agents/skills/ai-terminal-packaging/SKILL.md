@@ -50,3 +50,5 @@ package 会调用 Cargo release 构建，生成独立版本目录和 ZIP，记�
 0.9.1-preview.4 改用 Tabler SVG，package/governance 校验 assets/file-icons/SOURCE.json 全部文件，源码身份覆盖该目录。新包声明 file_icons，并强制携带 FILE-ICONS-SOURCE.json／Tabler-Icons-LICENSE.txt；旧包兼容保持。resvg/usvg/tiny-skia 许可按锁定依赖归档。
 
 可供用户试用的本地 ZIP 从独立目录中的实际包启动；复制会话元数据到唯一 output 目录，使用 `ai-terminal.exe --data-dir <目录> --settings`。不依赖 AI_TERMINAL_DATA_DIR。核对程序在指定目录保存了规范化设置，记录源副本摘要和新进程；不关闭用户正在使用的旧程序。
+
+Tabler 原件必须保持 .gitattributes 的 -text 规则：SVG 和 LICENSE.txt 在 Windows 分支切换后仍须与 SOURCE.json 逐字节一致。发现自动换行转换时从已核对摘要的 Git blob 恢复原字节，不更新摘要来迁就变形资产。
