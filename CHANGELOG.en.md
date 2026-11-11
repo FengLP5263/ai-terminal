@@ -4,6 +4,100 @@
 
 Record user-visible additions, improvements, fixes, and compatibility changes for each release; omit categories that do not apply. Review both languages together, use the same version entry in GitHub Releases, and ship both files in the ZIP. Historical summaries follow existing GitHub release notes and UTC publication dates; development versions without a separate release do not receive invented release dates.
 
+## [0.10.0] - 2026-11-11
+
+### Added
+
+- Floating background transparency from 0% to 80%, applied and saved immediately in Settings. Avatars, status badges and hints remain clear; existing settings default to opaque.
+- Muted names/icons and hover explanations for Git-ignored files and folders. Entries remain expandable and readable; nested rules, negations, repository/global excludes and tracked-file semantics follow Git.
+
+### Changed
+
+- Shared lightweight Tabler outline file-type icons across the tree, Git changes/commits and file titles. Python, HTML, Rust, JS/TS, scripts, media and documents have distinct icons, rasterized at final DPI with bounded caches. The `.gitignore` icon is neutral gray.
+- Header order is project folder, Git summary, status, zoom. Project entries show a name and full-path tooltip. Remove duplicate root headings and extra dividers, retaining narrow-window truncation and click behavior.
+- File and diff title icons stay beside left-aligned names; read-only indicators and close buttons align to the right edge.
+- Settings, rename, session-close and quit dialogs share compact desktop typography, 36-point controls and coordinated spacing. Application zoom, font choices and immediate saving are retained.
+- Refresh bilingual native README captures and ship the original Tabler MIT license, pinned source and hashes.
+
+### Fixed
+
+- Explicitly enable DWM desktop alpha composition for Windows/WGL floating bars and restore it after composition changes, fixing transparency sliders that changed without revealing the desktop.
+- Remove the floating window’s system border, shadow and extra client insets while preserving smooth application corners, eliminating light-background outlines and gaps.
+
+### Compatibility and limits
+
+- Existing sessions, directories, fonts, zoom and history-recovery settings are retained. Missing `ui.floating_opacity` defaults to opaque; no migration is needed.
+- Ignore classification runs in background batches only on directory loads or on-demand refreshes, with existing cache/cancellation/Git-query limits. Ordinary directories and missing Git remain browsable. No periodic scan or file-content persistence is added.
+- Windows x64 support remains unchanged. No model proxy, paid model requests or automatic trust actions are introduced.
+
+## [0.10.0-preview.5] - 2026-11-11
+
+### Changed
+
+- Use compact typography across settings, rename and confirmation dialogs: 18-point titles, 16-point section headings, 14-point body/buttons, 12-point supporting text and 36-point controls. Adjust spacing and confirmation width to match the main interface, retaining application zoom, font choices and immediate saving.
+
+## [0.10.0-preview.4] - 2026-11-11
+
+### Changed
+
+- Move the project folder entry before the Git branch summary. Header order is project, Git, status, zoom, retaining truncation and click behavior in narrow windows.
+
+## [0.10.0-preview.3] - 2026-11-11
+
+### Added
+
+- Project files and folders excluded by Git use muted names and icons with an ignore tooltip. They remain expandable and readable; tracked files and negated patterns retain their normal appearance.
+
+### Fixed
+
+- The transparent floating bar disables its own system border, shadow and extra client insets while retaining application corners. Native captures check enlarged edges and avatar clicks over light and gray backgrounds.
+
+## [0.10.0-preview.2] - 2026-11-11
+
+### Fixed
+
+- Explicitly enable DWM transparency for the Windows/WGL floating bar and restore it after composition changes, fixing a black background despite slider changes. Verify actual desktop pixels over an owned white backdrop, rather than framebuffer alpha alone.
+- Use a neutral gray ignored-file icon for `.gitignore` to reduce visual emphasis.
+
+## [0.10.0-preview.1] - 2026-11-11
+
+### Added
+
+- Floating background transparency (0%–80%) in Settings, applied immediately and saved automatically. Avatars, status badges and hover text stay clear; old settings default to opaque.
+
+### Fixed
+
+- Align read-only labels and close buttons with the content area's right edge in files and Git diffs, keeping filenames beside their type icons on the left.
+
+## [0.9.1-preview.4] - 2026-11-11
+
+### Fixed
+
+- File types use lightweight Tabler outline SVGs, including outline language symbols such as Python. Tree, Git lists and viewer titles share final-DPI rasterization with bounded caching and original MIT provenance/license.
+- File-title icons and names are adjacent and left-aligned, correcting the gap caused by centered names.
+- Header order is Git information, project folder, session status, zoom. Existing status sources, sessions and terminal processes are preserved.
+
+## [0.9.1-preview.3] - 2026-11-11
+
+### Fixed
+
+- The file tree, Git changes/commit files and read-only titles share Seti type icons for Python, HTML, Rust, JS/TS, React, Vue, CSS, scripts, media, documents and more. Common project filenames take precedence; unknown types retain plain-file/binary fallbacks.
+- Icons use the original upstream MIT font and palette, embedded and rasterized at the current size and zoom. No system-font installation is needed; terminal fonts, sessions and directories are unchanged. Packages include provenance, SHA-256 and the original license.
+
+## [0.9.1-preview.2] - 2026-11-11
+
+### Fixed
+
+- Remove the repeated dividers and gap between the Git panel tabs and Changes/History, retaining the divider above the file list.
+
+## [0.9.1-preview.1] - 2026-11-11
+
+### Fixed
+
+- The project-files entry now shows a folder icon and project name, using the same root as the file tree. Long names are shortened; hover shows the full path.
+- The shared Files/Git panel removes the repeated centered root name. Collapse-all, refresh and close share the tab row, with tab text shortened to fit narrow windows.
+- Existing sessions, working directories, fonts, zoom and terminal processes are preserved. No settings or assets are added.
+
 ## [0.9.0] - 2026-11-10
 
 ### Added

@@ -16,7 +16,7 @@ fn section(ui: &mut egui::Ui, title: &str, contents: impl FnOnce(&mut egui::Ui))
         .show(ui, |ui| {
             ui.spacing_mut().item_spacing.y = dialogs::GAP;
             ui.set_width(ui.available_width());
-            ui.label(RichText::new(title).size(18.0).strong());
+            ui.label(RichText::new(title).size(dialogs::SECTION_SIZE).strong());
             ui.add_space(4.0);
             contents(ui);
         });
@@ -69,7 +69,7 @@ pub fn show(ctx: &egui::Context, open: &mut bool, preferences: &mut UiSettings) 
     let width = (ctx.content_rect().width() - 80.0).clamp(200.0, 520.0);
     egui::Window::new(
         RichText::new(locale.text("设置", "Settings"))
-            .size(22.0)
+            .size(dialogs::TITLE_SIZE)
             .strong(),
     )
     .id(egui::Id::new("app-settings-window"))
@@ -145,7 +145,7 @@ pub fn show(ctx: &egui::Context, open: &mut bool, preferences: &mut UiSettings) 
                         "所选字体未安装，当前使用默认字体。",
                         "The selected font is not installed. Using the default font.",
                     ))
-                    .size(14.0),
+                    .size(dialogs::SMALL_SIZE),
                 );
             }
         });
@@ -186,12 +186,22 @@ pub fn show(ctx: &egui::Context, open: &mut bool, preferences: &mut UiSettings) 
                     )
                 },
             );
+            row(ui, locale.text("背景透明度", "Background transparency"), |ui, width| {
+                ui.spacing_mut().slider_width = (width - 80.0).max(60.0);
+                let mut transparency = ((1.0 - preferences.floating_opacity) * 100.0).round();
+                let response = ui.add_enabled(preferences.floating_enabled,
+                    egui::Slider::new(&mut transparency, 0.0..=80.0).step_by(1.0).custom_formatter(|value,_| format!("{value:.0}%")).custom_parser(|text| text.trim().trim_end_matches('%').trim().parse::<f64>().ok().filter(|v|v.is_finite()))
+                    .handle_shape(egui::style::HandleShape::Rect { aspect_ratio: 0.18 }))
+                    .on_hover_text(locale.text("0% 为不透明；数值越大，背景越透明。头像和状态标记保持清晰。", "0% is opaque; higher values make the background more transparent. Avatars and status badges stay clear."));
+                if response.changed() { preferences.floating_opacity = UiSettings::normalize_floating_opacity(1.0 - transparency / 100.0); }
+                response
+            });
             ui.label(
                 RichText::new(locale.text(
                     "与主窗口独立 · Ctrl + 滚轮调整",
                     "Independent of the main window · Ctrl+wheel",
                 ))
-                .size(14.0)
+                .size(dialogs::SMALL_SIZE)
                 .color(Color32::from_gray(178)),
             );
         });

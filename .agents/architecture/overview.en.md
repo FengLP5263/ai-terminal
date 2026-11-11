@@ -64,3 +64,17 @@ preview.6: git/worktree.rs reads HEAD-to-current-file net diffs on demand, shari
 0.8.0-preview.3: the bar lays out directly at its own scale without transforming rasterized layers. Icons requests textures/Codicons at the physical avatar size; badges and hit regions share those coordinates. dialogs.rs centralizes form typography, 44-point controls, spacing and surfaces; settings.rs uses fixed columns and narrow-screen stacking. Styles remain local to dialogs and do not alter terminal text.
 
 0.9.0 preview: project_files.rs owns one background browser worker, at most 64 cached directories and coalesced selected-file requests/results. project_ui.rs shares the Files / Git right panel and virtualizes the lazy tree. Ordinary documents and Git diffs share git_ui::diff::body, syntax preparation, indent guides and emoji; file_icons.rs centralizes standard Codicons file glyphs.
+
+0.9.1-preview.3: file_icons.rs maps filenames/extensions to embedded Seti glyphs and upstream palette colors, shared by all file rows and read-only titles. Folders/actions retain Codicons. No dependencies, file scanning, configuration reads or SVG runtime are added.
+
+0.9.1-preview.4: file_icons.rs shares Tabler SVGs, bounded parsed/texture caches isolated by type/color, and final-pixel rasterization. Only embedded icons are used, without user SVG handling or a browser. File/diff titles align icon and name to the left; the header order is Git, project, status, zoom.
+
+0.10.0 preview: floating background opacity updates immediately through FloatingBar shared scalar state, reusing the existing transparent native viewport, settings autosave and conditional wakeups, without additional windows or timers.
+
+0.10.0-preview.2 keeps floating transparency composition in the owned floating_native window lifecycle, applying it only on creation and composition notifications without polling. The ignored-file icon retains Tabler file-off with a neutral gray runtime tint.
+
+0.10.0-preview.3: background directory reads reuse Git Runner for a NUL-delimited check-ignore batch. Entry.ignored stores only positive results in the existing cache; project_ui draws muted names/icons and a tooltip. floating_native disables system non-client rendering and insets only for its own capsule; application rendering retains the corners.
+
+0.10.0-preview.4: header order is project, Git, status, zoom. Both entry widths are reserved before allocating space from the right.
+
+0.10.0-preview.5: dialogs.rs centralizes 18/16/14/12-point dialog typography and 36-point controls; settings.rs shares title and supporting-text constants. Styling remains scoped to dialogs.

@@ -108,6 +108,18 @@ impl Runner {
         })
     }
     pub fn run(&self, dir: &Path, args: &[&str], input: Option<&[u8]>) -> Result<Output, GitError> {
+        self.run_with_cancel(dir, args, input, || false)
+    }
+    pub fn run_with_cancel(
+        &self,
+        dir: &Path,
+        args: &[&str],
+        input: Option<&[u8]>,
+        cancelled: impl Fn() -> bool,
+    ) -> Result<Output, GitError> {
+        if self.cancelled() || cancelled() {
+            return Err(GitError::Cancelled);
+        }
         let mut cmd = Command::new(&self.git);
         cmd.args([
             "--no-optional-locks",
@@ -206,7 +218,7 @@ impl Runner {
             if began.elapsed() > Duration::from_secs(6) {
                 error = Some(GitError::Command("Git query timed out.".into()));
             }
-            if self.cancelled() {
+            if self.cancelled() || cancelled() {
                 error = Some(GitError::Cancelled);
             }
             if error.is_some() {

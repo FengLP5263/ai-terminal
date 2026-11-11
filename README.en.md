@@ -32,7 +32,7 @@ Enable the floating bar to see session avatars and status above other windows. C
 
 ![AI Terminal floating session bar](assets/readme/floating.en.png)
 
-> Screenshots use real 0.9.0 native components with synthetic sessions, terminal text, Git metadata and task status. They contain no real user data or private conversations. Click an image for its original resolution.
+> Screenshots use real 0.10.0 native components with synthetic sessions, terminal text, Git metadata and task status. They contain no real user data or private conversations. Click an image for its original resolution.
 
 ## Built for multiple sessions
 
@@ -41,7 +41,7 @@ Enable the floating bar to see session avatars and status above other windows. C
 | **A real terminal** | Open PowerShell, CMD, or Git Bash and run your installed command-line tools directly. |
 | **Agent recognition** | Starting Codex, Claude Code, Qoder CN, Kimi Code, ZCode or TRAE CLI displays the corresponding avatar; other commands still work as ordinary terminal sessions. |
 | **Task status** | See working, needs attention, completed, or failed states for supported Agents in the sidebar and floating bar. Status comes from supported lifecycle notifications and process exits; it is not a universal inference for every CLI. |
-| **Always-on-top bar** | Show only session avatars and status, up to 10 at a time. Drag the avatar area to see more, and click an avatar to return to its session. Scale it independently in Settings or with Ctrl+wheel over the bar. |
+| **Always-on-top bar** | Show only session avatars and status, up to 10 at a time. Drag the avatar area to see more, and click an avatar to return to its session. Scale it independently in Settings or with Ctrl+wheel over the bar. Background transparency can be adjusted immediately in Settings while avatars and status badges remain clear. |
 | **Your workspace** | Drag to reorder, rename or color sessions, collapse the sidebar, and scale the entire interface with Ctrl + mouse wheel. |
 | **Familiar terminal behavior** | Use Chinese text, ANSI colors, and system color emoji; pass clipboard images to Codex, Claude Code or Qoder CN CLI for the CLI to handle. |
 | **Project files** | Browse the project tree and view files read-only with syntax colors, line numbers and emoji. Files / Git share the right panel and standard icons. See [project files](docs/files.en.md). |
@@ -53,7 +53,7 @@ Enable the floating bar to see session avatars and status above other windows. C
 
 ## Browse project files
 
-Click the folder button in the terminal header to browse the current project in the right-side Files tab. Switch between Files and Git, resize the panel, expand folders on demand, refresh or collapse all folders. Ordinary directories work too.
+Click the folder button in the terminal header to browse the current project in the right-side Files tab. Switch between Files and Git, resize the panel, expand folders on demand, refresh or collapse all folders. Ordinary directories work too. Git-ignored entries have muted names and icons, remain expandable/readable, and explain their status on hover.
 
 Click a file to read its full content in the center with line numbers, syntax colors, indentation guides and color emoji. The tree marks the open file. Closing it returns to the original terminal while the Agent and background output keep running. See [project files](docs/files.en.md) for encoding support and read limits.
 
@@ -76,6 +76,12 @@ Click a file in Changes to see its net changes against HEAD, combining staged an
 ![AI Terminal read-only file diff with syntax highlighting, full line numbers and change backgrounds](assets/readme/git-diff.en.png)
 
 File views are read-only, without editing. See [Git panel](docs/git.en.md) for encoding, binary, size and linked-file boundaries.
+
+## Settings and floating bar
+
+Settings apply and save immediately. Floating-bar zoom is independent of the main window, and background transparency ranges from 0% to 80% while avatars and status badges stay clear. Settings, rename and confirmation dialogs use compact desktop typography and controls.
+
+![AI Terminal settings: fonts, independent floating zoom and background transparency](assets/readme/settings.en.png)
 
 ## Supported Agents
 

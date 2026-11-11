@@ -55,6 +55,7 @@ def source_identity(root=ROOT):
     inputs=[root/'build.rs',root/'Cargo.toml',root/'Cargo.lock',root/'vendor/egui_term/Cargo.toml',root/'vendor/egui-winit/Cargo.toml',root/'vendor/egui_glow/Cargo.toml']+list((root/'src').rglob('*.rs'))+list((root/'vendor/egui_term/src').rglob('*.rs'))+list((root/'vendor/egui-winit/src').rglob('*.rs'))+[p for p in (root/'vendor/egui_glow/src').rglob('*') if p.is_file()]+list((root/'assets/fonts').iterdir())+list((root/'assets/icons').iterdir())+list((root/'assets/branding').iterdir())+[p for p in (root/'assets/windows/conpty').rglob('*') if p.is_file()]
     inputs += [root/name for name in CHANGELOGS]
     inputs += [p for p in (root/'assets/syntaxes').rglob('*') if p.is_file()]
+    inputs += [p for p in (root/'assets/file-icons').rglob('*') if p.is_file()]
     for crate in ['alacritty_terminal', 'vte']:
         inputs += [root/f'vendor/{crate}/Cargo.toml']
         inputs += list((root/f'vendor/{crate}/src').rglob('*.rs'))
@@ -90,6 +91,7 @@ def verify_archive(path):
         if 'fonts' in manifest and not {'Cascadia-LICENSE.txt','FONT-SOURCE.json'}.issubset(expected):raise ValueError('font license/provenance incomplete')
         if any(name not in expected for name in manifest.get('fonts',{}).get('licenses',[])):raise ValueError('declared font license missing')
         if 'syntaxes' in manifest and not {'Syntax-LICENSES.json','SYNTAX-SOURCE.json'}.issubset(expected):raise ValueError('syntax license/provenance incomplete')
+        if 'file_icons' in manifest and not {'FILE-ICONS-SOURCE.json','Tabler-Icons-LICENSE.txt'}.issubset(expected):raise ValueError('file icon license/provenance incomplete')
         for name,record in manifest['files'].items():
             data=archive.read(name)
             if len(data)!=record['bytes'] or hashlib.sha256(data).hexdigest()!=record['sha256']:raise ValueError('checksum mismatch: '+name)
@@ -165,6 +167,22 @@ def icon_notices(folder,root=ROOT):
     for license_file in sorted(source.glob('LICENSE-*')):
         shutil.copy2(license_file,destination/license_file.name)
 
+def file_icon_sources(root=ROOT):
+    source=root/'assets/file-icons'
+    record=json.loads((source/'SOURCE.json').read_text(encoding='utf-8'))
+    for name,expected in record['files'].items():
+        if Path(name).name!=name:raise ValueError('invalid file icon name')
+        data=(source/name).read_bytes()
+        if len(data)!=expected['bytes'] or hashlib.sha256(data).hexdigest()!=expected['sha256']:raise ValueError('file icon identity mismatch: '+name)
+    if record['license_file'] not in record['files']:raise ValueError('file icon original license missing')
+    return record
+
+def file_icon_notices(folder,root=ROOT):
+    source=root/'assets/file-icons';record=file_icon_sources(root)
+    shutil.copy2(source/'SOURCE.json',folder/'FILE-ICONS-SOURCE.json')
+    shutil.copy2(source/record['license_file'],folder/'Tabler-Icons-LICENSE.txt')
+    return {'bundle':'Tabler Icons','revision':record['revision'],'source_record':'FILE-ICONS-SOURCE.json','licenses':['Tabler-Icons-LICENSE.txt']}
+
 def font_notices(folder,root=ROOT):
     source=root/'assets/fonts'
     record=json.loads((source/'SOURCE.json').read_text(encoding='utf-8'))
@@ -219,6 +237,8 @@ def build(allow_dirty=False):
     manifest['source_scope']+=', syntax license/provenance assets'
     manifest['syntaxes']=syntaxes
     manifest['fonts']=fonts
+    manifest['file_icons']=file_icon_notices(folder)
+    manifest['source_scope']+=', file icon SVG/license/provenance assets'
     for item in sorted(folder.rglob('*')):
         if item.is_file():manifest['files'][item.relative_to(folder).as_posix()]={'bytes':item.stat().st_size,'sha256':sha(item)}
     (folder/'manifest.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2),encoding='utf-8')

@@ -1,7 +1,7 @@
 //! Shared compact file rows for working-tree changes and expanded commits.
 use super::{chrome, display_text, header_font, i18n};
 use crate::file_icons::icon;
-use egui::{Color32, FontFamily, FontId, RichText, Sense};
+use egui::{Color32, RichText, Sense};
 
 pub(super) struct FileRow<'a> {
     pub path: &'a str,
@@ -33,13 +33,13 @@ pub(super) fn show(ui: &mut egui::Ui, file: FileRow<'_>, id: egui::Id) -> egui::
     } else if response.hovered() {
         ui.painter().rect_filled(rect, 2.0, Color32::from_gray(40));
     }
-    let (glyph, color) = icon(file.path, file.binary);
-    let icon_font = FontId::new(font.size, FontFamily::Name("codicons".into()));
-    let galley = ui.painter().layout_no_wrap(glyph.into(), icon_font, color);
-    ui.painter().galley(
-        egui::pos2(rect.left(), rect.center().y - galley.size().y * 0.5),
-        galley,
-        color,
+    let symbol = icon(file.path, file.binary);
+    symbol.paint(
+        ui,
+        egui::Rect::from_center_size(
+            egui::pos2(rect.left() + font.size / 2.0, rect.center().y),
+            egui::Vec2::splat(font.size),
+        ),
     );
     let status = if file.status == "??" {
         "U"

@@ -45,10 +45,36 @@ class ArchiveVerification(unittest.TestCase):
                     self.assertTrue(record['source'].startswith('https://'))
                     self.assertIn('no standalone license',record['license'])
 
+    def test_outline_icons_preserve_original_license_and_reject_changed_svg(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder)/'root';out=Path(folder)/'package';out.mkdir()
+            shutil.copytree(packaging.ROOT/'assets/file-icons',root/'assets/file-icons')
+            metadata=packaging.file_icon_notices(out,root)
+            self.assertEqual(metadata['bundle'],'Tabler Icons')
+            self.assertEqual((out/'Tabler-Icons-LICENSE.txt').read_bytes(),(root/'assets/file-icons/LICENSE.txt').read_bytes())
+            self.assertEqual((out/'FILE-ICONS-SOURCE.json').read_bytes(),(root/'assets/file-icons/SOURCE.json').read_bytes())
+            icon=root/'assets/file-icons/brand-python.svg'
+            icon.write_bytes(icon.read_bytes()+b'tampered')
+            with self.assertRaisesRegex(ValueError,'file icon identity mismatch'):
+                packaging.file_icon_notices(out,root)
+
+    def test_declared_file_icons_require_notices_while_old_archives_remain_valid(self):
+        with tempfile.TemporaryDirectory() as folder:
+            old=Path(folder)/'old.zip';new=Path(folder)/'new.zip';self.fixture(old)
+            self.assertTrue(packaging.verify_archive(old)['ok'])
+            with zipfile.ZipFile(old) as source,zipfile.ZipFile(new,'w') as archive:
+                for name in source.namelist():
+                    data=source.read(name)
+                    if name=='manifest.json':
+                        manifest=json.loads(data);manifest['file_icons']={'bundle':'Tabler Icons'};data=json.dumps(manifest).encode()
+                    archive.writestr(name,data)
+            with self.assertRaisesRegex(ValueError,'file icon license/provenance incomplete'):
+                packaging.verify_archive(new)
+
     def test_source_identity_covers_window_backend_build_sources_and_glow_shaders(self):
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder)
-            names=['CHANGELOG.md','CHANGELOG.en.md','build.rs','Cargo.toml','Cargo.lock','vendor/egui_term/Cargo.toml','vendor/alacritty_terminal/Cargo.toml','vendor/vte/Cargo.toml','vendor/egui-winit/Cargo.toml','vendor/winit/Cargo.toml','vendor/winit/build.rs','vendor/winit/src/platform_impl/windows/event_loop.rs','vendor/egui_glow/Cargo.toml','vendor/egui_glow/src/painter.rs','vendor/egui_glow/src/shader/fragment.glsl','vendor/alacritty_terminal/src/term/mod.rs','vendor/vte/src/ansi.rs']
+            names=['CHANGELOG.md','CHANGELOG.en.md','build.rs','Cargo.toml','Cargo.lock','vendor/egui_term/Cargo.toml','vendor/alacritty_terminal/Cargo.toml','vendor/vte/Cargo.toml','vendor/egui-winit/Cargo.toml','vendor/winit/Cargo.toml','vendor/winit/build.rs','vendor/winit/src/platform_impl/windows/event_loop.rs','vendor/egui_glow/Cargo.toml','vendor/egui_glow/src/painter.rs','vendor/egui_glow/src/shader/fragment.glsl','vendor/alacritty_terminal/src/term/mod.rs','vendor/vte/src/ansi.rs','assets/file-icons/brand-python.svg']
             for name in names:
                 path=root/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(b'original')
             for name in ['src','vendor/egui_term/src','vendor/egui-winit/src','assets/fonts','assets/icons','assets/branding']:(root/name).mkdir(parents=True,exist_ok=True)
