@@ -26,3 +26,7 @@ scripts/installer/NSIS-LICENSE.txt -text -whitespace
 assets/fonts/LICENSE-JetBrainsMono.txt -text -whitespace
 assets/fonts/LICENSE-Codicons.txt -text -whitespace
 assets/fonts/Codicons-mapping.css -text -whitespace
+
+# Preserve pinned Tabler SVG streams and the original MIT license on Windows.
+assets/file-icons/*.svg -text -whitespace
+assets/file-icons/LICENSE.txt -text -whitespace
