@@ -288,6 +288,9 @@ pub struct App {
     renderer: egui_term::TextRendererSession,
     helper: Result<PathBuf, String>,
     sessions: Vec<Session>,
+    groups: Vec<model::SessionGroup>,
+    group_edit: Option<(bool, String)>,
+    group_name: String,
     active: Option<String>,
     last_directory: Option<PathBuf>,
     can_draw: bool,
@@ -407,6 +410,9 @@ impl App {
                 .map(|p| p.with_file_name("ai-terminal-hook.exe"))
                 .map_err(|e| e.to_string()),
             sessions: workspace.sessions.into_iter().map(Session::new).collect(),
+            groups: workspace.groups,
+            group_edit: None,
+            group_name: String::new(),
             active: workspace.active,
             last_directory: workspace.last_directory,
             can_draw: true,
@@ -468,6 +474,7 @@ impl App {
         }
         let workspace = Workspace {
             sessions: self.sessions.iter().map(|s| s.spec.clone()).collect(),
+            groups: self.groups.clone(),
             active: self.active.clone(),
             last_directory: self.last_directory.clone(),
             ui: self.preferences,
@@ -607,6 +614,7 @@ impl App {
         }
         let workspace = Workspace {
             sessions: self.sessions.iter().map(|s| s.spec.clone()).collect(),
+            groups: self.groups.clone(),
             active: self.active.clone(),
             last_directory: self.last_directory.clone(),
             ui: self.preferences,
@@ -769,6 +777,8 @@ impl App {
         self.floating.set_scale(ctx, zoom);
         self.floating
             .set_opacity(ctx, self.preferences.floating_opacity);
+        self.floating
+            .set_border(ctx, self.preferences.floating_border);
         let zoom_changed = self.floating_zoom.is_some_and(|old| old != zoom);
         for action in self.floating.actions() {
             // An old child-frame position can be queued while the point scale changes.
@@ -777,8 +787,26 @@ impl App {
             }
             self.floating_action(action, ctx);
         }
+        let snapshot = Snapshot {
+            groups: self.groups.clone(),
+            items: self
+                .sessions
+                .iter()
+                .map(|s| Item {
+                    id: s.spec.id.clone(),
+                    name: s.spec.name.clone(),
+                    agent: s.display_agent(),
+                    color: s.spec.color,
+                    activity: s.status.activity,
+                    unread: s.status.unread,
+                })
+                .collect(),
+            active: self.active.clone(),
+            locale: i18n::locale(ctx),
+        };
+        let count = snapshot.entry_count();
         if self.preferences.floating_enabled {
-            if self.floating_session_count != Some(self.sessions.len()) || zoom_changed {
+            if self.floating_session_count != Some(count) || zoom_changed {
                 // Older workspaces stored egui points. Migrate once using the main viewport scale.
                 let saved = self.preferences.floating_position_pixels.or_else(|| {
                     self.preferences.floating_position.map(|p| {
@@ -787,46 +815,22 @@ impl App {
                     })
                 });
                 let position = Some(
-                    ai_terminal::floating::centered_geometry_at_scale(
-                        ctx,
-                        self.sessions.len(),
-                        saved,
-                        zoom,
-                    )
-                    .0,
+                    ai_terminal::floating::centered_geometry_at_scale(ctx, count, saved, zoom).0,
                 );
                 if self.preferences.floating_position_pixels != position {
                     self.preferences.floating_position_pixels = position;
                     self.preferences_changed(ctx);
                 }
             }
-            self.floating.update(
-                Snapshot {
-                    items: self
-                        .sessions
-                        .iter()
-                        .map(|s| Item {
-                            id: s.spec.id.clone(),
-                            name: s.spec.name.clone(),
-                            agent: s.display_agent(),
-                            color: s.spec.color,
-                            activity: s.status.activity,
-                            unread: s.status.unread,
-                        })
-                        .collect(),
-                    active: self.active.clone(),
-                    locale: i18n::locale(ctx),
-                },
-                ctx,
-            );
+            self.floating.update(snapshot, ctx);
             self.floating
                 .show(ctx, self.preferences.floating_position_pixels);
         }
-        self.floating_session_count = self
-            .preferences
-            .floating_enabled
-            .then_some(self.sessions.len());
+        self.floating_session_count = self.preferences.floating_enabled.then_some(count);
         self.floating_zoom = self.preferences.floating_enabled.then_some(zoom);
+        if !self.preferences.floating_enabled {
+            self.floating.dismiss();
+        }
     }
     fn floating_action(&mut self, action: ai_terminal::floating::Action, ctx: &egui::Context) {
         use ai_terminal::floating::Action;
@@ -1013,13 +1017,14 @@ impl App {
                 ),
             })
             .collect();
-        let actions = ai_terminal::sidebar::show(
+        let actions = ai_terminal::sidebar::show_with_groups(
             ui,
             &entries,
             self.active.as_deref(),
             self.preferences.sidebar_collapsed,
             self.preferences.sidebar_width,
             &self.icons,
+            &self.groups,
         );
         self.sidebar_right = ui.cursor().min.x;
         let ctx = ui.ctx();
@@ -1041,6 +1046,9 @@ impl App {
         }
         if let Some(id) = actions.select {
             self.activate(id, ctx);
+        }
+        if let Some(action) = actions.group {
+            self.group_action(action, ctx);
         }
         if let Some((id, color)) = actions.color {
             self.set_session_color(&id, color);
@@ -1069,6 +1077,35 @@ impl App {
         {
             session.spec.color = color;
             self.dirty = true;
+        }
+    }
+    fn group_action(&mut self, action: ai_terminal::sidebar::GroupAction, ctx: &egui::Context) {
+        use ai_terminal::sidebar::GroupAction;
+        match action {
+            GroupAction::Create(id) if self.sessions.iter().any(|s| s.spec.id == id) => {
+                self.group_name.clear();
+                self.group_edit = Some((true, id));
+            }
+            GroupAction::Rename(id) => {
+                if let Some(group) = self.groups.iter().find(|g| g.id == id) {
+                    self.group_name = group.name.clone();
+                    self.group_edit = Some((false, id));
+                }
+            }
+            GroupAction::Assign(id, target) => {
+                if self.sessions.iter().any(|s| s.spec.id == id) {
+                    self.dirty |= model::assign_group(&mut self.groups, &id, target.as_deref());
+                }
+            }
+            GroupAction::Dissolve(id) => {
+                let count = self.groups.len();
+                self.groups.retain(|g| g.id != id);
+                self.dirty |= count != self.groups.len();
+            }
+            _ => {}
+        }
+        if self.group_edit.is_some() {
+            ctx.memory_mut(|m| m.request_focus(egui::Id::new("group-name-input")));
         }
     }
     fn terminal(&mut self, ui: &mut egui::Ui) {
@@ -1105,6 +1142,7 @@ impl App {
                     return;
                 };
                 let focus = self.rename.is_none()
+                    && self.group_edit.is_none()
                     && self.close_session.is_none()
                     && !self.confirm_exit
                     && !self.settings_open
@@ -1219,6 +1257,40 @@ impl App {
         self.activate(id, ctx);
     }
     fn dialogs(&mut self, ctx: &egui::Context) {
+        if let Some((create, id)) = self.group_edit.clone() {
+            let mut open = true;
+            let done = ai_terminal::dialogs::name_input(
+                ctx,
+                &mut open,
+                &mut self.group_name,
+                "group-name",
+                if create {
+                    tr(ctx, "新建分组", "New group")
+                } else {
+                    tr(ctx, "重命名分组", "Rename group")
+                },
+                tr(ctx, "分组名称", "Group name"),
+            );
+            if done {
+                let name = self.group_name.trim().to_owned();
+                if create && self.sessions.iter().any(|s| s.spec.id == id) {
+                    model::assign_group(&mut self.groups, &id, None);
+                    self.groups.push(model::SessionGroup {
+                        id: uuid::Uuid::new_v4().to_string(),
+                        name,
+                        members: vec![id],
+                    });
+                    self.dirty = true;
+                } else if !create && let Some(group) = self.groups.iter_mut().find(|g| g.id == id) {
+                    group.name = name;
+                    self.dirty = true;
+                }
+            }
+            if done || !open {
+                self.group_edit = None;
+                self.terminal_focus_pending = true;
+            }
+        }
         let previous_font = self.preferences.terminal_font;
         if ai_terminal::settings::show(ctx, &mut self.settings_open, &mut self.preferences) {
             i18n::apply(ctx, self.preferences.language);
@@ -1262,6 +1334,7 @@ impl App {
                 if let Some(index) = self.sessions.iter().position(|s| s.spec.id == id) {
                     self.sessions[index].shutdown();
                     self.sessions.remove(index);
+                    model::assign_group(&mut self.groups, &id, None);
                 }
                 if self.active.as_deref() == Some(&id) {
                     if let Some(next) = self.sessions.first().map(|s| s.spec.id.clone()) {
@@ -1512,7 +1585,8 @@ impl eframe::App for App {
         self.renderer.release();
     }
     fn raw_input_hook(&mut self, ctx: &egui::Context, input: &mut egui::RawInput) {
-        if input.viewport_id == ai_terminal::floating::viewport_id()
+        if (input.viewport_id == ai_terminal::floating::viewport_id()
+            || input.viewport_id == ai_terminal::floating::group_viewport_id())
             && let Some(scale) = ai_terminal::zoom::input(input, self.preferences.floating_scale)
         {
             self.preferences.floating_scale = scale;
@@ -3293,6 +3367,21 @@ Send-State 'state=clear'; Wait-Step 5
         let pid = app.sessions[0].backend.as_ref().unwrap().pty_id();
         app.sessions[0].status.activity = Activity::Completed;
         app.sessions[0].status.unread = true;
+        let second = app.sessions[1].spec.id.clone();
+        app.sessions[1].status.unread = true;
+        app.group_action(ai_terminal::sidebar::GroupAction::Create(id.clone()), &ctx);
+        assert_eq!(app.group_edit, Some((true, id.clone())));
+        app.group_edit = None;
+        app.groups.push(model::SessionGroup {
+            id: "team".into(),
+            name: "开发队".into(),
+            members: vec![id.clone()],
+        });
+        app.group_action(
+            ai_terminal::sidebar::GroupAction::Assign(second.clone(), Some("team".into())),
+            &ctx,
+        );
+        assert_eq!(app.groups[0].members.len(), 2);
         app.can_draw = false;
         let mut input = egui::RawInput::default();
         input
@@ -3307,6 +3396,8 @@ Send-State 'state=clear'; Wait-Step 5
         assert_eq!(app.sessions[0].backend.as_ref().unwrap().pty_id(), pid);
         assert_eq!(app.sessions[0].status.activity, Activity::Completed);
         assert!(!app.sessions[0].status.unread);
+        assert!(app.sessions[1].status.unread);
+        assert_eq!(app.sessions[0].backend.as_ref().unwrap().pty_id(), pid);
         assert!(
             output.viewport_output[&egui::ViewportId::ROOT]
                 .commands
@@ -3318,13 +3409,26 @@ Send-State 'state=clear'; Wait-Step 5
             app.preferences.floating_position_pixels,
             Some([-320.0, 80.0])
         );
+        app.preferences.floating_border = false;
+        let _ = ctx.run_ui(egui::RawInput::default(), |_| app.manage_floating(&ctx));
+        assert_eq!(app.sessions[0].backend.as_ref().unwrap().pty_id(), pid);
+        let accepted_position = app.preferences.floating_position_pixels;
         app.floating_action(Action::Disable, &ctx);
         assert!(!app.preferences.floating_enabled);
         app.dirty = true;
         app.persist();
         let saved = model::load(&root.path().join("sessions.json")).unwrap();
+        assert_eq!(saved.groups, app.groups);
+        app.group_action(
+            ai_terminal::sidebar::GroupAction::Dissolve("team".into()),
+            &ctx,
+        );
+        assert!(app.groups.is_empty());
+        assert_eq!(app.sessions.len(), 2);
+        assert_eq!(app.sessions[0].backend.as_ref().unwrap().pty_id(), pid);
+        assert!(!saved.ui.floating_border);
         assert!(!saved.ui.floating_enabled);
-        assert_eq!(saved.ui.floating_position_pixels, Some([-320.0, 80.0]));
+        assert_eq!(saved.ui.floating_position_pixels, accepted_position);
     }
     #[test]
     fn island_stays_on_screen_when_the_session_count_grows() {

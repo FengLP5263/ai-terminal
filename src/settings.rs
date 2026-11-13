@@ -160,6 +160,10 @@ pub fn show(ctx: &egui::Context, open: &mut bool, preferences: &mut UiSettings) 
                     )
                 },
             );
+            row(ui, locale.text("浮窗边框", "Floating border"), |ui, _| {
+                ui.add_enabled(preferences.floating_enabled,
+                    egui::Checkbox::new(&mut preferences.floating_border, locale.text("显示", "Show")))
+            });
             row(
                 ui,
                 locale.text("浮窗缩放", "Floating bar scale"),
@@ -190,9 +194,9 @@ pub fn show(ctx: &egui::Context, open: &mut bool, preferences: &mut UiSettings) 
                 ui.spacing_mut().slider_width = (width - 80.0).max(60.0);
                 let mut transparency = ((1.0 - preferences.floating_opacity) * 100.0).round();
                 let response = ui.add_enabled(preferences.floating_enabled,
-                    egui::Slider::new(&mut transparency, 0.0..=80.0).step_by(1.0).custom_formatter(|value,_| format!("{value:.0}%")).custom_parser(|text| text.trim().trim_end_matches('%').trim().parse::<f64>().ok().filter(|v|v.is_finite()))
+                    egui::Slider::new(&mut transparency, 0.0..=100.0).step_by(1.0).custom_formatter(|value,_| format!("{value:.0}%")).custom_parser(|text| text.trim().trim_end_matches('%').trim().parse::<f64>().ok().filter(|v|v.is_finite()))
                     .handle_shape(egui::style::HandleShape::Rect { aspect_ratio: 0.18 }))
-                    .on_hover_text(locale.text("0% 为不透明；数值越大，背景越透明。头像和状态标记保持清晰。", "0% is opaque; higher values make the background more transparent. Avatars and status badges stay clear."));
+                    .on_hover_text(locale.text("0% 为不透明，100% 为背景完全透明。头像、状态标记和已开启的边框保持可见。", "0% is opaque; 100% makes the background fully transparent. Avatars, status badges and the enabled border stay visible."));
                 if response.changed() { preferences.floating_opacity = UiSettings::normalize_floating_opacity(1.0 - transparency / 100.0); }
                 response
             });

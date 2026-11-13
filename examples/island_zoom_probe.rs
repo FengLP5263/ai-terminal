@@ -184,6 +184,7 @@ fn main() -> eframe::Result {
             cc.egui_ctx.set_zoom_factor(0.71);
             let icons = Icons::new(&cc.egui_ctx);
             let snapshot = Snapshot {
+                groups: Vec::new(),
                 items: (0..12)
                     .map(|i| Item {
                         id: format!("s{i}"),

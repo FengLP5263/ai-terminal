@@ -127,6 +127,7 @@ pub struct UiSettings {
     #[serde(default = "legacy_floating_scale")]
     pub floating_scale: f32,
     pub floating_opacity: f32,
+    pub floating_border: bool,
     pub language: crate::i18n::Language,
     pub floating_enabled: bool,
     pub floating_position: Option<[f32; 2]>,
@@ -145,6 +146,7 @@ impl Default for UiSettings {
             ui_scale: 1.0,
             floating_scale: 1.0,
             floating_opacity: 1.0,
+            floating_border: true,
             language: crate::i18n::Language::System,
             floating_enabled: false,
             floating_position: None,
@@ -158,7 +160,7 @@ impl UiSettings {
     pub const MAX_SIDEBAR_WIDTH: f32 = 420.0;
     pub const MIN_ZOOM: f32 = 0.5;
     pub const MAX_ZOOM: f32 = 2.5;
-    pub const MIN_FLOATING_OPACITY: f32 = 0.2;
+    pub const MIN_FLOATING_OPACITY: f32 = 0.0;
     pub fn normalize_floating_opacity(value: f32) -> f32 {
         if value.is_finite() {
             value.clamp(Self::MIN_FLOATING_OPACITY, 1.0)
@@ -227,10 +229,43 @@ pub fn reorder<T>(items: &mut Vec<T>, source: usize, target: usize, after: bool)
     true
 }
 
+/// Only navigation metadata; member order follows the workspace session order.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SessionGroup {
+    pub id: String,
+    pub name: String,
+    pub members: Vec<String>,
+}
+
+pub fn session_group<'a>(groups: &'a [SessionGroup], session: &str) -> Option<&'a SessionGroup> {
+    groups
+        .iter()
+        .find(|g| g.members.iter().any(|id| id == session))
+}
+
+/// A session belongs to at most one group. Removing the last member removes its group.
+pub fn assign_group(groups: &mut Vec<SessionGroup>, session: &str, target: Option<&str>) -> bool {
+    if target.is_some_and(|id| !groups.iter().any(|g| g.id == id))
+        || session_group(groups, session).map(|g| g.id.as_str()) == target
+    {
+        return false;
+    }
+    for group in groups.iter_mut() {
+        group.members.retain(|id| id != session);
+        if Some(group.id.as_str()) == target {
+            group.members.push(session.into());
+        }
+    }
+    groups.retain(|g| !g.members.is_empty());
+    true
+}
+
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Workspace {
     #[serde(default)]
     pub sessions: Vec<SessionSpec>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub groups: Vec<SessionGroup>,
     pub active: Option<String>,
     #[serde(default)]
     pub last_directory: Option<PathBuf>,
@@ -249,7 +284,21 @@ pub fn load(path: &Path) -> Result<Workspace, String> {
         return Ok(Workspace::default());
     }
     let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
-    serde_json::from_slice(&bytes).map_err(|e| format!("无法读取会话记录：{e}"))
+    let mut workspace: Workspace =
+        serde_json::from_slice(&bytes).map_err(|e| format!("无法读取会话记录：{e}"))?;
+    let mut ids = std::collections::HashSet::new();
+    let mut members = std::collections::HashSet::new();
+    workspace.groups.retain_mut(|group| {
+        group.name = group.name.trim().to_owned();
+        if group.id.is_empty() || group.name.is_empty() || !ids.insert(group.id.clone()) {
+            return false;
+        }
+        group.members.retain(|id| {
+            workspace.sessions.iter().any(|s| s.id == *id) && members.insert(id.clone())
+        });
+        !group.members.is_empty()
+    });
+    Ok(workspace)
 }
 pub fn save(path: &Path, workspace: &Workspace) -> Result<(), String> {
     let parent = path.parent().ok_or("无效的保存路径")?;

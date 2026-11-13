@@ -32,13 +32,14 @@ Enable the floating bar to see session avatars and status above other windows. C
 
 ![AI Terminal floating session bar](assets/readme/floating.en.png)
 
-> Screenshots use real 0.10.0 native components with synthetic sessions, terminal text, Git metadata and task status. They contain no real user data or private conversations. Click an image for its original resolution.
+> Screenshots use real 0.11.0 native components with synthetic sessions, terminal text, Git metadata and task status. They contain no real user data or private conversations. Click an image for its original resolution.
 
 ## Built for multiple sessions
 
 | Feature | What you can do |
 | --- | --- |
 | **A real terminal** | Open PowerShell, CMD, or Git Bash and run your installed command-line tools directly. |
+| **Session groups** | Create or join teams from session context menus; compact monochrome name badges identify team members. The floating bar shows the first avatar and a simplified badge; hover to see “Group name × N” and switch between members with their session colors. |
 | **Agent recognition** | Starting Codex, Claude Code, Qoder CN, Kimi Code, ZCode or TRAE CLI displays the corresponding avatar; other commands still work as ordinary terminal sessions. |
 | **Task status** | See working, needs attention, completed, or failed states for supported Agents in the sidebar and floating bar. Status comes from supported lifecycle notifications and process exits; it is not a universal inference for every CLI. |
 | **Always-on-top bar** | Show only session avatars and status, up to 10 at a time. Drag the avatar area to see more, and click an avatar to return to its session. Scale it independently in Settings or with Ctrl+wheel over the bar. Background transparency can be adjusted immediately in Settings while avatars and status badges remain clear. |
@@ -50,6 +51,16 @@ Enable the floating bar to see session avatars and status above other windows. C
 | **Read-only file diffs** | Click a working or committed file to inspect its complete body, syntax colors and red/green change backgrounds. |
 | **Terminal fonts** | Default to JetBrains Mono and switch instantly to Cascadia Mono, Hack or two available Windows fonts in Settings while sessions stay connected and saved choices are preserved. |
 | **Chinese and English** | Follow the system language or choose Simplified Chinese or English in settings. |
+
+## Organize sessions into teams
+
+Right-click a session → **Group** to create or join a team. Members share a compact monochrome name badge while keeping their individual names, colors and draggable order. The same menu can remove a member, rename a group or dissolve it; dissolving keeps every session.
+
+The floating bar shows each team’s first avatar with the same simplified badge used by the collapsed sidebar. Hover to see “Group name × N” and each member’s avatar, title and state, then click to open its terminal. A neutral divider separates the first member; the other cards retain their colors and spacing. Order helps organize the team without granting extra permissions or combining histories.
+
+![AI Terminal group members: individual states, session colors and click-to-switch navigation](assets/readme/session-groups.en.png)
+
+Pending and unread member states remain visible on the floating bar. Grouping, removing members or dissolving a team never restarts terminals. Closing or removing the first member uses the next avatar in session order.
 
 ## Browse project files
 
@@ -79,7 +90,7 @@ File views are read-only, without editing. See [Git panel](docs/git.en.md) for e
 
 ## Settings and floating bar
 
-Settings apply and save immediately. Floating-bar zoom is independent of the main window, and background transparency ranges from 0% to 80% while avatars and status badges stay clear. Settings, rename and confirmation dialogs use compact desktop typography and controls.
+Settings apply and save immediately. The floating outline is enabled by default and can be turned off separately. Floating-bar zoom is independent of the main window, and background transparency ranges from 0% to 100% while avatars and status badges stay clear. Settings, rename and confirmation dialogs use compact desktop typography and controls.
 
 ![AI Terminal settings: fonts, independent floating zoom and background transparency](assets/readme/settings.en.png)
 

@@ -143,6 +143,7 @@ impl eframe::App for Probe {
             self.since = Instant::now();
         }
         let snapshot = Snapshot {
+            groups: Vec::new(),
             items: [
                 Agent::Shell,
                 Agent::Bash,
@@ -212,6 +213,7 @@ impl eframe::App for Probe {
         // Only the probe drives child frames while injecting its synthetic input.
         ui.ctx().request_repaint_of(floating::viewport_id());
         if self.shots.iter().all(|s| *s) {
+            let frame = verify_native_frame();
             let dimensions = native("ai-terminal status").expect("Owned floating window");
             let hint = native("ai-terminal hint").expect("Owned hint window");
             let dpi = dimensions[2] as f32 / 96.0;
@@ -223,7 +225,7 @@ impl eframe::App for Probe {
                 (dimensions[1] as f32 - 48.0 * dpi * bar).abs() <= 1.0,
                 "Bar height: {dimensions:?}"
             );
-            self.records.push(serde_json::json!({"main_scale":main,"floating_scale":bar,"bar":dimensions,"hint":hint,"root_zoom":ui.ctx().zoom_factor(),"reference_icons":self.references,"main":native("ai-terminal independent scaling")}));
+            self.records.push(serde_json::json!({"main_scale":main,"floating_scale":bar,"bar":dimensions,"hint":hint,"root_zoom":ui.ctx().zoom_factor(),"reference_icons":self.references,"main":native("ai-terminal independent scaling"),"native_frame":frame}));
             self.stage += 1;
             self.frames = 0;
             self.pending = false;
@@ -267,10 +269,10 @@ impl eframe::App for Probe {
     }
 }
 #[cfg(windows)]
-fn native(title: &str) -> Option<[i32; 5]> {
+fn owned_window(title: &str) -> Option<windows_sys::Win32::Foundation::HWND> {
     use windows_sys::Win32::{
-        Foundation::{HWND, LPARAM, RECT},
-        UI::{HiDpi::GetDpiForWindow, WindowsAndMessaging::*},
+        Foundation::{HWND, LPARAM},
+        UI::WindowsAndMessaging::*,
     };
     struct Find<'a> {
         title: &'a str,
@@ -295,17 +297,23 @@ fn native(title: &str) -> Option<[i32; 5]> {
         handle: std::ptr::null_mut(),
     };
     unsafe { EnumWindows(Some(visit), &mut find as *mut _ as LPARAM) };
-    if find.handle.is_null() {
-        return None;
-    }
+    (!find.handle.is_null()).then_some(find.handle)
+}
+#[cfg(windows)]
+fn native(title: &str) -> Option<[i32; 5]> {
+    use windows_sys::Win32::{
+        Foundation::RECT,
+        UI::{HiDpi::GetDpiForWindow, WindowsAndMessaging::*},
+    };
+    let hwnd = owned_window(title)?;
     let mut outer = RECT::default();
-    unsafe { GetWindowRect(find.handle, &mut outer) };
+    unsafe { GetWindowRect(hwnd, &mut outer) };
     let mut rect = RECT::default();
-    (unsafe { GetClientRect(find.handle, &mut rect) } != 0).then(|| {
+    (unsafe { GetClientRect(hwnd, &mut rect) } != 0).then(|| {
         [
             rect.right - rect.left,
             rect.bottom - rect.top,
-            unsafe { GetDpiForWindow(find.handle) } as i32,
+            unsafe { GetDpiForWindow(hwnd) } as i32,
             outer.left,
             outer.top,
         ]
@@ -314,6 +322,48 @@ fn native(title: &str) -> Option<[i32; 5]> {
 #[cfg(not(windows))]
 fn native(_: &str) -> Option<[i32; 5]> {
     None
+}
+#[cfg(windows)]
+fn verify_native_frame() -> serde_json::Value {
+    use windows_sys::Win32::UI::WindowsAndMessaging::*;
+    let hwnd = owned_window("ai-terminal status").unwrap();
+    let main = owned_window("ai-terminal independent scaling").unwrap();
+    let frame =
+        (WS_CAPTION | WS_THICKFRAME | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX) as isize;
+    let edges =
+        (WS_EX_DLGMODALFRAME | WS_EX_WINDOWEDGE | WS_EX_CLIENTEDGE | WS_EX_STATICEDGE) as isize;
+    unsafe {
+        let style = GetWindowLongPtrW(hwnd, GWL_STYLE);
+        let extended = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+        assert_eq!(
+            style & frame,
+            0,
+            "Floating window still has a legacy system caption/frame"
+        );
+        assert_eq!(
+            extended & edges,
+            0,
+            "Floating window still has a system edge"
+        );
+        let main_style = GetWindowLongPtrW(main, GWL_STYLE);
+        assert_ne!(main_style & WS_CAPTION as isize, 0);
+        // Simulate a backend style refresh and force a non-client repaint on our own bar.
+        SetWindowLongPtrW(hwnd, GWL_STYLE, style | frame);
+        SetWindowLongPtrW(hwnd, GWL_EXSTYLE, extended | edges);
+        SendMessageW(hwnd, WM_NCPAINT, 1, 0);
+        assert_eq!(
+            GetWindowLongPtrW(hwnd, GWL_STYLE) & frame,
+            0,
+            "Backend style refresh restored a caption"
+        );
+        assert_eq!(GetWindowLongPtrW(hwnd, GWL_EXSTYLE) & edges, 0);
+        assert_eq!(GetWindowLongPtrW(main, GWL_STYLE), main_style);
+        serde_json::json!({"caption_and_frame_absent":true,"system_edges_absent":true,"style_refresh_filtered":true,"non_client_repaint_simulated":true,"main_window_unchanged":true})
+    }
+}
+#[cfg(not(windows))]
+fn verify_native_frame() -> serde_json::Value {
+    panic!("Native frame verification requires Windows")
 }
 fn main() -> eframe::Result {
     ai_terminal::launch::prepare_gui_environment();

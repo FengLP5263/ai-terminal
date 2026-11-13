@@ -12,7 +12,7 @@ use ai_terminal::{
     },
     git_ui::{self, GitView},
     i18n::{self, Language, Locale},
-    model::{Agent, SessionColor},
+    model::{Agent, SessionColor, SessionGroup},
     project_files::FileClient,
     project_ui::{self, FileView},
     sidebar::{self, Entry, Icons},
@@ -149,7 +149,15 @@ impl eframe::App for Capture {
                 hint: String::new(),
             })
             .collect();
-        sidebar::show(ui, &entries, Some("readme-0"), false, 238.0, &self.icons);
+        sidebar::show_with_groups(
+            ui,
+            &entries,
+            Some("readme-0"),
+            false,
+            238.0,
+            &self.icons,
+            &self.snapshot.groups,
+        );
         let mut open = !self.files;
         let mut files_open = self.files;
         project_ui::panel(
@@ -452,6 +460,16 @@ fn main() -> eframe::Result {
             status.native_lifecycle = true;
             status.last_event = Some("UserPromptSubmit".into());
             let snapshot = Snapshot {
+                groups: vec![SessionGroup {
+                    id: "readme-product-team".into(),
+                    name: if english {
+                        "Product team"
+                    } else {
+                        "产品研发队"
+                    }
+                    .into(),
+                    members: (0..3).map(|n| format!("readme-{n}")).collect(),
+                }],
                 items: [
                     (
                         if english {
