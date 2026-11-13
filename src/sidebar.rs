@@ -1,6 +1,6 @@
 use crate::{
     appearance, chrome,
-    model::{Agent, SessionColor},
+    model::{Agent, SessionColor, SessionGroup, session_group},
     status::Activity,
 };
 use egui::{Color32, Pos2, Rect, Sense, Stroke, Vec2};
@@ -29,10 +29,19 @@ pub struct Actions {
     pub toggle: bool,
     pub select: Option<String>,
     pub rename: Option<String>,
+    pub group: Option<GroupAction>,
     pub color: Option<(String, Option<SessionColor>)>,
     pub close: Option<String>,
     pub reorder: Option<(String, String, bool)>,
     pub width: f32,
+}
+
+#[derive(Debug)]
+pub enum GroupAction {
+    Create(String),
+    Assign(String, Option<String>),
+    Rename(String),
+    Dissolve(String),
 }
 
 #[derive(Clone)]
@@ -258,10 +267,50 @@ fn paint_status_on(
 }
 
 #[derive(Clone, Copy)]
-struct CardStyle {
+struct GroupMark<'a> {
+    group: &'a SessionGroup,
+    first: bool,
+}
+
+fn group_mark<'a>(
+    groups: &'a [SessionGroup],
+    entries: &[Entry<'_>],
+    id: &str,
+) -> Option<GroupMark<'a>> {
+    let group = session_group(groups, id)?;
+    Some(GroupMark {
+        group,
+        first: entries
+            .iter()
+            .find(|entry| group.members.iter().any(|member| member == entry.id))
+            .is_some_and(|entry| entry.id == id),
+    })
+}
+
+#[derive(Clone, Copy)]
+struct CardStyle<'a> {
     selected: bool,
     hovered: bool,
     raised: bool,
+    group: Option<GroupMark<'a>>,
+}
+
+pub(crate) fn paint_group_mark(painter: &egui::Painter, avatar: Rect, name: &str, scale: f32) {
+    let badge = Rect::from_center_size(
+        Pos2::new(avatar.right() - 3.0 * scale, avatar.top() + 3.0 * scale),
+        Vec2::splat(12.0 * scale),
+    );
+    painter.rect_filled(badge, (2.0 * scale) as u8, Color32::WHITE);
+    painter.text(
+        badge.center(),
+        egui::Align2::CENTER_CENTER,
+        name.chars()
+            .next()
+            .map(|c| c.to_string())
+            .unwrap_or_default(),
+        egui::FontId::proportional(9.0 * scale),
+        Color32::BLACK,
+    );
 }
 
 fn paint_card(
@@ -271,7 +320,7 @@ fn paint_card(
     rect: Rect,
     collapsed: bool,
     icons: &Icons,
-    style: CardStyle,
+    style: CardStyle<'_>,
 ) {
     let fill = chrome::session_fill(entry.color, style.selected, style.hovered);
     if style.raised {
@@ -295,8 +344,32 @@ fn paint_card(
     );
     icons.paint(painter, avatar, entry.agent);
     paint_status_on(ui, painter, avatar, entry.activity, entry.unread, fill);
+    if collapsed && let Some(mark) = style.group {
+        paint_group_mark(painter, avatar, &mark.group.name, 1.0);
+    }
     if !collapsed {
         let left = rect.left() + 52.0;
+        let badge = style.group.map(|mark| {
+            let max_width = (rect.width() * 0.38).clamp(52.0, 96.0);
+            let galley = crate::ui_text::layout(
+                ui,
+                &mark.group.name,
+                10.0,
+                Color32::BLACK,
+                max_width - 12.0,
+            );
+            let width = galley.size().x + 12.0;
+            let badge = Rect::from_center_size(
+                Pos2::new(rect.right() - 8.0 - width / 2.0, rect.center().y + 12.0),
+                Vec2::new(width, 18.0),
+            );
+            painter.rect_filled(badge, 2, Color32::WHITE);
+            let origin = Pos2::new(badge.left() + 6.0, badge.center().y - galley.size().y / 2.0);
+            let badge_painter = painter.with_clip_rect(badge.shrink(2.0));
+            badge_painter.galley(origin, galley.clone(), Color32::BLACK);
+            crate::ui_text::paint_emoji(&badge_painter, origin, &galley, 10.0, Color32::BLACK);
+            badge
+        });
         let text_rect = Rect::from_min_max(
             Pos2::new(left, rect.center().y - 18.0),
             Pos2::new(rect.right() - 40.0, rect.bottom()),
@@ -320,16 +393,20 @@ fn paint_card(
             .file_name()
             .unwrap_or(entry.directory.as_os_str())
             .to_string_lossy();
-        painter.text(
+        crate::ui_text::paint(
+            ui,
+            &painter,
             Pos2::new(left, rect.center().y + 4.0),
-            egui::Align2::LEFT_TOP,
-            project,
-            egui::FontId::proportional(12.0),
+            &project,
+            12.0,
             if style.selected || style.hovered {
                 Color32::from_gray(180)
             } else {
                 chrome::SECONDARY
             },
+            badge
+                .map_or(text_rect.width(), |badge| badge.left() - left - 6.0)
+                .max(0.0),
         );
     }
 }
@@ -341,6 +418,18 @@ pub fn show(
     collapsed: bool,
     width: f32,
     icons: &Icons,
+) -> Actions {
+    show_with_groups(ui, entries, active, collapsed, width, icons, &[])
+}
+
+pub fn show_with_groups(
+    ui: &mut egui::Ui,
+    entries: &[Entry<'_>],
+    active: Option<&str>,
+    collapsed: bool,
+    width: f32,
+    icons: &Icons,
+    groups: &[SessionGroup],
 ) -> Actions {
     let mut actions = Actions::default();
     let panel = egui::Panel::left(if collapsed {
@@ -509,6 +598,7 @@ pub fn show(
                             collapsed,
                             icons,
                             CardStyle {
+                                group: group_mark(groups, entries, entry.id),
                                 selected,
                                 hovered,
                                 raised: false,
@@ -518,7 +608,14 @@ pub fn show(
                     let mut edit = false;
                     if !collapsed && drag.is_none() && (hovered || selected) {
                         let edit_rect = Rect::from_center_size(
-                            Pos2::new(rect.right() - 18.0, rect.center().y),
+                            Pos2::new(
+                                rect.right() - 18.0,
+                                if session_group(groups, entry.id).is_some() {
+                                    rect.top() + 16.0
+                                } else {
+                                    rect.center().y
+                                },
+                            ),
                             Vec2::splat(chrome::CONTROL),
                         );
                         edit = chrome::icon_at(
@@ -554,10 +651,20 @@ pub fn show(
                             entry.name,
                             entry.agent.label(),
                             entry.directory.display(),
-                            entry.hint
+                            session_group(groups, entry.id).map_or_else(
+                                || entry.hint.clone(),
+                                |g| format!(
+                                    "{} · {}\n{}",
+                                    crate::i18n::tr(ui.ctx(), "分组", "Group"),
+                                    g.name,
+                                    entry.hint
+                                )
+                            )
                         ));
                     }
                     response.context_menu(|ui| {
+                        ui.set_width(148.0);
+                        ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Truncate);
                         if ui
                             .button(crate::i18n::tr(ui.ctx(), "编辑名称", "Rename"))
                             .clicked()
@@ -574,6 +681,77 @@ pub fn show(
                                 }
                             },
                         );
+                        ui.menu_button(crate::i18n::tr(ui.ctx(), "分组", "Group"), |ui| {
+                            // Submenus start narrow; commands and group names share one row each.
+                            ui.set_width(200.0);
+                            ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Truncate);
+                            let current = session_group(groups, entry.id);
+                            if ui
+                                .button(crate::i18n::tr(ui.ctx(), "新建分组…", "New group…"))
+                                .clicked()
+                            {
+                                actions.group = Some(GroupAction::Create(entry.id.into()));
+                                ui.close();
+                            }
+                            for group in groups {
+                                if ui
+                                    .selectable_label(
+                                        current.is_some_and(|g| g.id == group.id),
+                                        &group.name,
+                                    )
+                                    .on_hover_text(&group.name)
+                                    .clicked()
+                                {
+                                    actions.group = Some(GroupAction::Assign(
+                                        entry.id.into(),
+                                        Some(group.id.clone()),
+                                    ));
+                                    ui.close();
+                                }
+                            }
+                            if let Some(group) = current {
+                                ui.separator();
+                                if ui
+                                    .button(crate::i18n::tr(
+                                        ui.ctx(),
+                                        "移出分组",
+                                        "Remove from group",
+                                    ))
+                                    .clicked()
+                                {
+                                    actions.group =
+                                        Some(GroupAction::Assign(entry.id.into(), None));
+                                    ui.close();
+                                }
+                                if ui
+                                    .button(crate::i18n::tr(
+                                        ui.ctx(),
+                                        "重命名分组…",
+                                        "Rename group…",
+                                    ))
+                                    .clicked()
+                                {
+                                    actions.group = Some(GroupAction::Rename(group.id.clone()));
+                                    ui.close();
+                                }
+                                if ui
+                                    .button(crate::i18n::tr(
+                                        ui.ctx(),
+                                        "解散分组",
+                                        "Ungroup sessions",
+                                    ))
+                                    .on_hover_text(crate::i18n::tr(
+                                        ui.ctx(),
+                                        "保留所有会话及其运行进程",
+                                        "Keep all sessions and their running processes",
+                                    ))
+                                    .clicked()
+                                {
+                                    actions.group = Some(GroupAction::Dissolve(group.id.clone()));
+                                    ui.close();
+                                }
+                            }
+                        });
                         if ui
                             .button(crate::i18n::tr(ui.ctx(), "关闭会话", "Close session"))
                             .clicked()
@@ -583,10 +761,20 @@ pub fn show(
                         }
                     });
                     if slot + 1 < entries.len() {
+                        let first = group_mark(groups, entries, entry.id)
+                            .filter(|mark| mark.first && mark.group.members.len() > 1);
                         ui.painter().hline(
                             rect.left() + 4.0..=rect.right() - 4.0,
                             rect.bottom() + if collapsed { 2.0 } else { 5.0 },
-                            Stroke::new(1.0 / ui.ctx().pixels_per_point(), Color32::from_gray(40)),
+                            first.map_or_else(
+                                || {
+                                    Stroke::new(
+                                        1.0 / ui.ctx().pixels_per_point(),
+                                        Color32::from_gray(40),
+                                    )
+                                },
+                                |_| Stroke::new(1.0, chrome::BORDER),
+                            ),
                         );
                     }
                     if !collapsed {
@@ -654,6 +842,7 @@ pub fn show(
                             collapsed,
                             icons,
                             CardStyle {
+                                group: group_mark(groups, entries, entry.id),
                                 selected: active == Some(entry.id),
                                 hovered: true,
                                 raised: true,

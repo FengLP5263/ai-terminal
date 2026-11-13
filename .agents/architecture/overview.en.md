@@ -78,3 +78,5 @@ preview.6: git/worktree.rs reads HEAD-to-current-file net diffs on demand, shari
 0.10.0-preview.4: header order is project, Git, status, zoom. Both entry widths are reserved before allocating space from the right.
 
 0.10.0-preview.5: dialogs.rs centralizes 18/16/14/12-point dialog typography and 36-point controls; settings.rs shares title and supporting-text constants. Styling remains scoped to dialogs.
+
+In 0.11.0, model owns UUID group navigation metadata and sidebar provides context-menu management and labels. floating projects each group to its first session in session order, with a simplified group badge and highest-priority actual member state so pending work stays visible; it creates no team-completed event. floating_group is an interactive, non-activating native viewport owned by the bar. It shares only member metadata and bounded activation messages, with no terminal content or extra terminal instances.

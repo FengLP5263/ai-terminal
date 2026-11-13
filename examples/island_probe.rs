@@ -244,6 +244,7 @@ fn main() -> eframe::Result {
             i18n::apply(&cc.egui_ctx, Language::ZhCn);
             let icons = Icons::new(&cc.egui_ctx);
             let snapshot = Snapshot {
+                groups: Vec::new(),
                 items: [
                     ("网站开发 ✨", Activity::Working),
                     ("接口联调", Activity::Waiting),

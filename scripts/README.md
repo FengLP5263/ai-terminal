@@ -188,3 +188,13 @@ Windows 原生设置入口：`ai-terminal.exe --settings`；可组合 `--data-di
 0.10.0-preview.3 沿用 floating_opacity_probe 命令和 12 张截图，在 136% 比例下补查灰色底板、圆角逐像素合成及窗外 16 像素无系统描边／阴影。readme_capture files 使用自建 Git 仓库展示淡化的忽略文件及文件夹，不能代替真实用户仓库验收。
 
 0.10.0-preview.5 沿用 settings_probe 的命令，现生成 14 张原生 PNG，包含中英文确认框及 133%／150% 退出确认；只绘制样例，不结束真实会话。
+
+会话分组原生核查：`cargo build --offline --locked --release --example session_groups_probe`，然后运行 `target/release/examples/session_groups_probe.exe output/<unique-session-groups>`。探针只使用自身样例元数据和 egui 合成输入，在 100%／142%／200% 核对宽／窄及收起侧栏工牌、首位中性分隔线、浮窗代表头像与数量、跨窗口悬停、成员点击、非激活／可点击窗口属性及移出关闭，输出十二张原生 PNG 和 result.json；不注入系统输入、不启动 Agent／模型。真实 ConPTY 身份和逐成员未读另由 App 回归覆盖。此探针仅支持 Windows，POSIX 原生动作明确失败。
+
+分组菜单原生核查：`cargo build --offline --locked --release --example session_group_menu_probe` 后运行 `target/release/examples/session_group_menu_probe.exe output/<unique-group-menus>`，以正式侧栏右键菜单生成 100%／133%／200% 中英文六张原生 PNG。检查主菜单及子菜单命令单行、统一宽度和长组名省略；仅自身样例和 egui 合成输入，不启动 PTY／Agent，不注入系统输入；仅支持 Windows。
+
+工牌／边框沿用 session_groups_probe 命令，输出十二张图，包含两组工牌、首位中性分隔、190 点与收起侧栏及边框开／关。边框原生像素比较只允许边缘改变，同时核对同一 HWND、位置及尺寸。floating_opacity_probe 关闭边框以独立检查透明度、圆角及桌面合成。
+
+0.11.0-preview.4 沿用分组与菜单探针命令，工牌为白底黑字、无主协调标记。floating_opacity_probe 增至十五张图，新增 100% 背景透明与该状态下的头像点击；仍检查自身原生窗口、桌面合成、圆角和不透明头像，不调用模型或注入系统输入。
+
+0.11.0 分组截图：`target/release/examples/session_groups_probe.exe output/<unique-groups-zh>` 使用中文样例；追加 `en` 生成全英文样例。每次仍执行全部十二张图与交互核查；README 只选用首组的 case-0-members.png，保留原始 PNG。readme_capture 的各模式使用同一固定研发队伍展示侧栏工牌，不读取用户分组。

@@ -293,6 +293,7 @@ mod windows {
                     bar: FloatingBar::new(Icons::new(&cc.egui_ctx)),
                     icons: Icons::new(&cc.egui_ctx),
                     snapshot: Snapshot {
+                        groups: Vec::new(),
                         items: vec![
                             Item {
                                 id: "kimi".into(),

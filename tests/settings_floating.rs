@@ -82,6 +82,7 @@ fn floating_geometry_and_scaled_clicks_are_independent_of_main_zoom() {
     let icons = Icons::new(&ctx);
     let bar = floating::FloatingBar::new(icons.clone());
     let snapshot = Snapshot {
+        groups: Vec::new(),
         items: vec![Item {
             id: "scaled".into(),
             name: "Scaled".into(),
@@ -160,6 +161,7 @@ fn floating_icons_are_rasterized_at_their_final_physical_size() {
             ai_terminal::zoom::initialize(&ctx, main);
             let icons = Icons::new(&ctx);
             let snapshot = Snapshot {
+                groups: Vec::new(),
                 items: [Agent::Shell, Agent::Codex]
                     .into_iter()
                     .enumerate()
@@ -424,6 +426,7 @@ fn island_clicks_identify_sessions_and_keep_failure_question_and_completion_dist
     appearance::setup(&ctx);
     let icons = Icons::new(&ctx);
     let snapshot = Snapshot {
+        groups: Vec::new(),
         items: [
             Activity::Working,
             Activity::Completed,
@@ -502,6 +505,7 @@ fn a_single_session_stays_clickable_after_a_long_hover() {
     appearance::setup(&ctx);
     let icons = Icons::new(&ctx);
     let snapshot = Snapshot {
+        groups: Vec::new(),
         items: vec![Item {
             id: "one".into(),
             name: "A long session name for tooltip".into(),
@@ -615,6 +619,7 @@ fn many_sessions_stay_still_and_only_drag_scrolls_without_opening_a_session() {
     appearance::setup(&ctx);
     let icons = Icons::new(&ctx);
     let snapshot = Snapshot {
+        groups: Vec::new(),
         items: (0..40)
             .map(|i| Item {
                 id: i.to_string(),
@@ -739,6 +744,7 @@ fn floating_result_dot_disappears_when_the_session_is_read() {
         appearance::setup(&ctx);
         let icons = Icons::new(&ctx);
         let mut snapshot = Snapshot {
+            groups: Vec::new(),
             items: vec![Item {
                 id: "one".into(),
                 name: "Session".into(),
@@ -790,8 +796,8 @@ fn floating_opacity_defaults_clamps_and_survives_restart_independently() {
     for (value, expected) in [
         (f32::NAN, 1.0),
         (f32::INFINITY, 1.0),
-        (-2.0, 0.2),
-        (0.0, 0.2),
+        (-2.0, 0.0),
+        (0.0, 0.0),
         (0.5, 0.5),
         (2.0, 1.0),
     ] {
@@ -828,6 +834,7 @@ fn live_floating_opacity_updates_background_preserves_avatars_and_click_targets(
     let bar = floating::FloatingBar::new(Icons::new(&ctx));
     bar.update(
         Snapshot {
+            groups: Vec::new(),
             items: vec![Item {
                 id: "opacity".into(),
                 name: "Status".into(),
@@ -874,7 +881,7 @@ fn live_floating_opacity_updates_background_preserves_avatars_and_click_targets(
         (output, target.unwrap())
     };
     let mut target = None;
-    for opacity in [1.0, 0.5, 0.2, 1.0] {
+    for opacity in [1.0, 0.5, 0.2, 0.0, 1.0] {
         bar.set_opacity(&ctx, opacity);
         frame(vec![]);
         let (out, rect) = frame(vec![]);
@@ -891,4 +898,53 @@ fn live_floating_opacity_updates_background_preserves_avatars_and_click_targets(
         assert!(bar.actions().contains(&Action::Activate("opacity".into())));
     }
     assert_eq!(ctx.zoom_factor(), 1.0);
+}
+
+#[test]
+fn floating_border_defaults_on_and_checkbox_saves_without_changing_opacity() {
+    let old: UiSettings =
+        serde_json::from_str(r#"{"floating_enabled":true,"floating_opacity":0.5}"#).unwrap();
+    assert!(old.floating_border);
+    let ctx = egui::Context::default();
+    appearance::setup(&ctx);
+    i18n::apply(&ctx, Language::ZhCn);
+    let mut prefs = old;
+    let mut open = true;
+    let mut tick = 0;
+    let mut frame = |events| {
+        tick += 1;
+        let output = ctx.run_ui(
+            egui::RawInput {
+                screen_rect: Some(Rect::from_min_size(Pos2::ZERO, egui::vec2(1100.0, 950.0))),
+                time: Some(tick as f64 * 0.1),
+                events,
+                ..Default::default()
+            },
+            |_| {
+                settings::show(&ctx, &mut open, &mut prefs);
+            },
+        );
+        (output, prefs)
+    };
+    frame(vec![]);
+    let (out, _) = frame(vec![]);
+    let pos = text_rect(&out, "显示").unwrap().center();
+    for pressed in [true, false] {
+        frame(pointer(pos, pressed));
+    }
+    let (_, prefs) = frame(vec![]);
+    assert!(!prefs.floating_border);
+    assert_eq!(prefs.floating_opacity, 0.5);
+    assert!(prefs.floating_enabled);
+    let directory = tempfile::tempdir().unwrap();
+    let file = directory.path().join("sessions.json");
+    model::save(
+        &file,
+        &Workspace {
+            ui: prefs,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    assert!(!model::load(&file).unwrap().ui.floating_border);
 }

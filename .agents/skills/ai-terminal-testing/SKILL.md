@@ -126,3 +126,17 @@ preview.6：git_repository 以真实隔离 Git 验证暂存＋未暂存的净差
 0.10.0-preview.3：project_files 使用真实隔离 Git 覆盖嵌套／例外／全局／info-exclude 和已跟踪文件，project_ui 验证灰色条目仍可展开、只读查看。floating_opacity_probe 在 136% 下捕获浅色及灰色底板和窗外 16 像素，检查客户区与 framebuffer 合成差异、窗外无描边／阴影、同一 HWND／几何和透明点击；继续产生 12 张 PNG。readme_capture files 的自建仓库加入忽略文件及文件夹。必须目视检查原生 PNG，不把合成输入当作真实鼠标拖动。
 
 0.10.0-preview.5：settings_probe 增至 14 张原生图，补齐中英文关闭／退出和 133%／150% 退出确认；检查紧凑文字层级、按钮与宽窄布局。继续运行 dialogs、settings_floating 的真实控件交互回归，确认取消／退出选择、中文 emoji、即时保存与全局样式隔离。
+
+会话分组核查：构建并运行 session_groups_probe（命令见 scripts/README.md），检查十二张原生图及 result.json，覆盖 100%／142%／200%、中英文、首成员折叠、数量徽标、跨窗口悬停、成员点击和移出关闭。session_groups 测试覆盖旧数据、原子保存、无效引用和唯一归属；floating 单测覆盖排序／首成员移除及一次关闭计时。App 实际 ConPTY 回归核对组员切换只清除自身未读，分组／解散不重启终端。合成输入不代表真实 Agent 模型回合验收。
+
+分组子菜单回归：sidebar_interaction 在中英文及 75%／100%／133%／200% 下验证主菜单和分组子菜单的所有命令单行且不溢出，长组名保持一行省略。session_group_menu_probe 从正式侧栏右键打开分组菜单，在 100%／133%／200% 输出中英文六张 PNG（命令见 scripts/README.md）；必须目视检查。仅自身样例及合成输入，不操作用户终端。
+
+工牌／边框核查：session_groups_probe 输出十二张 PNG，补充两组工牌、首位中性分隔、190 点窄侧栏、收起侧栏和边框开／关；result.json 检查同一 HWND／尺寸／位置，开关只改变边缘像素。sidebar_interaction 核查组名及黑白样式一致、无角色标记、改名和收起行为；settings_floating 核查旧设置默认开启、真实复选框和持久化；App 真实 ConPTY 测试确认开关不重启终端。floating_opacity_probe 明确关闭边框以隔离既有透明度／圆角像素测试，默认开启与开关另由上述探针核查。
+
+0.11.0-preview.4：sidebar_interaction 检查工牌白底黑字、组名一致且无“主”／L 标记；中性首位分隔线由原生图核对。floating_opacity_probe 增至十五张图，覆盖不透明度 0.0（100% 背景透明）及头像点击，核对 alpha 为 0、桌面背景透出、头像仍不透明、同一 HWND 和无外沿阴影。范围／持久化与实时 0.0 更新由 settings_floating 验证。
+
+0.11.0-preview.5：sidebar_interaction 核对完整工牌文字左右各 6 点留白；floating 的实际绘制回归覆盖三档比例的白底黑字组名首字角标。floating_group 的正式内容组件回归覆盖中英文、三档比例、组名 × N、普通／悬停／选中背景及成员点击。session_groups_probe 的未选中普通成员带粉色底色，PNG 内像素核对该背景确实存在；继续目视核对十二张图及无激活／点击／边框结果。
+
+0.11.0 README 更新：readme_capture 使用固定三成员分组和正式侧栏工牌；session_groups_probe 追加 `en` 可用全英文成员与组名进行同样的十二图核查。公开组图选 case-0-members.png，与中英文主界面／历史／差异／文件／浮窗／设置共十四张 PNG 原样复制并更新 SOURCE.json。所有图片均为隔离样例，不读取用户分组或调用模型。
+
+0.11.0 浮窗系统外框回归：floating_scale_probe 在六组比例下验证真实 HWND 的标题栏／菜单／边缘位均为空；向自有浮窗模拟后端恢复装饰样式及 WM_NCPAINT，确认过滤后仍无系统外框、主窗口样式不变。继续核对十八张原生截图、尺寸、头像像素与点击；floating_opacity_probe 验证原 alpha、合成恢复和边缘。只操作探针自己的窗口，不向用户窗口注入输入。

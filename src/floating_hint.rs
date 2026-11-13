@@ -10,7 +10,7 @@ use windows_sys::Win32::{
     UI::{HiDpi::GetDpiForWindow, WindowsAndMessaging::*},
 };
 
-fn window(ctx: &egui::Context, title: &str, key: &str) -> Option<HWND> {
+pub(crate) fn window(ctx: &egui::Context, title: &str, key: &str) -> Option<HWND> {
     fn owned(hwnd: HWND) -> bool {
         let mut pid = 0;
         unsafe {
@@ -62,7 +62,7 @@ fn window(ctx: &egui::Context, title: &str, key: &str) -> Option<HWND> {
     }
     find.result
 }
-fn anchor(owner: HWND, zoom: f32) -> Option<([i32; 4], [i32; 4], f32)> {
+pub(crate) fn anchor(owner: HWND, zoom: f32) -> Option<([i32; 4], [i32; 4], f32)> {
     let mut bar = RECT::default();
     let mut work = MONITORINFO {
         cbSize: size_of::<MONITORINFO>() as u32,
@@ -230,7 +230,13 @@ pub fn show(ctx: &egui::Context, hint: Option<HoverHint>, zoom: f32) {
     });
 }
 
-fn origin_for(bar: [i32; 4], anchor: i32, size: [i32; 2], work: [i32; 4], gap: i32) -> [i32; 2] {
+pub(crate) fn origin_for(
+    bar: [i32; 4],
+    anchor: i32,
+    size: [i32; 2],
+    work: [i32; 4],
+    gap: i32,
+) -> [i32; 2] {
     let x = (anchor - size[0] / 2).clamp(work[0], (work[2] - size[0]).max(work[0]));
     let below = bar[3] + gap;
     let y = if below + size[1] <= work[3] {

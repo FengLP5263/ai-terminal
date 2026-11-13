@@ -111,46 +111,60 @@ pub fn confirm(
 
 /// Returns true only when a nonempty name has been submitted.
 pub fn rename(ctx: &egui::Context, open: &mut bool, text: &mut String) -> bool {
+    name_input(
+        ctx,
+        open,
+        text,
+        "session-rename",
+        i18n::tr(ctx, "重命名", "Rename"),
+        i18n::tr(ctx, "会话名称", "Session name"),
+    )
+}
+
+pub fn name_input(
+    ctx: &egui::Context,
+    open: &mut bool,
+    text: &mut String,
+    id: &str,
+    title: &str,
+    label: &str,
+) -> bool {
     let width = content_width(ctx);
     let mut done = false;
-    egui::Window::new(
-        egui::RichText::new(i18n::tr(ctx, "重命名", "Rename"))
-            .size(TITLE_SIZE)
-            .strong(),
-    )
-    .id(egui::Id::new("session-rename-window"))
-    .open(open)
-    .collapsible(false)
-    .resizable(false)
-    .frame(frame(ctx))
-    .auto_sized()
-    .default_width(width + 50.0)
-    .min_width(width + 50.0)
-    .max_width(width + 50.0)
-    .max_height((ctx.content_rect().height() - 24.0).max(80.0))
-    .vscroll(true)
-    .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
-    .show(ctx, |ui| {
-        body(ui);
-        ui.set_width(width);
-        ui.label(i18n::tr(ctx, "会话名称", "Session name"));
-        let input =
-            ui_text::edit_sized(ui, text, egui::Id::new("session-rename-input"), width).response;
-        done = input.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
-        ui.add_space(4.0);
-        ui.allocate_ui_with_layout(
-            egui::vec2(width, FIELD_HEIGHT),
-            egui::Layout::right_to_left(egui::Align::Center),
-            |ui| {
-                done |= ui
-                    .add_enabled(
-                        !text.trim().is_empty(),
-                        egui::Button::new(i18n::tr(ctx, "保存", "Save"))
-                            .min_size(egui::vec2(ACTION_WIDTH, FIELD_HEIGHT)),
-                    )
-                    .clicked();
-            },
-        );
-    });
+    egui::Window::new(egui::RichText::new(title).size(TITLE_SIZE).strong())
+        .id(egui::Id::new(format!("{id}-window")))
+        .open(open)
+        .collapsible(false)
+        .resizable(false)
+        .frame(frame(ctx))
+        .auto_sized()
+        .default_width(width + 50.0)
+        .min_width(width + 50.0)
+        .max_width(width + 50.0)
+        .max_height((ctx.content_rect().height() - 24.0).max(80.0))
+        .vscroll(true)
+        .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+        .show(ctx, |ui| {
+            body(ui);
+            ui.set_width(width);
+            ui.label(label);
+            let input =
+                ui_text::edit_sized(ui, text, egui::Id::new(format!("{id}-input")), width).response;
+            done = input.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
+            ui.add_space(4.0);
+            ui.allocate_ui_with_layout(
+                egui::vec2(width, FIELD_HEIGHT),
+                egui::Layout::right_to_left(egui::Align::Center),
+                |ui| {
+                    done |= ui
+                        .add_enabled(
+                            !text.trim().is_empty(),
+                            egui::Button::new(i18n::tr(ctx, "保存", "Save"))
+                                .min_size(egui::vec2(ACTION_WIDTH, FIELD_HEIGHT)),
+                        )
+                        .clicked();
+                },
+            );
+        });
     done && !text.trim().is_empty()
 }

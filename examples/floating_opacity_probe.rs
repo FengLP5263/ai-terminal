@@ -12,12 +12,15 @@ use std::{
     path::PathBuf,
     time::{Duration, Instant},
 };
+// Keep the owned capture fixture clear of the system IME candidate strip.
+const BACKDROP_Y: i32 = 340;
 const PAD: usize = 16;
-const CASES: [(Language, f32); 4] = [
+const CASES: [(Language, f32); 5] = [
     (Language::ZhCn, 1.0),
     (Language::ZhCn, 0.5),
     (Language::ZhCn, 0.2),
     (Language::En, 0.5),
+    (Language::En, 0.0),
 ];
 struct Probe {
     renderer: egui_term::TextRendererSession,
@@ -136,7 +139,7 @@ impl eframe::App for Probe {
         input
             .events
             .retain(|e| matches!(e, egui::Event::Screenshot { .. }));
-        if child && self.stage == 3 && self.shots.iter().all(|s| *s) && self.clicked < 2 {
+        if child && self.stage == 4 && self.shots.iter().all(|s| *s) && self.clicked < 2 {
             input.focused = true;
             input
                 .viewports
@@ -172,8 +175,10 @@ impl eframe::App for Probe {
         settings::show(ui.ctx(), &mut self.open, &mut self.prefs);
         self.bar.set_scale(ui.ctx(), self.prefs.floating_scale);
         self.bar.set_opacity(ui.ctx(), self.prefs.floating_opacity);
+        self.bar.set_border(ui.ctx(), self.prefs.floating_border);
         self.bar.update(
             Snapshot {
+                groups: Vec::new(),
                 items: [Agent::Shell, Agent::Bash, Agent::Codex, Agent::Claude]
                     .into_iter()
                     .enumerate()
@@ -200,7 +205,8 @@ impl eframe::App for Probe {
                 self.activated = true;
             }
         }
-        self.bar.show(ui.ctx(), Some([60.0, 60.0]));
+        self.bar
+            .show(ui.ctx(), Some([60.0, (BACKDROP_Y + 20) as f32]));
         if self.stage == 1 && self.frames == 4 && !self.composition_reset {
             let native = owned_bar().expect("Owned native bar before reset");
             simulate_composition_reset(native[0]);
@@ -208,7 +214,7 @@ impl eframe::App for Probe {
         }
         self.frames += 1;
         ui.ctx().request_repaint_of(floating::viewport_id());
-        if self.shots.iter().all(|s| *s) && (self.stage != 3 || self.activated) {
+        if self.shots.iter().all(|s| *s) && (self.stage != 4 || self.activated) {
             self.stage += 1;
             self.frames = 0;
             self.pending = false;
@@ -226,7 +232,9 @@ impl eframe::App for Probe {
                 );
                 let channel =
                     |stage: usize| self.records[stage]["desktop_rgb"][0].as_i64().unwrap();
-                let composition_ok = channel(0) < 25
+                let composition_ok = channel(4) >= 250
+                    && self.records[4]["background_alpha"].as_u64().unwrap() == 0
+                    && channel(0) < 25
                     && channel(1) > 40
                     && channel(2) > 150
                     && channel(2) > channel(1) + 20
@@ -246,7 +254,7 @@ impl eframe::App for Probe {
                     r["client_composite_error"].as_u64().unwrap() <= 12
                         && r["outside_halo_error"].as_u64().unwrap() <= 12
                 });
-                std::fs::write(self.output.join("result.json"),serde_json::to_vec_pretty(&serde_json::json!({"ok":composition_ok&&edges_ok,"native_edges_ok":edges_ok,"native_desktop_composition_ok":composition_ok,"composition_reset_simulated":self.composition_reset,"version":env!("CARGO_PKG_VERSION"),"screenshots":12,"stages":self.records,"transparent_avatar_activated":self.activated,"ptys":0,"model_requests":false,"system_input_injected":false,"synthetic_egui_input":true})).unwrap()).unwrap();
+                std::fs::write(self.output.join("result.json"),serde_json::to_vec_pretty(&serde_json::json!({"ok":composition_ok&&edges_ok,"native_edges_ok":edges_ok,"native_desktop_composition_ok":composition_ok,"composition_reset_simulated":self.composition_reset,"version":env!("CARGO_PKG_VERSION"),"screenshots":15,"stages":self.records,"transparent_avatar_activated":self.activated,"ptys":0,"model_requests":false,"system_input_injected":false,"synthetic_egui_input":true})).unwrap()).unwrap();
                 assert!(
                     composition_ok && edges_ok,
                     "Native desktop does not show the white backdrop through the bar: {:?}",
@@ -362,7 +370,7 @@ impl Backdrop {
                 title.as_ptr(),
                 WS_POPUP | WS_VISIBLE | 6, // SS_WHITERECT
                 40,
-                40,
+                BACKDROP_Y,
                 520,
                 160,
                 std::ptr::null_mut(),
@@ -411,16 +419,16 @@ fn desktop_capture(native: [i64; 5], expected: u8) -> (egui::ColorImage, [u8; 3]
     );
     assert!(
         native[1] - PAD as i64 >= 40
-            && native[2] - PAD as i64 >= 40
+            && native[2] - PAD as i64 >= i64::from(BACKDROP_Y)
             && native[1] + native[3] + PAD as i64 <= 560
-            && native[2] + native[4] + PAD as i64 <= 200,
+            && native[2] + native[4] + PAD as i64 <= i64::from(BACKDROP_Y + 160),
         "Capture must stay inside our opaque backdrop"
     );
     unsafe {
         DwmFlush();
         let screen = GetDC(std::ptr::null_mut());
         assert!(!screen.is_null());
-        let fixture = GetPixel(screen, 550, 190);
+        let fixture = GetPixel(screen, 550, BACKDROP_Y + 150);
         let reference = [
             (fixture & 255) as u8,
             ((fixture >> 8) & 255) as u8,
@@ -521,6 +529,7 @@ fn main() -> eframe::Result {
                 _backdrop: Backdrop::new(),
                 bar: FloatingBar::new(Icons::new(&cc.egui_ctx)),
                 prefs: UiSettings {
+                    floating_border: false,
                     floating_enabled: true,
                     floating_scale: 1.36,
                     ..Default::default()

@@ -234,6 +234,7 @@ fn main() -> eframe::Result {
             Ok(Box::new(Probe {
                 bar: FloatingBar::new(icons),
                 snapshot: Snapshot {
+                    groups: Vec::new(),
                     items: (0..12)
                         .map(|i| Item {
                             id: format!("s{i}"),
