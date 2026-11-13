@@ -19,6 +19,10 @@ Record user-visible additions, improvements, fixes, and compatibility changes fo
 - Floating background transparency now spans 0%–100%. Avatars, state indicators and the enabled outline remain clear and clickable at full transparency.
 - README includes bilingual group guidance, current native screenshots and updated asset provenance.
 
+### Fixed
+
+- Remove native caption, menu and edge styles from the floating window and keep it frameless during backend style refreshes, preventing legacy system chrome from appearing while scaling. The application outline, transparency, movement and independent scale are preserved.
+
 ### Compatibility and boundaries
 
 - Older workspaces load with no groups. Group metadata and the outline preference use compatible defaults and atomic saves, preserving existing sessions, colors, directories, fonts, scales and transparency.

@@ -18,6 +18,10 @@ mod windows {
 
     const SUBCLASS: usize = 0xA174;
     const APPLY: u32 = WM_APP + 0x174;
+    const SYSTEM_FRAME: u32 =
+        WS_CAPTION | WS_THICKFRAME | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX;
+    const SYSTEM_EDGES: u32 =
+        WS_EX_DLGMODALFRAME | WS_EX_WINDOWEDGE | WS_EX_CLIENTEDGE | WS_EX_STATICEDGE;
     static PROPERTY: std::sync::LazyLock<Vec<u16>> =
         std::sync::LazyLock::new(|| "ai-terminal.floating.geometry\0".encode_utf16().collect());
     struct Geometry {
@@ -101,6 +105,15 @@ mod windows {
         let corners = DWMWCP_DONOTROUND;
         let border = 0xffff_fffe_u32; // DWMWA_COLOR_NONE (Windows 11).
         unsafe {
+            // Undecorated winit windows can retain caption/menu flags. Disabling
+            // DWM chrome alone lets classic non-client painting show during resize.
+            for (index, mask) in [(GWL_STYLE, SYSTEM_FRAME), (GWL_EXSTYLE, SYSTEM_EDGES)] {
+                let style = GetWindowLongPtrW(hwnd, index);
+                let frameless = style & !(mask as isize);
+                if style != frameless {
+                    SetWindowLongPtrW(hwnd, index, frameless);
+                }
+            }
             DwmSetWindowAttribute(
                 hwnd,
                 DWMWA_NCRENDERING_POLICY as u32,
@@ -256,6 +269,16 @@ mod windows {
         // This capsule has no non-client frame. Bypass winit's shadow-only 1px inset.
         if message == WM_NCCALCSIZE {
             return 0;
+        }
+        if message == WM_STYLECHANGING && lparam != 0 {
+            let styles = unsafe { &mut *(lparam as *mut STYLESTRUCT) };
+            // Preserve this owned capsule's frameless contract when the backend
+            // refreshes native styles, before Windows can paint a legacy frame.
+            if wparam as i32 == GWL_STYLE {
+                styles.styleNew &= !SYSTEM_FRAME;
+            } else if wparam as i32 == GWL_EXSTYLE {
+                styles.styleNew &= !SYSTEM_EDGES;
+            }
         }
         if message == APPLY {
             apply(hwnd, data);

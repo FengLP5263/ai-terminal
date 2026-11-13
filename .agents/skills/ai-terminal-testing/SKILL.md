@@ -138,3 +138,5 @@ preview.6：git_repository 以真实隔离 Git 验证暂存＋未暂存的净差
 0.11.0-preview.5：sidebar_interaction 核对完整工牌文字左右各 6 点留白；floating 的实际绘制回归覆盖三档比例的白底黑字组名首字角标。floating_group 的正式内容组件回归覆盖中英文、三档比例、组名 × N、普通／悬停／选中背景及成员点击。session_groups_probe 的未选中普通成员带粉色底色，PNG 内像素核对该背景确实存在；继续目视核对十二张图及无激活／点击／边框结果。
 
 0.11.0 README 更新：readme_capture 使用固定三成员分组和正式侧栏工牌；session_groups_probe 追加 `en` 可用全英文成员与组名进行同样的十二图核查。公开组图选 case-0-members.png，与中英文主界面／历史／差异／文件／浮窗／设置共十四张 PNG 原样复制并更新 SOURCE.json。所有图片均为隔离样例，不读取用户分组或调用模型。
+
+0.11.0 浮窗系统外框回归：floating_scale_probe 在六组比例下验证真实 HWND 的标题栏／菜单／边缘位均为空；向自有浮窗模拟后端恢复装饰样式及 WM_NCPAINT，确认过滤后仍无系统外框、主窗口样式不变。继续核对十八张原生截图、尺寸、头像像素与点击；floating_opacity_probe 验证原 alpha、合成恢复和边缘。只操作探针自己的窗口，不向用户窗口注入输入。
