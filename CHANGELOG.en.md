@@ -4,6 +4,72 @@
 
 Record user-visible additions, improvements, fixes, and compatibility changes for each release; omit categories that do not apply. Review both languages together, use the same version entry in GitHub Releases, and ship both files in the ZIP. Historical summaries follow existing GitHub release notes and UTC publication dates; development versions without a separate release do not receive invented release dates.
 
+## [0.11.0] - 2026-11-13
+
+### Added
+
+- Session groups: create, join, leave, rename and dissolve teams from session context menus. Monochrome badges identify members while preserving session order, directories and colors.
+- The floating bar collapses each team into its first avatar with a simplified badge. Hover to see “Group name × N”, member avatars, titles and individual states; click a member to open its terminal. Pending and unread member states remain visible.
+- The floating bar has an enabled-by-default outline that can be toggled and saved immediately, independently of opacity and floating scale.
+
+### Changed
+
+- Name badges fit their text and truncate long names on one line. Member cards keep session colors and clear spacing; order and a neutral divider distinguish the first member without a role marker.
+- Session and group context menus retain tidy, single-line commands; hover over truncated group names to see them in full.
+- Floating background transparency now spans 0%–100%. Avatars, state indicators and the enabled outline remain clear and clickable at full transparency.
+- README includes bilingual group guidance, current native screenshots and updated asset provenance.
+
+### Compatibility and boundaries
+
+- Older workspaces load with no groups. Group metadata and the outline preference use compatible defaults and atomic saves, preserving existing sessions, colors, directories, fonts, scales and transparency.
+- Grouping and dissolving only change navigation: terminals are not restarted, histories are not combined, and member states do not imply team completion. Removing the first member selects the next avatar in session order.
+- Windows x64 support is unchanged. Screenshots and lifecycle probes use isolated data and synthetic events, without paid model requests or automatic trust actions.
+
+## [0.11.0-preview.6] - 2026-11-13
+
+### Changed
+
+- Floating member cards have six-point gaps, with a twelve-point gap and neutral divider after the first session. Panel height includes the spacing, and longer lists remain scrollable.
+
+## [0.11.0-preview.5] - 2026-11-13
+
+### Improved
+
+- Group name badges fit their text with small, equal horizontal padding; long names remain truncated on one line.
+- Grouped floating avatars share the collapsed sidebar’s white badge with a black group-name initial. Hover headers show member counts as “Group name × N”.
+
+### Fixed
+
+- All hover-list members retain their session background colors. Normal, hovered and selected surfaces match the sidebar, including the background behind status indicators.
+
+## [0.11.0-preview.4] - 2026-11-13
+
+### Changed
+
+- Group badges use simple white rectangles with black names, removing colored dots/outlines and all lead markers or labels. Order and a neutral divider distinguish the first member; floating counts and panel headings use neutral colors.
+- Floating background transparency now spans 0%–100%. At full transparency, avatars, status indicators and the enabled outline remain visible and avatars stay clickable. Saved opacity supports 0.0–1.0.
+
+## [0.11.0-preview.3] - 2026-11-13
+
+### Added
+
+- Grouped sessions show name badges with stable colors and a separate directory line. The first member has a lead marker and divider, also represented in the collapsed sidebar and hover member panel.
+- A thin floating-bar outline is enabled by default, with an immediately applied, saved settings toggle. It is independent of background opacity and preserves window position, avatar hitboxes and native frame behavior.
+
+## [0.11.0-preview.2] - 2026-11-13
+
+### Fixed
+
+- Keep session context-menu and group submenu items on single rows with a consistent width. Long names are truncated with full hover text; the ungroup action keeps session-preservation details in its tooltip, preventing narrow multiline commands.
+
+## [0.11.0-preview.1] - 2026-11-13
+
+### Added
+
+- Session groups: create, join, leave, rename or dissolve teams from the session context menu. The sidebar shows group names while preserving session order.
+- The floating bar collapses each group to its first session avatar with a member count. Hover to see member avatars, titles and individual states; click a member to restore the main window and its existing terminal. Pending/unread states remain visible without restarting terminals or merging histories.
+- Group metadata is saved atomically with the workspace. Old workspaces remain ungrouped; closing the first member promotes the next session avatar.
+
 ## [0.10.0] - 2026-11-11
 
 ### Added

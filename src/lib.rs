@@ -20,6 +20,8 @@ pub mod zoom;
 
 pub mod floating;
 #[cfg(windows)]
+mod floating_group;
+#[cfg(windows)]
 mod floating_hint;
 mod floating_native;
 pub mod i18n;

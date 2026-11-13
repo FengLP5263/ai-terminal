@@ -169,6 +169,7 @@ impl eframe::App for Probe {
             "drag accidentally opened a session"
         );
         let snapshot = floating::Snapshot {
+            groups: Vec::new(),
             items: entries
                 .iter()
                 .map(|e| floating::Item {

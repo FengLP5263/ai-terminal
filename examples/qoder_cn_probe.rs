@@ -211,6 +211,7 @@ impl eframe::App for Probe {
                     ui.label(format!("{:?}", self.status.activity));
                 });
                 let snapshot = floating::Snapshot {
+                    groups: Vec::new(),
                     items: vec![floating::Item {
                         id: "qoder".into(),
                         name: "Qoder CN 👋".into(),

@@ -143,6 +143,7 @@ impl eframe::App for Probe {
             self.since = Instant::now();
         }
         let snapshot = Snapshot {
+            groups: Vec::new(),
             items: [
                 Agent::Shell,
                 Agent::Bash,

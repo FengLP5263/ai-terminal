@@ -18,6 +18,7 @@ struct Harness {
     width: f32,
     height: f32,
     active: &'static str,
+    groups: Vec<ai_terminal::model::SessionGroup>,
 }
 impl Harness {
     fn new() -> Self {
@@ -36,6 +37,7 @@ impl Harness {
             width: 238.0,
             height: 600.0,
             active: "a",
+            groups: Vec::new(),
         }
     }
     fn frame(&mut self, events: Vec<Event>, collapsed: bool) -> Actions {
@@ -82,13 +84,14 @@ impl Harness {
         }));
         let mut actions = Actions::default();
         let output = self.ctx.run_ui(input, |ui| {
-            actions = sidebar::show(
+            actions = sidebar::show_with_groups(
                 ui,
                 &entries,
                 Some(self.active),
                 collapsed,
                 self.width,
                 &self.icons,
+                &self.groups,
             );
         });
         self.output = Some(output);
@@ -435,7 +438,11 @@ fn text_rect(output: &egui::FullOutput, wanted: &str) -> Option<Rect> {
             _ => None,
         }
     }
-    output.shapes.iter().find_map(|s| find(&s.shape, wanted))
+    output
+        .shapes
+        .iter()
+        .rev()
+        .find_map(|s| find(&s.shape, wanted))
 }
 #[test]
 fn new_session_is_a_shell_menu_without_directory_or_agent_selection() {
@@ -816,4 +823,234 @@ fn held_card_scrolls_long_lists_at_the_edge_and_stops_after_cancel() {
             );
         }
     }
+}
+
+#[test]
+fn session_context_menu_groups_without_selecting_or_closing_a_terminal() {
+    use sidebar::GroupAction;
+    for collapsed in [false, true] {
+        for choice in ["新建分组…", "开发队", "移出分组", "重命名分组…", "解散分组"]
+        {
+            let mut h = Harness::new();
+            h.groups.push(ai_terminal::model::SessionGroup {
+                id: "team".into(),
+                name: "开发队".into(),
+                members: vec!["b".into(), "c".into()],
+            });
+            h.frame(vec![], collapsed);
+            let pos = h.row("b").center();
+            for pressed in [true, false] {
+                h.frame(
+                    vec![
+                        Event::PointerMoved(pos),
+                        Event::PointerButton {
+                            pos,
+                            button: PointerButton::Secondary,
+                            pressed,
+                            modifiers: Modifiers::NONE,
+                        },
+                    ],
+                    collapsed,
+                );
+            }
+            h.frame(vec![], collapsed);
+            let menu = text_rect(h.output.as_ref().unwrap(), "分组").unwrap();
+            h.click(menu.center(), collapsed);
+            h.frame(vec![], collapsed);
+            let item = text_rect(h.output.as_ref().unwrap(), choice).unwrap();
+            let actions = h.click(item.center(), collapsed);
+            assert!(
+                actions.select.is_none() && actions.close.is_none() && actions.rename.is_none()
+            );
+            match (choice, actions.group.unwrap()) {
+                ("新建分组…", GroupAction::Create(id)) => assert_eq!(id, "b"),
+                ("开发队", GroupAction::Assign(id, target)) => {
+                    assert_eq!(id, "b");
+                    assert_eq!(target.as_deref(), Some("team"));
+                }
+                ("移出分组", GroupAction::Assign(id, target)) => {
+                    assert_eq!(id, "b");
+                    assert_eq!(target, None);
+                }
+                ("重命名分组…", GroupAction::Rename(id))
+                | ("解散分组", GroupAction::Dissolve(id)) => {
+                    assert_eq!(id, "team")
+                }
+                _ => panic!("unexpected group menu action"),
+            }
+        }
+    }
+}
+
+#[test]
+fn group_submenus_keep_one_line_at_each_zoom_and_language() {
+    use ai_terminal::i18n::{self, Language};
+    for language in [Language::ZhCn, Language::En] {
+        for zoom in [0.75, 1.0, 1.33, 2.0] {
+            let mut h = Harness::new();
+            h.ctx.set_zoom_factor(zoom);
+            i18n::apply(&h.ctx, language);
+            let long_name = "很长的项目队伍名称 / A very long project team name ".repeat(8);
+            h.groups = vec![
+                ai_terminal::model::SessionGroup {
+                    id: "team".into(),
+                    name: "聚合团队".into(),
+                    members: vec!["b".into()],
+                },
+                ai_terminal::model::SessionGroup {
+                    id: "long".into(),
+                    name: long_name.clone(),
+                    members: vec!["c".into()],
+                },
+            ];
+            for _ in 0..3 {
+                h.frame(vec![], false);
+            }
+            let pos = h.row("b").center();
+            for pressed in [true, false] {
+                h.frame(
+                    vec![
+                        Event::PointerMoved(pos),
+                        Event::PointerButton {
+                            pos,
+                            button: PointerButton::Secondary,
+                            pressed,
+                            modifiers: Modifiers::NONE,
+                        },
+                    ],
+                    false,
+                );
+            }
+            h.frame(vec![], false);
+            let menu = text_rect(
+                h.output.as_ref().unwrap(),
+                if language == Language::En {
+                    "Group"
+                } else {
+                    "分组"
+                },
+            )
+            .unwrap();
+            h.click(menu.center(), false);
+            h.frame(vec![], false);
+            let commands = if language == Language::En {
+                [
+                    "New group…",
+                    "Remove from group",
+                    "Rename group…",
+                    "Ungroup sessions",
+                ]
+            } else {
+                ["新建分组…", "移出分组", "重命名分组…", "解散分组"]
+            };
+            fn find<'a>(
+                shape: &'a egui::Shape,
+                wanted: &str,
+            ) -> Option<&'a egui::epaint::TextShape> {
+                match shape {
+                    egui::Shape::Text(t) if t.galley.job.text == wanted => Some(t),
+                    egui::Shape::Vec(shapes) => shapes.iter().find_map(|s| find(s, wanted)),
+                    _ => None,
+                }
+            }
+            let parent_commands = if language == Language::En {
+                ["Rename", "Session color", "Close session"]
+            } else {
+                ["编辑名称", "会话颜色", "关闭会话"]
+            };
+            for label in commands
+                .into_iter()
+                .chain(parent_commands)
+                .chain(["聚合团队", long_name.as_str()])
+            {
+                let text = h
+                    .output
+                    .as_ref()
+                    .unwrap()
+                    .shapes
+                    .iter()
+                    .find_map(|shape| find(&shape.shape, label))
+                    .unwrap_or_else(|| panic!("missing {label} at {zoom:?}"));
+                assert_eq!(text.galley.rows.len(), 1, "wrapped {label} at {zoom:?}");
+                assert!(
+                    text.galley.size().x <= 200.0,
+                    "menu text exceeded fixed width"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn group_badges_are_monochrome_and_do_not_label_session_roles() {
+    let mut h = Harness::new();
+    h.groups.push(ai_terminal::model::SessionGroup {
+        id: "team".into(),
+        name: "聚合团队".into(),
+        members: vec!["b".into(), "a".into()],
+    });
+    h.frame(vec![], false);
+    h.frame(vec![], false);
+    let output = h.output.as_ref().unwrap();
+    let names: Vec<_> = output
+        .shapes
+        .iter()
+        .filter_map(|shape| match &shape.shape {
+            egui::Shape::Text(t) if t.galley.job.text == "聚合团队" => Some(t),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(names.len(), 2);
+    assert_eq!(
+        names[0].galley.job.sections[0].format.color,
+        names[1].galley.job.sections[0].format.color
+    );
+    assert!(text_rect(output, "主").is_none());
+    assert!(text_rect(output, "L").is_none());
+    assert_eq!(
+        names[0].galley.job.sections[0].format.color,
+        egui::Color32::BLACK
+    );
+    let white_badges=output.shapes.iter().filter(|shape| matches!(&shape.shape,egui::Shape::Rect(r) if r.fill==egui::Color32::WHITE && r.rect.height()<=20.0)).count();
+    assert_eq!(white_badges, 2);
+    for text in &names {
+        assert_eq!(text.galley.rows.len(), 1);
+        assert!(text.galley.size().x < 100.0);
+        let badge = output
+            .shapes
+            .iter()
+            .find_map(|shape| match &shape.shape {
+                egui::Shape::Rect(r)
+                    if r.fill == egui::Color32::WHITE && r.rect.contains(text.pos) =>
+                {
+                    Some(r.rect)
+                }
+                _ => None,
+            })
+            .expect("white name badge");
+        assert!((text.pos.x - badge.left() - 6.0).abs() < 0.1);
+        assert!((badge.right() - text.pos.x - text.galley.size().x - 6.0).abs() < 0.1);
+    }
+    let badge_color = names[0].galley.job.sections[0].format.color;
+    h.groups[0].name = "重命名队伍".into();
+    h.frame(vec![], false);
+    let renamed = h
+        .output
+        .as_ref()
+        .unwrap()
+        .shapes
+        .iter()
+        .find_map(|s| match &s.shape {
+            egui::Shape::Text(t) if t.galley.job.text == "重命名队伍" => {
+                Some(t.galley.job.sections[0].format.color)
+            }
+            _ => None,
+        })
+        .unwrap();
+    assert_eq!(renamed, badge_color);
+    h.frame(vec![], true);
+    h.frame(vec![], true);
+    assert!(text_rect(h.output.as_ref().unwrap(), "主").is_none());
+    assert!(text_rect(h.output.as_ref().unwrap(), "重").is_some());
+    assert!(text_rect(h.output.as_ref().unwrap(), "重命名队伍").is_none());
 }
