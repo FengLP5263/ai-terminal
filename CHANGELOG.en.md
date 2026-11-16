@@ -4,6 +4,17 @@
 
 Record user-visible additions, improvements, fixes, and compatibility changes for each release; omit categories that do not apply. Review both languages together, use the same version entry in GitHub Releases, and ship both files in the ZIP. Historical summaries follow existing GitHub release notes and UTC publication dates; development versions without a separate release do not receive invented release dates.
 
+## [0.11.1] - 2026-11-16
+
+### Fixed
+
+- Opening a detected terminal link no longer acquires the same grid lock twice. Read the target under one lock, release it before invoking the system launcher, and avoid freezing the interface and the affected terminal's output drain during input.
+
+### Compatibility and upgrade
+
+- Fix the same locking defect that remains in 0.11.0, preserving workspaces, session groups, settings, recovery records, and CLI integrations.
+- Close the old instance before starting the new version. An upgrade cannot release an existing deadlock inside an old process and does not automatically terminate its terminal sessions.
+
 ## [0.11.0] - 2026-11-13
 
 ### Added
