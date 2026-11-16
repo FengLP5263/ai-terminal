@@ -7,6 +7,8 @@ description: 验证 ai-terminal 的离线 Rust 回归、治理脚本、Windows �
 
 简体中文 | [English](SKILL.en.md)
 
+终端链接回归 `cargo test --offline --locked -p egui_term --lib opening_link_releases_grid` 使用有十秒截止时间的独立测试进程、无 profile PowerShell 和固定 example.invalid 文本；检查无悬停时不启动、已识别目标准确、启动器回调期间两把 FairMutex 锁均已释放、后续滚动／同步可用。注入启动器，不打开浏览器、不发送模型请求；旧重复加锁路径必须超时失败，原生 smoke 与截图另行核对。
+
 ```powershell
 .\scripts\windows\project.ps1 ci
 .\scripts\windows\project.ps1 release

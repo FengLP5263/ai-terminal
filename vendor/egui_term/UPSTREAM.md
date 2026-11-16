@@ -95,3 +95,7 @@ Font comparison can select a system CJK family (default Microsoft YaHei UI); fam
 0.4.9-preview.4: TerminalView suppresses ConPTY resize during sizing/invisible/already discarded passes and when raw screen geometry is unknown or invalid. Input processing remains independent, and visible real-window resizing stays enabled. No history copy, polling or idle repaint is added.
 
 0.7.0 preview: add O(1) history-size metadata, clamped local ScrollTo and a fixed-gutter viewport scrollbar. Drag/track gestures are consumed locally, including release outside; no PTY mouse reports. Hide for empty history/alternate screen; preserve 5,000-line bounds, viewport-only cells and event-driven repaint.
+
+Unreleased terminal-link fix: dispatch opening before the general command grid lock, read the hovered target under one short lock, then release it before calling the detached system launcher. This removes a self-deadlock in ProcessLink(Open) and keeps the PTY reader free to drain output. Hover, clear, input and mouse protocols retain their behavior. A bounded child-process regression uses an injected launcher to verify the real backend without opening a browser.
+
+未发布的终端链接修复：打开动作在通用命令网格锁之前分发，只在一段短锁内读取悬停目标，释放后再交给脱离等待的系统启动器。消除 ProcessLink(Open) 的自锁，避免同时阻塞 PTY 输出排空；悬停、清除、输入与鼠标协议保持原有行为。有截止时间的子进程回归注入启动器，验证真实后端而不打开浏览器。
