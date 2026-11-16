@@ -77,6 +77,10 @@ Codex PermissionRequest also fires before automatic review, so it does not alone
 
 Claude PermissionRequest/Elicitation can likewise be resolved automatically by other hooks. Notification confirms actual permission or elicitation prompts, typically after about six seconds for permission prompts. PermissionDenied and PostToolBatch restore state after a denial or completed tool batch. Claude launched with explicit `--settings` still uses the user's settings without injecting project hooks. After a prompt is resolved, a CLI without a close event may not return to Working until the associated tool or batch ends; this is not a complete realtime status protocol.
 
+## Terminal links
+
+Terminal link opening is dispatched before the general input-command guard. Read the target under one short grid lock and release it before invoking the system launcher. Never acquire the FairMutex data or queue lock again while holding its data guard. Opening does not wait for the target application to exit, write a launch command to the PTY, or change session lifecycle.
+
 ## Multi-session shutdown
 
 Closing first asks for confirmation and does not stop sessions early. The confirmation paints the active terminal's latest snapshot without waiting for its grid lock while output continues draining. Once confirmed, session metadata is saved in the background and up to four owned jobs and PTYs are closed concurrently; the responsive window displays progress. A save or cleanup failure keeps the window open for a retry. Unrelated processes are never scanned or terminated. Forced termination does not guarantee persistence.

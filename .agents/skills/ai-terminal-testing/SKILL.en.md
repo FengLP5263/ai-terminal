@@ -2,6 +2,8 @@
 
 [简体中文](SKILL.md) | English
 
+The terminal-link regression `cargo test --offline --locked -p egui_term --lib opening_link_releases_grid` uses a separate test process with a ten-second deadline, no-profile PowerShell, and fixed example.invalid text. It checks no launch without a hovered link, exact target extraction, both FairMutex locks released during the launcher callback, and subsequent scrolling/synchronization. An injected launcher prevents browser opening and model requests. The old nested-lock path must time out; native smoke and screenshots are checked separately.
+
 ```powershell
 .\scripts\windows\project.ps1 ci
 .\scripts\windows\project.ps1 release

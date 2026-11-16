@@ -356,6 +356,24 @@ impl TerminalBackend {
     }
 
     pub fn process_command(&mut self, cmd: BackendCommand) {
+        self.process_command_with_link_opener(cmd, |target| {
+            let _ = open::that_detached(target);
+        });
+    }
+
+    fn process_command_with_link_opener(
+        &mut self,
+        cmd: BackendCommand,
+        open_link: impl FnOnce(String),
+    ) {
+        // Opening must not enter the general command guard: link_target takes
+        // the grid lock once, and the launcher must run after it is released.
+        if matches!(&cmd, BackendCommand::ProcessLink(LinkAction::Open, _)) {
+            if let Some(target) = self.link_target() {
+                open_link(target);
+            }
+            return;
+        }
         // Queue user input before waiting for the emulator grid, which can be
         // busy parsing output from the child process.
         if let BackendCommand::Write(input) = cmd {
@@ -524,12 +542,12 @@ impl TerminalBackend {
                 self.last_content.hovered_hyperlink = None;
             }
             LinkAction::Open => {
-                self.open_link();
+                unreachable!("link opening is dispatched separately");
             }
         };
     }
 
-    fn open_link(&self) {
+    fn link_target(&self) -> Option<String> {
         if let Some(range) = &self.last_content.hovered_hyperlink {
             let start = range.start();
             let end = range.end();
@@ -543,7 +561,9 @@ impl TerminalBackend {
                 }
             }
 
-            let _ = open::that(url);
+            Some(url)
+        } else {
+            None
         }
     }
 
@@ -796,6 +816,101 @@ impl EventListener for EventProxy {
         if self.sender.send(event).is_err() {
             self.wake_pending.store(false, Ordering::Release);
         }
+    }
+}
+
+#[cfg(all(test, windows))]
+mod link_open_tests {
+    use super::*;
+    use std::process::{Command, Stdio};
+    use std::time::{Duration, Instant};
+
+    #[test]
+    fn opening_link_releases_grid_before_the_launcher_and_keeps_backend_usable() {
+        const CHILD: &str = "AI_TERMINAL_LINK_OPEN_REGRESSION_CHILD";
+        if std::env::var_os(CHILD).is_none() {
+            // A deadlock regression must fail within a deadline, without leaving
+            // a blocked worker in the shared test process or opening a browser.
+            let mut child = Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "backend::link_open_tests::opening_link_releases_grid_before_the_launcher_and_keeps_backend_usable",
+                    "--nocapture",
+                ])
+                .env(CHILD, "1")
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn()
+                .unwrap();
+            let deadline = Instant::now() + Duration::from_secs(10);
+            loop {
+                if child.try_wait().unwrap().is_some() {
+                    let result = child.wait_with_output().unwrap();
+                    assert!(
+                        result.status.success(),
+                        "link-opening fixture failed: {}{}",
+                        String::from_utf8_lossy(&result.stdout),
+                        String::from_utf8_lossy(&result.stderr)
+                    );
+                    return;
+                }
+                if Instant::now() >= deadline {
+                    child.kill().unwrap();
+                    child.wait().unwrap();
+                    panic!("link opening deadlocked while processing terminal input");
+                }
+                std::thread::sleep(Duration::from_millis(20));
+            }
+        }
+
+        let ctx = egui::Context::default();
+        let (tx, _rx) = mpsc::channel();
+        let mut backend = TerminalBackend::new(
+            92_814,
+            ctx,
+            tx,
+            BackendSettings {
+                shell: "powershell.exe".into(),
+                args: vec![
+                    "-NoLogo".into(),
+                    "-NoProfile".into(),
+                    "-Command".into(),
+                    "Start-Sleep -Seconds 5".into(),
+                ],
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let point = Point::new(Line(0), Column(0));
+        backend.process_command_with_link_opener(
+            BackendCommand::ProcessLink(LinkAction::Open, point),
+            |_| panic!("opening without a hovered link invoked the launcher"),
+        );
+
+        const TARGET: &str = "https://example.invalid/help";
+        let term = backend.term.clone();
+        {
+            let mut terminal = term.lock();
+            let mut parser: alacritty_terminal::vte::ansi::Processor =
+                alacritty_terminal::vte::ansi::Processor::new();
+            parser.advance(&mut *terminal, TARGET.as_bytes());
+        }
+        backend.last_content.hovered_hyperlink =
+            Some(point..=Point::new(Line(0), Column(TARGET.len() - 1)));
+        let mut launched = false;
+        backend.process_command_with_link_opener(
+            BackendCommand::ProcessLink(LinkAction::Open, point),
+            |target| {
+                assert_eq!(target, TARGET);
+                // Also reserve the FairMutex lease: both locks must be free
+                // before handing the target to any external launcher.
+                let _guard = term.lock();
+                launched = true;
+            },
+        );
+        assert!(launched);
+        backend.process_command(BackendCommand::Scroll(0));
+        assert!(!backend.sync().cells.is_empty());
     }
 }
 
