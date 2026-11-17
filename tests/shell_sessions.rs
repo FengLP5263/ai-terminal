@@ -238,6 +238,7 @@ fn agent_roundtrip(kind: Agent) {
         fake.to_string_lossy().into_owned(),
     );
     for key in [
+        "AI_TERMINAL_REAL_QODER",
         "AI_TERMINAL_REAL_KIMI",
         "AI_TERMINAL_REAL_ZCODE",
         "AI_TERMINAL_REAL_TRAE",
@@ -275,6 +276,9 @@ fn agent_roundtrip(kind: Agent) {
         ("qodercn", "qodercn"),
         ("qoderclicn", "qodercn"),
         ("qodercn --settings=custom-settings.json", "qodercn"),
+        ("qoder", "qoder"),
+        ("qodercli", "qoder"),
+        ("qoder --settings=custom-settings.json", "qoder"),
         ("kimi", "kimi"),
         ("zcode", "zcode"),
         ("traecli", "traecli"),

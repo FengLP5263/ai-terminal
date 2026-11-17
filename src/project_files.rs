@@ -67,6 +67,7 @@ pub struct Document {
     pub page: Page,
     pub image: Option<Arc<crate::project_media::PreviewImage>>,
     pub markdown: Option<crate::project_media::Markdown>,
+    pub media: Option<crate::project_media::Playable>,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Stamp {
@@ -326,6 +327,26 @@ pub fn read_page(
     if crate::project_media::unsupported(path) {
         return Err(FileError::Unsupported);
     }
+    if let Some(kind) = crate::project_media::playable_path(path) {
+        let mut content = plain_content(&path.to_string_lossy());
+        content.binary = true;
+        return Ok(Document {
+            content,
+            encoding: "",
+            bytes: 0,
+            page: Page {
+                cursor,
+                next: None,
+                total_bytes: metadata.len(),
+            },
+            image: None,
+            markdown: None,
+            media: Some(crate::project_media::Playable {
+                path: resolve(root, path)?,
+                kind,
+            }),
+        });
+    }
     if crate::project_media::image_path(path) {
         let image = crate::project_media::read_image(root, path, false, &cancelled)?;
         let mut content = plain_content(&path.to_string_lossy());
@@ -341,6 +362,7 @@ pub fn read_page(
             },
             image: Some(Arc::new(image)),
             markdown: None,
+            media: None,
         });
     }
     let mut header = [0; 3];
@@ -384,6 +406,7 @@ pub fn read_page(
             },
             image: Some(Arc::new(image)),
             markdown: None,
+            media: None,
         });
     }
     let skip = if cursor.offset == 0 { bom } else { 0 };
@@ -471,6 +494,7 @@ pub fn read_page(
         },
         image: None,
         markdown: prepared,
+        media: None,
     })
 }
 

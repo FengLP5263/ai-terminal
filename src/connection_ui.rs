@@ -37,8 +37,8 @@ pub fn show(ui: &mut egui::Ui, agent: Agent, status: &Status) -> egui::Response 
                 if agent==Agent::Codex {
                     ui.label(crate::i18n::tr(ui.ctx(),"Codex 原生状态支持共享 agents 总览，无需额外状态 hook。已在 Codex 0.166.0 验证。","Codex native lifecycle supports the shared agents overview without additional status hooks. Verified with Codex 0.166.0."));
                     ui.label(crate::i18n::tr(ui.ctx(),"旧版没有原生通知时，可退出后运行 codex --no-daemon 使用兼容模式，再用 /hooks 审查状态钩子。此模式没有共享 agents 入口。","For older CLIs without native events, exit and run codex --no-daemon for compatibility, then review status hooks in /hooks. This mode has no shared agents entry."));
-                } else if agent == Agent::QoderCn {
-                    ui.label(crate::i18n::tr(ui.ctx(),"Qoder CN 通过本次启动的 --settings 接入任务 hook。请在 CLI 中自行确认目录信任，再检查 /hooks；手动传入 --settings 时沿用你的配置。","Qoder CN uses task hooks from session-scoped --settings. Review directory trust in the CLI and check /hooks; explicit --settings preserves your configuration."));
+                } else if matches!(agent, Agent::QoderCn | Agent::Qoder) {
+                    ui.label(crate::i18n::tr(ui.ctx(),"Qoder / Qoder CN 通过本次启动的 --settings 接入任务 hook。请在 CLI 中自行确认目录信任，再检查 /hooks；手动传入 --settings 时沿用你的配置。","Qoder / Qoder CN uses task hooks from session-scoped --settings. Review directory trust in the CLI and check /hooks; explicit --settings preserves your configuration."));
                 } else if agent == Agent::Kimi {
                     ui.label(crate::i18n::tr(ui.ctx(),"Kimi Code 2.5.0 的受管 kimi 入口启用原生生命周期通知。登录与目录信任由你在 CLI 内处理；已有进程需退出后重新启动。","The managed kimi entry enables native lifecycle events in Kimi Code 2.5.0. Review login and workspace trust in the CLI; restart existing processes to apply integration."));
                 } else if agent == Agent::Trae {
@@ -49,7 +49,7 @@ pub fn show(ui: &mut egui::Ui, agent: Agent, status: &Status) -> egui::Response 
                     ui.label(crate::i18n::tr(ui.ctx(),"在当前 Claude 输入 /hooks，检查状态钩子是否加载。手动指定配置文件时，请确认其中包含状态钩子。","Use /hooks in Claude to check the status hooks. Custom settings files must include them."));
                 }
             }
-            if matches!(agent, Agent::Codex | Agent::Claude | Agent::QoderCn | Agent::Trae) {
+            if matches!(agent, Agent::Codex | Agent::Claude | Agent::QoderCn | Agent::Qoder | Agent::Trae) {
                 if ui.button(crate::i18n::tr(ui.ctx(),"复制 /hooks","Copy /hooks")).clicked() {
                     ui.ctx().copy_text("/hooks".into());
                     ui.close();

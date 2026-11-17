@@ -6,7 +6,7 @@
 
 **A calmer workspace for your AI sessions.**
 
-Use Codex, Claude Code, Qoder CN, Kimi Code, ZCode and TRAE CLI in a familiar terminal, keep an eye on their status, and return to any session in a click.
+Use Codex, Claude Code, Qoder / Qoder CN, Kimi Code, ZCode and TRAE CLI in a familiar terminal, keep an eye on their status, and return to any session in a click.
 
 [![GitHub Release](https://img.shields.io/github/v/release/FengLP5263/ai-terminal?label=release)](https://github.com/FengLP5263/ai-terminal/releases/latest)
 [![Platform](https://img.shields.io/badge/platform-Windows%20x64-0078D4)](#platform-support)
@@ -32,7 +32,7 @@ Enable the floating bar to see session avatars and status above other windows. C
 
 ![AI Terminal floating session bar](assets/readme/floating.en.png)
 
-> Screenshots use real 0.11.0 native components with synthetic sessions, terminal text, Git metadata and task status. They contain no real user data or private conversations. Click an image for its original resolution.
+> Screenshots use real native components with synthetic sessions, terminal text, Git metadata and task status. Per-image versions and sources are recorded in [SOURCE.json](assets/readme/SOURCE.json). They contain no real user data or private conversations. Click an image for its original resolution.
 
 ## Built for multiple sessions
 
@@ -40,7 +40,7 @@ Enable the floating bar to see session avatars and status above other windows. C
 | --- | --- |
 | **A real terminal** | Open PowerShell, CMD, or Git Bash and run your installed command-line tools directly. |
 | **Session groups** | Create or join teams from session context menus; compact monochrome name badges identify team members. The floating bar shows the first avatar and a simplified badge; hover to see “Group name × N” and switch between members with their session colors. |
-| **Agent recognition** | Starting Codex, Claude Code, Qoder CN, Kimi Code, ZCode or TRAE CLI displays the corresponding avatar; other commands still work as ordinary terminal sessions. |
+| **Agent recognition** | Starting Codex, Claude Code, Qoder / Qoder CN, Kimi Code, ZCode or TRAE CLI displays the corresponding avatar; other commands still work as ordinary terminal sessions. |
 | **Task status** | See working, needs attention, completed, or failed states for supported Agents in the sidebar and floating bar. Status comes from supported lifecycle notifications and process exits; it is not a universal inference for every CLI. |
 | **Always-on-top bar** | Show only session avatars and status, up to 10 at a time. Drag the avatar area to see more, and click an avatar to return to its session. Scale it independently in Settings or with Ctrl+wheel over the bar. Background transparency can be adjusted immediately in Settings while avatars and status badges remain clear. |
 | **Your workspace** | Drag to reorder, rename or color sessions, collapse the sidebar, and scale the entire interface with Ctrl + mouse wheel. |
@@ -80,6 +80,8 @@ Fit images to the window, view actual size or zoom; a checkerboard shows transpa
 
 ![Read-only image preview, zoom and transparency checkerboard](assets/readme/image-preview.en.png)
 
+Audio/video files have native play/pause, seek and volume controls. Playback starts only when you click Play; closing the preview or switching sessions stops it. Format availability depends on Windows codecs.
+
 ## Inspect Git changes and history
 
 When the terminal directory belongs to a Git repository, the header shows its branch and line additions/deletions alongside the session name and path. Click the branch to open the right panel, then switch between Changes and History. Resize or collapse the panel while the terminal stays connected.
@@ -111,6 +113,7 @@ Settings apply and save immediately. The floating outline is enabled by default 
 | <img src="assets/readme/agent-codex.png" width="32" height="32" alt="Codex CLI"> | [Codex CLI](https://github.com/openai/codex) | `codex` | Supported | Native lifecycle; compatibility hooks for older versions |
 | <img src="assets/readme/agent-claude.png" width="32" height="32" alt="Claude Code"> | [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview) | `claude` | Supported | Session-scoped hooks |
 | <img src="assets/readme/agent-qoder-cn.png" width="32" height="32" alt="Qoder CN CLI"> | [Qoder CN CLI](https://docs.qoder.cn/en/cli/installation) | `qodercn` / `qoderclicn` | Supported | Session-scoped hooks |
+| <img src="assets/readme/agent-qoder-cn.png" width="32" height="32" alt="Qoder CLI"> | [Qoder CLI](https://docs.qoder.com/cli/cli-reference) | `qoder` / `qodercli` | Supported | Session-scoped hooks; resolves the public `qodercli` entry to distinguish the IDE. |
 | <img src="assets/readme/agent-kimi.png" width="32" height="32" alt="Kimi Code CLI"> | [Kimi Code CLI](https://www.kimi.com/code/docs/) | `kimi` | Supported | Native lifecycle (Kimi Code 2.5.0) |
 | <img src="assets/readme/agent-zcode.png" width="32" height="32" alt="ZCode"> | [ZCode](https://zcode.z.ai/) | `zcode` | Supported | Session hooks: start / tools / completion; configuration limits below |
 | <img src="assets/readme/agent-trae.png" width="32" height="32" alt="TRAE CLI"> | [TRAE CLI](https://docs.trae.cn/cli_about-trae-code-cli-2) | `traecli` | Supported | Session-scoped hooks; review trust in the CLI |
@@ -145,7 +148,7 @@ Select a Shell with the **+** button at the top left, or press <kbd>Ctrl</kbd> +
 ```powershell
 cd 'C:\path\to\your-project'
 codex
-# or run claude / qodercn / kimi / zcode / traecli
+# or run claude / qoder / qodercn / kimi / zcode / traecli
 ```
 
 Install and configure [Codex CLI](https://github.com/openai/codex), [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview), [Qoder CN CLI](https://docs.qoder.cn/en/cli/installation), Kimi Code, ZCode or TRAE CLI separately. AI Terminal respects the CLI's own login, model, trust, and permission settings.
@@ -154,7 +157,7 @@ Install and configure [Codex CLI](https://github.com/openai/codex), [Claude Code
 
 Use the gear at the top left to set the language, terminal font and floating bar. Hover over a session avatar for details and click it to switch sessions. Drag the floating bar to reposition it, and turn it off in settings. Hold <kbd>Ctrl</kbd> and scroll to scale the entire interface.
 
-Interactively launching `powershell`, `cmd` or `bash` through a managed entry updates the avatar to the current shell; `exit` restores each level. Codex/Claude/Qoder CN/Kimi Code/ZCode/TRAE CLI take avatar priority while active, then return to the current shell. One-off scripts and tool commands inside Agents do not change shell identity.
+Interactively launching `powershell`, `cmd` or `bash` through a managed entry updates the avatar to the current shell; `exit` restores each level. Codex/Claude/Qoder/Qoder CN/Kimi Code/ZCode/TRAE CLI take avatar priority while active, then return to the current shell. One-off scripts and tool commands inside Agents do not change shell identity.
 
 The terminal defaults to embedded **JetBrains Mono** with system **Microsoft YaHei UI** for CJK, preserving saved font choices. Settings also offers Cascadia Mono, Hack and available Windows fonts. Original native rendering is retained, and regular, bold, italic and bold-italic styles of embedded families ship with the app. See [third-party notices](THIRD_PARTY_NOTICES.en.md) for provenance and licensing.
 
@@ -170,7 +173,7 @@ Yes, use PowerShell or CMD directly. Git Bash is optional; selecting it when una
 
 ### Why is there no Agent status?
 
-Status depends on explicit CLI lifecycle notifications. Codex uses native events while preserving the shared agents overview; older versions can explicitly run `codex --no-daemon` for compatibility hooks. Claude Code and Qoder CN use session-scoped hooks. Stable 0.4.7 only recognizes Kimi Code, ZCode and TRAE CLI avatars and launch/exit. The table above describes integration in 0.4.8. Without notifications, status stays "Awaiting task events"; a ZCode start event shows "Working", followed by subsequent hook updates. The manager never trusts hooks or edits user/project hook configuration on your behalf.
+Status depends on explicit CLI lifecycle notifications. Codex uses native events while preserving the shared agents overview; older versions can explicitly run `codex --no-daemon` for compatibility hooks. Claude Code and Qoder / Qoder CN use session-scoped hooks. Stable 0.4.7 only recognizes Kimi Code, ZCode and TRAE CLI avatars and launch/exit. The table above describes integration in 0.4.8. Without notifications, status stays "Awaiting task events"; a ZCode start event shows "Working", followed by subsequent hook updates. The manager never trusts hooks or edits user/project hook configuration on your behalf.
 
 ### Can I continue a conversation after restarting?
 
@@ -178,7 +181,7 @@ The app restores the session list and interface settings, not running processes 
 
 ### How do I scroll terminal history or paste an image?
 
-Use the mouse wheel for history. When a full-screen app takes over the wheel, use <kbd>Shift</kbd> + wheel for local history. When Codex, Claude Code, Qoder CN, Kimi Code, ZCode or TRAE CLI is recognized, <kbd>Ctrl</kbd> + <kbd>V</kbd> or <kbd>Shift</kbd> + <kbd>Insert</kbd> passes a clipboard image to the CLI.
+Use the mouse wheel for history. When a full-screen app takes over the wheel, use <kbd>Shift</kbd> + wheel for local history. When Codex, Claude Code, Qoder / Qoder CN, Kimi Code, ZCode or TRAE CLI is recognized, <kbd>Ctrl</kbd> + <kbd>V</kbd> or <kbd>Shift</kbd> + <kbd>Insert</kbd> passes a clipboard image to the CLI.
 
 ### Does the first run create a desktop shortcut?
 

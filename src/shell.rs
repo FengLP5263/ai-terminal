@@ -62,6 +62,8 @@ pub fn build(
         (Agent::Codex, "codex.exe", "AI_TERMINAL_REAL_CODEX"),
         (Agent::Claude, "claude.exe", "AI_TERMINAL_REAL_CLAUDE"),
         (Agent::QoderCn, "qodercn.exe", "AI_TERMINAL_REAL_QODER_CN"),
+        (Agent::Qoder, "qoder.exe", "AI_TERMINAL_REAL_QODER"),
+        (Agent::Qoder, "qodercli.exe", "AI_TERMINAL_REAL_QODER"),
         (
             Agent::QoderCn,
             "qoderclicn.exe",
@@ -220,6 +222,10 @@ pub fn shim_agent() -> Option<Agent> {
         || name.eq_ignore_ascii_case(std::ffi::OsStr::new("qoderclicn"))
     {
         Some(Agent::QoderCn)
+    } else if name.eq_ignore_ascii_case(std::ffi::OsStr::new("qoder"))
+        || name.eq_ignore_ascii_case(std::ffi::OsStr::new("qodercli"))
+    {
+        Some(Agent::Qoder)
     } else if name.eq_ignore_ascii_case(std::ffi::OsStr::new("kimi")) {
         Some(Agent::Kimi)
     } else if name.eq_ignore_ascii_case(std::ffi::OsStr::new("zcode")) {
@@ -273,6 +279,7 @@ fn notice(name: &str, agent: Agent, invocation: &str, exit_code: Option<i32>) {
                 Agent::Codex => "codex",
                 Agent::Claude => "claude",
                 Agent::QoderCn => "qodercn",
+                Agent::Qoder => "qoder",
                 Agent::Kimi => "kimi",
                 Agent::ZCode => "zcode",
                 Agent::Trae => "traecli",
@@ -401,6 +408,7 @@ pub fn run_agent(agent: Agent, args: Vec<OsString>) -> i32 {
             Agent::Codex => "AI_TERMINAL_REAL_CODEX",
             Agent::Claude => "AI_TERMINAL_REAL_CLAUDE",
             Agent::QoderCn => "AI_TERMINAL_REAL_QODER_CN",
+            Agent::Qoder => "AI_TERMINAL_REAL_QODER",
             Agent::Kimi => "AI_TERMINAL_REAL_KIMI",
             Agent::ZCode => "AI_TERMINAL_REAL_ZCODE",
             Agent::Trae => "AI_TERMINAL_REAL_TRAE",
@@ -441,7 +449,9 @@ pub fn run_agent(agent: Agent, args: Vec<OsString>) -> i32 {
         let explicit_settings = args
             .iter()
             .any(|arg| arg == "--settings" || arg.to_string_lossy().starts_with("--settings="));
-        let injected = if matches!(agent, Agent::Claude | Agent::QoderCn) && explicit_settings {
+        let injected = if matches!(agent, Agent::Claude | Agent::QoderCn | Agent::Qoder)
+            && explicit_settings
+        {
             Vec::new()
         } else if agent == Agent::Codex && args.iter().any(|arg| arg == "--no-daemon") {
             launch::codex_legacy_overrides()
