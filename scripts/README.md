@@ -1,6 +1,10 @@
 # 开发与交付脚本
 
+文件粘贴原生核查（Windows）：`cargo build --offline --locked --release --bins --example file_paste_probe` 后运行 `target/release/examples/file_paste_probe.exe output/<unique-file-paste>`。自身标准 CF_HDROP 内存经正式解析及输入编码写入真实无 profile PowerShell ReadLine 样例；覆盖多文件、空格、中文／emoji 和 UNC 路径。先截图未提交输入，再仅向该样例发回车核对 UTF-8 字节；检查 result.json、PNG、退出码及自身 PTY 回收。不改系统剪贴板、不读用户文件、不启动 Agent／模型；不将此证据冒充各 CLI 附件识别验收。统一 Windows／POSIX 动作不变。
+
 简体中文 | [English](README.en.md)
+
+侧栏表情悬停核查（Windows）：`cargo build --offline --locked --release --bins --example sidebar_tooltip_probe` 后运行 `target/release/examples/sidebar_tooltip_probe.exe output/<unique-sidebar-tooltips>`。正式侧栏使用固定名称、长路径、组名和状态，在 100%／114%／200% 下分别捕获展开／收起六张及顶部提示两张 PNG 及 result.json；核对爱心、肤色／ZWJ、旗帜、键帽和路径换行。只使用自身 egui 合成悬停，不启动 PTY／Agent／模型、不读取用户配置、不注入系统输入。原生图片需目视检查，退出码需单独确认；Windows／POSIX 统一动作不变。
 
 统一入口：Windows `scripts/windows/project.ps1 <action>`；POSIX `sh scripts/posix/project.sh <action>`。
 从脚本位置定位仓库，不要求调用者当前目录。相对制品路径统一相对仓库根目录。
@@ -173,7 +177,7 @@ git_probe 的 JSON 样例现带 UTF-8 BOM 与正常中文；沿用现有命令�
 
 Windows 原生设置入口：`ai-terminal.exe --settings`；可组合 `--data-dir <目录>` 用于隔离预览。现有 Windows／POSIX project 动作及参数不变；POSIX 非 Windows 平台仍明确拒绝原生 GUI 动作。
 
-项目文件原生核查（Windows）：`cargo build --offline --locked --release --bins --example project_files_probe` 后运行 `target/release/examples/project_files_probe.exe output/<unique-project-files>`。使用正式文件树／共享面板／只读文档和自建样例，生成中英、多档缩放及异常文件 12 张图；一个真实无 profile PowerShell PTY 在查看期间保持身份，探针 Job 仅回收自身进程。不读用户配置、不执行样例代码或模型。既有 Windows／POSIX 动作与参数不变，非 Windows 原生动作仍明确失败。
+项目文件原生核查（Windows）：`cargo build --offline --locked --release --bins --example project_files_probe` 后运行 `target/release/examples/project_files_probe.exe output/<unique-project-files>`。使用正式文件树／共享面板／只读文档和自建样例，生成中英、多档缩放、异常文件、透明 PNG、JPEG、SVG、Markdown 表格／代码／插图及大文本下一页 18 张图；一个真实无 profile PowerShell PTY 在查看期间保持身份，探针 Job 仅回收自身进程。不读用户配置、不执行样例代码或模型。既有 Windows／POSIX 动作与参数不变，非 Windows 原生动作仍明确失败。
 
 0.9.0 README 的 `files` 模式仅在自己的输出目录建立固定示例文件，复用正式文件树和只读正文组件；对外顶部路径固定为示例，不读取用户项目。核对两套 project-files 原生 PNG、当前文件标记、文件夹图标、语法颜色、缩进与 emoji 后原样复制并记录摘要。
 
@@ -191,10 +195,14 @@ Windows 原生设置入口：`ai-terminal.exe --settings`；可组合 `--data-di
 
 会话分组原生核查：`cargo build --offline --locked --release --example session_groups_probe`，然后运行 `target/release/examples/session_groups_probe.exe output/<unique-session-groups>`。探针只使用自身样例元数据和 egui 合成输入，在 100%／142%／200% 核对宽／窄及收起侧栏工牌、首位中性分隔线、浮窗代表头像与数量、跨窗口悬停、成员点击、非激活／可点击窗口属性及移出关闭，输出十二张原生 PNG 和 result.json；不注入系统输入、不启动 Agent／模型。真实 ConPTY 身份和逐成员未读另由 App 回归覆盖。此探针仅支持 Windows，POSIX 原生动作明确失败。
 
-分组菜单原生核查：`cargo build --offline --locked --release --example session_group_menu_probe` 后运行 `target/release/examples/session_group_menu_probe.exe output/<unique-group-menus>`，以正式侧栏右键菜单生成 100%／133%／200% 中英文六张原生 PNG。检查主菜单及子菜单命令单行、统一宽度和长组名省略；仅自身样例和 egui 合成输入，不启动 PTY／Agent，不注入系统输入；仅支持 Windows。
+分组菜单原生核查：`cargo build --offline --locked --release --example session_group_menu_probe` 后运行 `target/release/examples/session_group_menu_probe.exe output/<unique-group-menus>`，以正式侧栏右键菜单生成 100%／133%／200% 中英文六张侧栏及两张顶部提示原生 PNG。检查主菜单及子菜单命令单行、统一宽度和长组名省略；仅自身样例和 egui 合成输入，不启动 PTY／Agent，不注入系统输入；仅支持 Windows。
 
 工牌／边框沿用 session_groups_probe 命令，输出十二张图，包含两组工牌、首位中性分隔、190 点与收起侧栏及边框开／关。边框原生像素比较只允许边缘改变，同时核对同一 HWND、位置及尺寸。floating_opacity_probe 关闭边框以独立检查透明度、圆角及桌面合成。
 
 0.11.0-preview.4 沿用分组与菜单探针命令，工牌为白底黑字、无主协调标记。floating_opacity_probe 增至十五张图，新增 100% 背景透明与该状态下的头像点击；仍检查自身原生窗口、桌面合成、圆角和不透明头像，不调用模型或注入系统输入。
 
 0.11.0 分组截图：`target/release/examples/session_groups_probe.exe output/<unique-groups-zh>` 使用中文样例；追加 `en` 生成全英文样例。每次仍执行全部十二张图与交互核查；README 只选用首组的 case-0-members.png，保留原始 PNG。readme_capture 的各模式使用同一固定研发队伍展示侧栏工牌，不读取用户分组。
+
+Git 规模原生核查（Windows）：`cargo build --offline --locked --release --bins --example git_count_probe` 后运行 `target/release/examples/git_count_probe.exe output/<unique-git-counts>`。四张正式组件图覆盖累计 15 MB 未跟踪文本、10,001 个新文件及独占锁前后；行数均不包含未跟踪正文，锁不触发遗漏。自身单个 PowerShell PTY 保持身份，不发模型请求或改用户项目。离线测试另覆盖已跟踪净差异、无 HEAD 的暂存区和列表虚拟化；原生示例仅支持 Windows。
+
+0.12.0 README 图：readme_capture 的第四参数支持 files／history／diff／markdown／image，第二参数为独立 output 目录，第三参数为 zh／en。新增 Markdown 与图片模式只在自身目录创建固定双语文档及透明 PNG，使用正式只读组件，主界面仍显示固定示例路径；不读用户项目或调用模型。公开图保持原始 PNG 字节，并在 assets/readme/SOURCE.json 逐文件记录版本、语言、尺寸与摘要。

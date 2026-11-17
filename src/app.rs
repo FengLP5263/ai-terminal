@@ -1167,12 +1167,13 @@ impl App {
                     self.set_ui_scale(1.0, &ctx);
                     self.terminal_focus_pending = true;
                 }
-                if let Some(file) = self.project_files.file.as_ref() {
-                    if ai_terminal::project_ui::document(ui,file,self.project_files.root.as_deref()) {
+                if self.project_files.file.is_some() {
+                    if self.project_view.document(ui,&mut self.project_files) {
                         self.project_files.close_file();self.sync_visibility();self.terminal_focus_pending=true;ctx.request_repaint();
                     }
                     return;
                 }
+                self.project_view.release_document(&ctx);
                 if let Some(patch) = self.git.as_ref().and_then(|g| g.patch.as_ref()) {
                     if ai_terminal::git_ui::diff::show(ui, patch) {
                         if let Some(git) = &mut self.git {git.close_patch();}

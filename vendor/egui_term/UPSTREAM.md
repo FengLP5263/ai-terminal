@@ -4,6 +4,8 @@ Source: https://github.com/kemokempo/egui_term
 Revision: 31bbc7ab8503c9518fcee5717cfa29011e59f451
 License: MIT (LICENSE preserved).
 
+0.12.0-preview.5: terminal paste reads Windows CF_HDROP on demand with DragQueryFileW, quoting and space-separating paths when no text is available, ahead of image formats. No file bodies, attachment copies, clipboard changes or Enter are produced; bitmap images retain native CLI paste. Lists are bounded to 1,024 entries/65,536 UTF-16 units, falling back as a whole on invalid data. Attachment recognition belongs to the CLI.
+
 Unreleased: fit complete native emoji clusters inside their cell bounds, including
 narrow text-default pause/play badges. Preserve VS15 text presentation and the
 emulator's original cell coordinates. See the paired UPSTREAM records.

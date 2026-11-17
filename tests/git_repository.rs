@@ -72,7 +72,7 @@ impl Repo {
 }
 
 #[test]
-fn net_totals_include_untracked_text_without_double_counting_staged_edits() {
+fn net_totals_follow_git_and_exclude_untracked_files() {
     let repo = Repo::new();
     repo.write("文件 space &.txt", "one\ntwo\nthree\n");
     repo.write(".gitignore", "ignored/\n");
@@ -87,7 +87,7 @@ fn net_totals_include_untracked_text_without_double_counting_staged_edits() {
     std::fs::create_dir(&sub).unwrap();
     let snapshot = git::read(&sub, 50).unwrap().unwrap();
     assert_eq!(snapshot.branch, "main");
-    assert_eq!((snapshot.added, snapshot.deleted), (3, 2));
+    assert_eq!((snapshot.added, snapshot.deleted), (1, 2));
     assert_eq!(snapshot.total_files, 3);
     let tracked = snapshot
         .files
@@ -100,9 +100,8 @@ fn net_totals_include_untracked_text_without_double_counting_staged_edits() {
         snapshot
             .files
             .iter()
-            .find(|f| f.path == "image.bin")
-            .unwrap()
-            .binary
+            .filter(|f| f.index == '?')
+            .all(|f| f.added == 0 && f.deleted == 0 && !f.omitted)
     );
     assert_eq!(snapshot.commits.len(), 1);
 }
@@ -116,7 +115,7 @@ fn unborn_detached_and_branch_history_are_distinct_and_paged() {
     let unborn = repo.snapshot();
     assert!(unborn.unborn);
     assert_eq!(unborn.branch, "main");
-    assert_eq!(unborn.added, 2);
+    assert_eq!(unborn.added, 1);
     assert!(unborn.commits.is_empty());
     repo.commit("base");
     let base = repo.run(&["rev-parse", "HEAD"]);
@@ -160,16 +159,104 @@ fn git_file_metadata_and_non_repository_have_explicit_results() {
 }
 
 #[test]
-fn large_untracked_files_and_binary_files_do_not_produce_invented_line_counts() {
+fn untracked_content_size_and_exclusive_locks_do_not_affect_git_totals() {
+    use std::os::windows::fs::OpenOptionsExt;
     let repo = Repo::new();
-    repo.write("base.txt", "line\n");
-    repo.commit("initial");
-    repo.write("large.txt", vec![b'a'; 1024 * 1024 + 1]);
-    repo.write("binary.bin", [0, 1, 2]);
+    repo.write("base.txt", "base\n");
+    repo.commit("base");
+    repo.write("base.txt", "base\nadded\n");
+    let large = std::fs::File::create(repo.dir().join("large.txt")).unwrap();
+    large.set_len(128 * 1024 * 1024).unwrap();
+    drop(large);
+    repo.write("locked.txt", "line\n");
+    let locked = std::fs::OpenOptions::new()
+        .read(true)
+        .share_mode(0)
+        .open(repo.dir().join("locked.txt"))
+        .unwrap();
     let snapshot = repo.snapshot();
-    assert_eq!(snapshot.added, 0);
-    assert!(snapshot.partial);
-    assert!(snapshot.files.iter().any(|f| f.omitted));
+    assert_eq!(
+        (snapshot.added, snapshot.deleted, snapshot.total_files),
+        (1, 0, 3)
+    );
+    assert!(!snapshot.partial);
+    assert!(
+        snapshot
+            .files
+            .iter()
+            .filter(|f| f.index == '?')
+            .all(|f| f.added == 0 && f.deleted == 0 && !f.omitted)
+    );
+    drop(locked);
+}
+
+#[test]
+fn more_than_ten_thousand_untracked_files_stay_listed_without_synthetic_line_counts() {
+    let repo = Repo::new();
+    for index in 0..=git::MAX_WORKTREE_FILES {
+        repo.write(&format!("files/{index:05}.txt"), "x\n");
+    }
+    let snapshot = repo.snapshot();
+    assert_eq!(snapshot.total_files, git::MAX_WORKTREE_FILES + 1);
+    assert_eq!(snapshot.files.len(), git::MAX_WORKTREE_FILES);
+    assert_eq!((snapshot.added, snapshot.deleted), (0, 0));
+    assert!(!snapshot.partial);
+    assert!(
+        snapshot
+            .files
+            .iter()
+            .all(|f| f.index == '?' && f.added == 0 && !f.omitted)
+    );
+}
+
+#[test]
+fn unborn_totals_use_the_git_index_and_untracked_filter_attributes_do_not_warn() {
+    let repo = Repo::new();
+    repo.write("staged.txt", "index\n");
+    repo.run(&["add", "staged.txt"]);
+    repo.write("staged.txt", "working\nextra\n");
+    repo.write("untracked.txt", "not counted\n");
+    repo.write(".gitattributes", "untracked.txt filter=fixture\n");
+    repo.run(&[
+        "config",
+        "filter.fixture.clean",
+        "echo invoked > filter-ran; cat",
+    ]);
+    let s = repo.snapshot();
+    assert!(s.unborn && !s.partial);
+    assert_eq!((s.added, s.deleted), (1, 0));
+    assert!(!repo.dir().join("filter-ran").exists());
+}
+
+#[test]
+fn switching_repositories_during_large_file_refresh_never_publishes_old_counts() {
+    let a = Repo::new();
+    let b = Repo::new();
+    a.write("large.txt", b"row\n".repeat(8 * 1024 * 1024));
+    b.write("new.txt", "new\n");
+    let mut client = GitClient::new(egui::Context::default());
+    client.set_directory(Some(a.dir()));
+    client.refresh();
+    client.set_directory(Some(b.dir()));
+    let expected = b.dir().canonicalize().unwrap();
+    wait(&mut client, |s| {
+        s.root.canonicalize().ok().as_ref() == Some(&expected) && s.added == 0
+    });
+    for _ in 0..10 {
+        client.poll();
+        assert_eq!(
+            client
+                .snapshot
+                .as_ref()
+                .unwrap()
+                .root
+                .canonicalize()
+                .unwrap(),
+            expected
+        );
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert!(!client.snapshot.as_ref().unwrap().partial);
 }
 
 fn wait(client: &mut GitClient, condition: impl Fn(&Snapshot) -> bool) {
@@ -296,7 +383,7 @@ fn oversized_history_fails_boundedly_without_blocking_or_changing_repository() {
 }
 
 #[test]
-fn file_display_cap_is_partial_but_tracked_totals_stay_complete() {
+fn commit_file_cap_is_separate_from_complete_worktree_totals() {
     let repo = Repo::new();
     for i in 0..501 {
         repo.write(&format!("files/{i:03}.txt"), "base\n");
@@ -313,10 +400,10 @@ fn file_display_cap_is_partial_but_tracked_totals_stay_complete() {
         repo.write(&format!("files/{i:03}.txt"), "base\nadded\n");
     }
     let snapshot = repo.snapshot();
-    assert_eq!(snapshot.files.len(), 500);
+    assert_eq!(snapshot.files.len(), 501);
     assert_eq!(snapshot.total_files, 501);
     assert_eq!((snapshot.added, snapshot.deleted), (501, 0));
-    assert!(snapshot.partial);
+    assert!(!snapshot.partial);
 }
 
 #[test]

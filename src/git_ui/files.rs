@@ -15,7 +15,7 @@ pub(super) struct FileRow<'a> {
 
 pub(super) fn show(ui: &mut egui::Ui, file: FileRow<'_>, id: egui::Id) -> egui::Response {
     let font = header_font(ui);
-    let height = ui.text_style_height(&egui::TextStyle::Body).max(18.0) + 4.0;
+    let height = row_height(ui);
     let (rect, _) =
         ui.allocate_exact_size(egui::vec2(ui.available_width(), height), Sense::hover());
     let response = ui.interact(rect, id, Sense::click());
@@ -85,7 +85,12 @@ pub(super) fn show(ui: &mut egui::Ui, file: FileRow<'_>, id: egui::Id) -> egui::
             locale.text("状态", "Status"),
             status_description(file.status, locale)
         ));
-        if file.binary {
+        if file.status == "??" {
+            ui.weak(locale.text(
+                "未跟踪，不计入增删行数",
+                "Untracked; excluded from line counts",
+            ));
+        } else if file.binary {
             ui.weak(locale.text("二进制", "Binary"));
         } else if file.omitted {
             ui.weak(locale.text("未统计行数", "Line counts unavailable"));
@@ -96,6 +101,9 @@ pub(super) fn show(ui: &mut egui::Ui, file: FileRow<'_>, id: egui::Id) -> egui::
             });
         }
     })
+}
+pub(super) fn row_height(ui: &egui::Ui) -> f32 {
+    ui.text_style_height(&egui::TextStyle::Body).max(18.0) + 4.0
 }
 
 fn status_description(status: &str, locale: i18n::Locale) -> String {

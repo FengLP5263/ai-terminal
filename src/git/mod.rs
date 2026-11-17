@@ -14,7 +14,6 @@ pub use patch::{FilePatch, PatchKind, PatchLine, PatchResult, PatchSource, read_
 pub use service::GitClient;
 use std::{
     collections::{HashMap, HashSet},
-    io::Read,
     path::{Path, PathBuf},
 };
 pub use worktree::read_worktree_patch;
@@ -22,6 +21,7 @@ pub use worktree::read_worktree_patch;
 pub const PAGE: usize = 50;
 pub const MAX_COMMITS: usize = 300;
 pub const MAX_FILES: usize = 500;
+pub const MAX_WORKTREE_FILES: usize = 10_000;
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct FileChange {
@@ -54,6 +54,7 @@ pub struct Snapshot {
     pub total_files: usize,
     pub files: Vec<FileChange>,
     pub partial: bool,
+    pub omitted_files: usize,
     pub commits: Vec<Commit>,
     pub more: bool,
 }
@@ -125,6 +126,7 @@ fn read_with(r: &Runner, directory: &Path, limit: usize) -> Result<Option<Snapsh
     let filtered = if r.filters_disabled() && !files.is_empty() {
         let input: Vec<u8> = files
             .iter()
+            .filter(|f| f.index != '?')
             .flat_map(|f| f.path.bytes().chain([0]))
             .collect();
         let output = r.run(
@@ -154,8 +156,6 @@ fn read_with(r: &Runner, directory: &Path, limit: usize) -> Result<Option<Snapsh
         HashSet::new()
     };
     let total_files = files.len();
-    let mut partial = total_files > MAX_FILES || !filtered.is_empty();
-    files.truncate(MAX_FILES);
     // One diff against HEAD counts the net staged + unstaged changes without double counting.
     let diff = if head.success {
         r.checked(
@@ -173,7 +173,21 @@ fn read_with(r: &Runner, directory: &Path, limit: usize) -> Result<Option<Snapsh
             ],
         )?
     } else {
-        Vec::new()
+        // Without HEAD, Git's cached diff compares the index against the empty tree.
+        r.checked(
+            &root,
+            &[
+                "diff",
+                "--cached",
+                "--no-ext-diff",
+                "--no-textconv",
+                "--no-renames",
+                "--ignore-submodules=all",
+                "--numstat",
+                "-z",
+                "--",
+            ],
+        )?
     };
     let stats = parse_numstat(&diff)?;
     let (mut added, mut deleted) = (0u64, 0u64);
@@ -184,32 +198,27 @@ fn read_with(r: &Runner, directory: &Path, limit: usize) -> Result<Option<Snapsh
         added = added.saturating_add(value.0);
         deleted = deleted.saturating_add(value.1);
     }
-    let mut budget = 8 * 1024 * 1024;
     for file in &mut files {
+        if r.cancelled() {
+            return Err(GitError::Cancelled);
+        }
+        if file.index == '?' {
+            continue;
+        }
         if filtered.contains(&file.path) {
             file.omitted = true;
             continue;
         }
-        if file.index != '?'
-            && let Some(&(a, d, binary)) = stats.get(&file.path)
-        {
+        if let Some(&(a, d, binary)) = stats.get(&file.path) {
             file.added = a;
             file.deleted = d;
             file.binary = binary;
         }
-        // New/untracked text contributes additions. Never follow a symlink or store its content.
-        if file.index == '?' || !head.success {
-            if file.worktree == 'D' {
-                continue;
-            }
-            let (lines, binary, omitted) = new_file_lines(&root, &file.path, &mut budget);
-            file.added = lines;
-            file.binary = binary;
-            file.omitted = omitted;
-            added = added.saturating_add(lines);
-            partial |= omitted;
-        }
     }
+    let omitted_files = files.iter().filter(|f| f.omitted).count();
+    let partial = omitted_files > 0;
+    // Display limits do not change Git's totals; untracked files contribute no lines.
+    files.truncate(MAX_WORKTREE_FILES);
     let limit = limit.clamp(1, MAX_COMMITS);
     let mut commits = if head.success {
         parse_log(&r.checked(
@@ -250,6 +259,7 @@ fn read_with(r: &Runner, directory: &Path, limit: usize) -> Result<Option<Snapsh
         total_files,
         files,
         partial,
+        omitted_files,
         commits,
         more,
     }))
@@ -331,39 +341,4 @@ fn parse_log(bytes: &[u8]) -> Result<Vec<Commit>, GitError> {
             })
         })
         .collect()
-}
-fn new_file_lines(root: &Path, path: &str, budget: &mut u64) -> (u64, bool, bool) {
-    let relative = Path::new(path);
-    if relative
-        .components()
-        .any(|c| !matches!(c, std::path::Component::Normal(_)))
-    {
-        return (0, false, true);
-    }
-    let file = root.join(relative);
-    let Ok(meta) = std::fs::symlink_metadata(&file) else {
-        return (0, false, true);
-    };
-    if !meta.file_type().is_file() || meta.len() > 1024 * 1024 || meta.len() > *budget {
-        return (0, false, true);
-    }
-    *budget -= meta.len();
-    let Ok(mut input) = std::fs::File::open(file) else {
-        return (0, false, true);
-    };
-    let mut bytes = Vec::new();
-    if (&mut input)
-        .take(meta.len() + 1)
-        .read_to_end(&mut bytes)
-        .is_err()
-        || bytes.len() as u64 > meta.len()
-    {
-        return (0, false, true);
-    }
-    if bytes.iter().take(8000).any(|b| *b == 0) {
-        return (0, true, false);
-    }
-    let lines = bytes.iter().filter(|b| **b == b'\n').count() as u64
-        + u64::from(!bytes.is_empty() && bytes.last() != Some(&b'\n'));
-    (lines, false, false)
 }

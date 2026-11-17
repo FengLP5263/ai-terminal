@@ -646,7 +646,7 @@ pub fn show_with_groups(
                         ui.ctx().request_repaint();
                     }
                     if drag.is_none() && !response.dragged() {
-                        response.clone().on_hover_text(format!(
+                        let tooltip = format!(
                             "{} · {}\n{}\n{}",
                             entry.name,
                             entry.agent.label(),
@@ -660,7 +660,10 @@ pub fn show_with_groups(
                                     entry.hint
                                 )
                             )
-                        ));
+                        );
+                        response.clone().on_hover_ui(|ui| {
+                            crate::ui_text::multiline_label(ui, &tooltip);
+                        });
                     }
                     response.context_menu(|ui| {
                         ui.set_width(148.0);
@@ -699,7 +702,9 @@ pub fn show_with_groups(
                                         current.is_some_and(|g| g.id == group.id),
                                         &group.name,
                                     )
-                                    .on_hover_text(&group.name)
+                                    .on_hover_ui(|ui| {
+                                        crate::ui_text::multiline_label(ui, &group.name);
+                                    })
                                     .clicked()
                                 {
                                     actions.group = Some(GroupAction::Assign(

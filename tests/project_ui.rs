@@ -88,9 +88,9 @@ impl Fixture {
                     &mut self.files_open,
                 )
                 .file;
-                if let Some(file) = &self.client.file {
+                if self.client.file.is_some() {
                     self.document_right = ui.available_rect_before_wrap().right();
-                    close = project_ui::document(ui, file, self.client.root.as_deref());
+                    close = self.view.document(ui, &mut self.client);
                 } else {
                     ui.label("TERMINAL");
                 }
@@ -208,6 +208,112 @@ fn panel_tabs_are_exclusive_and_the_files_entry_exists_outside_git() {
         ]);
     }
     assert!(files_open && !git_open);
+}
+
+#[test]
+fn markdown_renders_code_switches_to_source_and_routes_only_safe_local_links() {
+    let mut f = Fixture::new();
+    let source = "# Preview title\n\n**Strong text**\n\n```json\n{\n  \"name\": \"demo\"\n}\n```\n\n[Local file](src/app.rs) [Blocked](javascript:alert)\n";
+    std::fs::write(f.root.path().join("README.md"), source).unwrap();
+    f.client.open_file(Path::new("README.md"));
+    wait(&mut f.client, |c| {
+        c.file.as_ref().is_some_and(|s| !s.loading)
+    });
+    f.frame(vec![], 1200.0);
+    let output = f.frame(vec![], 1200.0);
+    assert!(text_rect(&output, "Preview title").is_some());
+    assert!(
+        text_rect(&output, "  \"name\": \"demo\"").is_some_and(|row| text_rect(&output, "{").is_some_and(|first| row.top()>first.top())),
+        "fenced code must be rendered"
+    );
+    let source_button = text_rect(&output, "Source").unwrap().center();
+    f.click(source_button, 1200.0);
+    let output = f.frame(vec![], 1200.0);
+    assert!(text_rect(&output, "# Preview title").is_some());
+    f.click(text_rect(&output, "Preview").unwrap().center(), 1200.0);
+    let output = f.frame(vec![], 1200.0);
+    let blocked = text_rect(&output, "Blocked").unwrap();
+    // Inline galleys include preceding horizontal layout space in their bounding box.
+    f.click(
+        egui::pos2(blocked.right() - 5.0, blocked.center().y),
+        1200.0,
+    );
+    let output = f.frame(vec![], 1200.0);
+    assert!(text_rect(&output, "This link is not supported.").is_some());
+    assert!(
+        !output
+            .platform_output
+            .commands
+            .iter()
+            .any(|c| matches!(c, egui::OutputCommand::OpenUrl(_)))
+    );
+    f.click(text_rect(&output, "Local file").unwrap().center(), 1200.0);
+    assert_eq!(
+        f.client.file.as_ref().unwrap().path,
+        Path::new("src/app.rs")
+    );
+    assert_eq!(
+        std::fs::read_to_string(f.root.path().join("README.md")).unwrap(),
+        source
+    );
+}
+
+#[test]
+fn image_controls_and_text_page_buttons_remain_inside_the_read_only_view() {
+    let mut f = Fixture::new();
+    image::RgbaImage::from_pixel(16, 8, image::Rgba([10, 100, 210, 128]))
+        .save(f.root.path().join("image.png"))
+        .unwrap();
+    f.client.open_file(Path::new("image.png"));
+    wait(&mut f.client, |c| {
+        c.file.as_ref().is_some_and(|s| !s.loading)
+    });
+    f.frame(vec![], 1200.0);
+    let output = f.frame(vec![], 1200.0);
+    assert!(text_rect(&output, "Fit").is_some());
+    assert!(text_rect(&output, "100%").is_some());
+    assert!(text_rect(&output, "Read only").is_some());
+    std::fs::write(f.root.path().join("large.txt"), "row\n".repeat(20_004)).unwrap();
+    f.client.open_file(Path::new("large.txt"));
+    wait(&mut f.client, |c| {
+        c.file.as_ref().is_some_and(|s| !s.loading)
+    });
+    let output = f.frame(vec![], 1200.0);
+    f.click(text_rect(&output, "Next").unwrap().center(), 1200.0);
+    wait(&mut f.client, |c| {
+        c.file.as_ref().is_some_and(|s| !s.loading)
+    });
+    let output = f.frame(vec![], 1200.0);
+    assert_eq!(
+        f.client
+            .file
+            .as_ref()
+            .unwrap()
+            .data
+            .as_ref()
+            .unwrap()
+            .content
+            .lines[0]
+            .new,
+        Some(20_001)
+    );
+    f.click(text_rect(&output, "Previous").unwrap().center(), 1200.0);
+    wait(&mut f.client, |c| {
+        c.file.as_ref().is_some_and(|s| !s.loading)
+    });
+    assert_eq!(
+        f.client
+            .file
+            .as_ref()
+            .unwrap()
+            .data
+            .as_ref()
+            .unwrap()
+            .page
+            .cursor
+            .offset,
+        0
+    );
 }
 
 #[test]

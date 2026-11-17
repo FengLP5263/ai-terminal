@@ -783,9 +783,17 @@ fn process_keyboard_event(
                 .last_content()
                 .terminal_mode
                 .contains(TermMode::BRACKETED_PASTE);
-            let image = native_image_paste && crate::paste::has_image();
+            let files = if text.is_empty() {
+                crate::paste::files()
+            } else {
+                None
+            };
+            let image = files.is_none() && native_image_paste && crate::paste::has_image();
             InputAction::BackendCall(BackendCommand::Write(crate::paste::bytes(
-                &text, bracketed, image,
+                &text,
+                bracketed,
+                image,
+                files.as_deref(),
             )))
         }
         egui::Event::Copy => {

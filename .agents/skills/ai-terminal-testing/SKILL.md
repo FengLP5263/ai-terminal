@@ -3,9 +3,13 @@ name: ai-terminal-testing
 description: 验证 ai-terminal 的离线 Rust 回归、治理脚本、Windows 原生 smoke、DPI 和受控 Agent 联调，区分付费模型请求。
 ---
 
+文件粘贴原生核查（Windows）：`cargo build --offline --locked --release --bins --example file_paste_probe` 后运行 `target/release/examples/file_paste_probe.exe output/<unique-file-paste>`。自身标准 CF_HDROP 内存经正式解析及输入编码写入真实无 profile PowerShell ReadLine 样例；覆盖多文件、空格、中文／emoji 和 UNC 路径。先截图未提交输入，再仅向该样例发回车核对 UTF-8 字节；检查 result.json、PNG、退出码及自身 PTY 回收。不改系统剪贴板、不读用户文件、不启动 Agent／模型；不将此证据冒充各 CLI 附件识别验收。统一 Windows／POSIX 动作不变。
+
 # 测试与验收
 
 简体中文 | [English](SKILL.en.md)
+
+侧栏悬停表情：`cargo test --offline --locked --test ui_text --test sidebar_interaction` 核对原始多行内容、完整字素簇、原生彩色纹理及窄宽度换行。构建／运行 sidebar_tooltip_probe 的命令见 scripts/README.md；目视检查展开／收起侧栏在 100%／114%／200% 的六张侧栏及两张顶部提示原生 PNG 及正常退出。名称、长路径、组名和状态均为固定样例；不创建 PTY、不启动 Agent／模型、不读用户配置或注入系统输入。合成悬停不能代替真实 Agent 任务验收。
 
 终端链接回归 `cargo test --offline --locked -p egui_term --lib opening_link_releases_grid` 使用有十秒截止时间的独立测试进程、无 profile PowerShell 和固定 example.invalid 文本；检查无悬停时不启动、已识别目标准确、启动器回调期间两把 FairMutex 锁均已释放、后续滚动／同步可用。注入启动器，不打开浏览器、不发送模型请求；旧重复加锁路径必须超时失败，原生 smoke 与截图另行核对。
 
@@ -142,3 +146,7 @@ preview.6：git_repository 以真实隔离 Git 验证暂存＋未暂存的净差
 0.11.0 README 更新：readme_capture 使用固定三成员分组和正式侧栏工牌；session_groups_probe 追加 `en` 可用全英文成员与组名进行同样的十二图核查。公开组图选 case-0-members.png，与中英文主界面／历史／差异／文件／浮窗／设置共十四张 PNG 原样复制并更新 SOURCE.json。所有图片均为隔离样例，不读取用户分组或调用模型。
 
 0.11.0 浮窗系统外框回归：floating_scale_probe 在六组比例下验证真实 HWND 的标题栏／菜单／边缘位均为空；向自有浮窗模拟后端恢复装饰样式及 WM_NCPAINT，确认过滤后仍无系统外框、主窗口样式不变。继续核对十八张原生截图、尺寸、头像像素与点击；floating_opacity_probe 验证原 alpha、合成恢复和边缘。只操作探针自己的窗口，不向用户窗口注入输入。
+
+Git 规模原生核查（Windows）：`cargo build --offline --locked --release --bins --example git_count_probe` 后运行 `target/release/examples/git_count_probe.exe output/<unique-git-counts>`。四张正式组件图覆盖累计 15 MB 未跟踪文本、10,001 个新文件及独占锁前后；行数均不包含未跟踪正文，锁不触发遗漏。自身单个 PowerShell PTY 保持身份，不发模型请求或改用户项目。离线测试另覆盖已跟踪净差异、无 HEAD 的暂存区和列表虚拟化；原生示例仅支持 Windows。
+
+0.12.0 README 图：readme_capture 的第四参数支持 files／history／diff／markdown／image，第二参数为独立 output 目录，第三参数为 zh／en。新增 Markdown 与图片模式只在自身目录创建固定双语文档及透明 PNG，使用正式只读组件，主界面仍显示固定示例路径；不读用户项目或调用模型。公开图保持原始 PNG 字节，并在 assets/readme/SOURCE.json 逐文件记录版本、语言、尺寸与摘要。

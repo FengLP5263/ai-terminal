@@ -32,4 +32,6 @@ pub mod integration;
 pub mod file_icons;
 pub mod project_files;
 
+pub mod project_media;
+pub mod project_preview;
 pub mod project_ui;

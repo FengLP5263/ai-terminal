@@ -115,7 +115,7 @@ fn limits_errors_and_cancellation_are_explicit_and_never_rewrite_files() {
     big.set_len(files::MAX_BYTES + 1).unwrap();
     assert_eq!(
         files::read_file(root, Path::new("large"), || false).unwrap_err(),
-        FileError::TooLarge
+        FileError::Binary
     );
     fs::write(
         root.join("lines.txt"),
@@ -127,7 +127,9 @@ fn limits_errors_and_cancellation_are_explicit_and_never_rewrite_files() {
     assert_eq!(doc.content.lines.len(), files::MAX_LINES);
     fs::write(root.join("wide.txt"), "中".repeat(files::MAX_CHARS + 1)).unwrap();
     let doc = files::read_file(root, Path::new("wide.txt"), || false).unwrap();
-    assert!(doc.content.partial);
+    assert!(!doc.content.partial);
+    assert_eq!(doc.content.lines.len(), 2);
+    assert_eq!(doc.content.lines[1].text, "中");
     assert_eq!(doc.content.lines[0].text.chars().count(), files::MAX_CHARS);
     assert_eq!(
         files::read_file(root, Path::new("missing"), || true).unwrap_err(),

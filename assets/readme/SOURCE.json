@@ -1,17 +1,17 @@
 {
   "description": "Native Release captures with fixed synthetic content and production sidebar, group, header, Git, file, floating and settings components. Per-file versions identify captures. No private data, user repositories or real model requests.",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "profile": "release",
   "model_requests": false,
   "user_profiles": false,
   "files": {
     "workspace.png": {
-      "sha256": "16fab4a00a1cac78f4eeb35fa115caab2dbcd4bd100a58336e2684f325d311dc",
-      "bytes": 196896,
+      "sha256": "9bf0c88a177fb5e77a627f18f92aaa9781289d2fa7ccddbda9a05623b9a6dd24",
+      "bytes": 197261,
       "width": 1920,
       "height": 1080,
-      "source": "examples/readme_capture.rs zh",
-      "version": "0.11.0",
+      "source": "examples/readme_capture.rs zh workspace",
+      "version": "0.12.0",
       "language": "zh-CN",
       "unmodified_native_capture": true,
       "synthetic_git": true
@@ -87,12 +87,12 @@
       "original_asset_provenance": "assets/icons/SOURCE.json"
     },
     "workspace.en.png": {
-      "sha256": "5e84edffc963b737a8f0bddc5de9d63a3dc1f5e7f9d21f2e04e2ccf65bf98c9d",
-      "bytes": 205091,
+      "sha256": "ffd32ad0c5b7e31261da4d37d0f195030dcdf8487dd50ec7c11ec25b53463550",
+      "bytes": 205280,
       "width": 1920,
       "height": 1080,
-      "source": "examples/readme_capture.rs en",
-      "version": "0.11.0",
+      "source": "examples/readme_capture.rs en workspace",
+      "version": "0.12.0",
       "language": "en",
       "unmodified_native_capture": true,
       "synthetic_git": true
@@ -108,67 +108,67 @@
       "unmodified_native_capture": true
     },
     "git-history.png": {
-      "sha256": "f735d369a0c92cca56507e3b10163632fb095832a34e76613f746ce31fb4e9c9",
-      "bytes": 219475,
+      "sha256": "704383972e3a94ffd326555aa5afdc4cfb3526578aa99d219a6f561de391c220",
+      "bytes": 218733,
       "width": 1920,
       "height": 1080,
       "source": "examples/readme_capture.rs zh history",
-      "version": "0.11.0",
+      "version": "0.12.0",
       "language": "zh-CN",
       "unmodified_native_capture": true,
       "synthetic_git": true
     },
     "git-history.en.png": {
-      "sha256": "548aa96fa8ea3f8d69cf6d3187a4f247057a9d1f78fc585dcc41104321e2ca6a",
-      "bytes": 227145,
+      "sha256": "5d0c724c38b310cfeb7177d09c1e10f559fb35311e52387421c1426221c2c654",
+      "bytes": 226303,
       "width": 1920,
       "height": 1080,
       "source": "examples/readme_capture.rs en history",
-      "version": "0.11.0",
+      "version": "0.12.0",
       "language": "en",
       "unmodified_native_capture": true,
       "synthetic_git": true
     },
     "git-diff.png": {
-      "sha256": "00029b2c3c298dd875bd995bedd789dcbdc4d1d29502859561c17c810c1da337",
-      "bytes": 240703,
+      "sha256": "2f3d2f8da66087b8da9cbdd65b2894507495962e4ffceb9cd90c1cfcff416f7d",
+      "bytes": 241067,
       "width": 1920,
       "height": 1080,
       "source": "examples/readme_capture.rs zh diff",
-      "version": "0.11.0",
+      "version": "0.12.0",
       "language": "zh-CN",
       "unmodified_native_capture": true,
       "synthetic_git": true
     },
     "git-diff.en.png": {
-      "sha256": "18f98ecf9609bfafd7f61c534f63de15aed3958e5e284de9b9bdf9246aef6e94",
-      "bytes": 238455,
+      "sha256": "9c0549f1b584d29f0164ca100f62bbb1a32b8d21b537202a96c4713c9ac79ea9",
+      "bytes": 238646,
       "width": 1920,
       "height": 1080,
       "source": "examples/readme_capture.rs en diff",
-      "version": "0.11.0",
+      "version": "0.12.0",
       "language": "en",
       "unmodified_native_capture": true,
       "synthetic_git": true
     },
     "project-files.png": {
-      "sha256": "86f10aee1fd6896efd3e874b95993778e8f9780768d797fca47241cc3d9b4cb2",
-      "bytes": 240642,
+      "sha256": "dfb45b1bd8d12125d1d57c9fe08e331166e6e7b5d3ca2bec160c914c7b4b4829",
+      "bytes": 249975,
       "width": 1920,
       "height": 1080,
       "source": "examples/readme_capture.rs zh files",
-      "version": "0.11.0",
+      "version": "0.12.0",
       "language": "zh-CN",
       "unmodified_native_capture": true,
       "synthetic_git": true
     },
     "project-files.en.png": {
-      "sha256": "3cd092fac4d7398082f0ee82d43d237dd7dc86c55a8141afce1e82d43e67be5d",
-      "bytes": 238525,
+      "sha256": "686447a3a52570cc94ed8f566fa22aaea73891259ab971a9c3449b91f00deaa0",
+      "bytes": 247358,
       "width": 1920,
       "height": 1080,
       "source": "examples/readme_capture.rs en files",
-      "version": "0.11.0",
+      "version": "0.12.0",
       "language": "en",
       "unmodified_native_capture": true,
       "synthetic_git": true
@@ -212,6 +212,50 @@
       "version": "0.11.0",
       "language": "en",
       "unmodified_native_capture": true
+    },
+    "markdown-preview.png": {
+      "sha256": "f4a0fa57545e74ff2b3eafd768d02618ec4c6a0183a19551ae610a993251d29b",
+      "bytes": 248945,
+      "width": 1920,
+      "height": 1080,
+      "source": "examples/readme_capture.rs zh markdown",
+      "version": "0.12.0",
+      "language": "zh-CN",
+      "unmodified_native_capture": true,
+      "synthetic_git": true
+    },
+    "image-preview.png": {
+      "sha256": "58ed240d2da1df5251287073266583d77c18a74282dc86b4d8ce1a849014d4d5",
+      "bytes": 226526,
+      "width": 1920,
+      "height": 1080,
+      "source": "examples/readme_capture.rs zh image",
+      "version": "0.12.0",
+      "language": "zh-CN",
+      "unmodified_native_capture": true,
+      "synthetic_git": true
+    },
+    "markdown-preview.en.png": {
+      "sha256": "eb47499344c7ecd52e2e9c605db40bb072f30efddef9bd796aa7278307e9f692",
+      "bytes": 247199,
+      "width": 1920,
+      "height": 1080,
+      "source": "examples/readme_capture.rs en markdown",
+      "version": "0.12.0",
+      "language": "en",
+      "unmodified_native_capture": true,
+      "synthetic_git": true
+    },
+    "image-preview.en.png": {
+      "sha256": "d797f4e8450e95457831bf598dedc3ad547aa26cc2563d083134476633067527",
+      "bytes": 223546,
+      "width": 1920,
+      "height": 1080,
+      "source": "examples/readme_capture.rs en image",
+      "version": "0.12.0",
+      "language": "en",
+      "unmodified_native_capture": true,
+      "synthetic_git": true
     }
   }
 }
