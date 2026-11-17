@@ -85,3 +85,5 @@ Kimi Code 2.5.0 使用自身 pi-tui 的 OSC 7501 `app=kimi-code`；仅受管入�
 0.4.11 预览：调用真实 Agent 前，仅从其子进程 PATH 排除本会话 shim 目录，避免公共分发器查询其他别名时再次进入管理器包装器。外层交互 Shell 保留入口；用户 PATH、CLI 文件和配置不变，hook 继续使用绝对 helper 路径。
 
 0.4.12：Git for Windows 另作为可选只读工具，提供当前目录的分支、状态与历史；不捆绑、自动安装或访问远端。不把查看仓库视为修改代码、提交或同步的授权；不持久化文件正文、提交历史或凭据。界面和限制见 [Git 面板](../../docs/git.md)。
+
+0.13.0：Qoder 国际版通过公开 qodercli（受管 Shell 同时提供 qoder／qodercli）接入，独立于 Qoder CN；不将 IDE 的 qoder 命令视为 CLI。复用会话级 --settings、--resume 及 Qoder hook 事件，不覆盖显式设置、不写用户配置或确认信任。本机 1.1.90 的真实启动、合成 hook 和真实模型回合分别记录。官方接口见 https://docs.qoder.com/cli/cli-reference 与 https://docs.qoder.com/cli/hooks 。Windows 音视频解码使用系统 Media Foundation，不引入其他源码仓库。

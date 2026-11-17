@@ -137,3 +137,5 @@ Seti 按官方 VS Code 文件图标的 150% 尺寸规范校准图标族的显示
 0.11.0 README 原生截图新增中英文 session-groups.png／session-groups.en.png，来自 session_groups_probe 的固定三成员面板；其余十二张当前工作区、历史、差异、文件、浮窗和设置图同步刷新。全部使用正式组件及隔离样例，原样复制并逐文件登记版本、语言、尺寸与 SHA-256；历史六枚 Agent 头像的来源记录保留原版本。
 
 0.12.0 README 图：readme_capture 的第四参数支持 files／history／diff／markdown／image，第二参数为独立 output 目录，第三参数为 zh／en。新增 Markdown 与图片模式只在自身目录创建固定双语文档及透明 PNG，使用正式只读组件，主界面仍显示固定示例路径；不读用户项目或调用模型。公开图保持原始 PNG 字节，并在 assets/readme/SOURCE.json 逐文件记录版本、语言、尺寸与摘要。
+
+0.13.0：国际版 Qoder 在会话元数据中使用新增可选枚举值 Qoder；旧枚举及配置保持兼容，运行身份仍不持久化。国际版复用既有 qoder.png，不新增图片／字体或改动来源字节。音视频仅保存本次查看的已验证本地路径和短暂播放器状态，不保存进度、媒体副本或正文，不整份读取大媒体。windows 0.62.2 启用 Media Foundation／WIC 投影并直接引用既有 windows-core 0.62.2；无解码器包或浏览器依赖。

@@ -235,8 +235,11 @@ pub fn icon(path: &str, binary: bool) -> FileIcon {
             "png" | "jpg" | "jpeg" | "gif" | "ico" | "bmp" | "webp" | "avif" | "heic" | "tif"
             | "tiff" => ("image", PURPLE),
             "svg" | "svgz" => ("svg", ORANGE),
-            "mp3" | "wav" | "flac" | "ogg" | "m4a" | "aac" | "wma" | "mid" => ("audio", PURPLE),
-            "mp4" | "mkv" | "avi" | "mov" | "webm" | "wmv" | "mpeg" => ("video", PURPLE),
+            "mp3" | "wav" | "flac" | "ogg" | "m4a" | "aac" | "wma" | "mid" | "opus" | "aif"
+            | "aiff" => ("audio", PURPLE),
+            "mp4" | "mkv" | "avi" | "mov" | "webm" | "wmv" | "mpeg" | "mpg" | "m4v" => {
+                ("video", PURPLE)
+            }
             "pdf" => ("pdf", RED),
             "zip" | "7z" | "gz" | "tgz" | "tar" | "rar" | "xz" | "bz2" | "zst" => ("zip", YELLOW),
             "ttf" | "otf" | "woff" | "woff2" | "eot" => ("font", RED),
