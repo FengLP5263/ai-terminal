@@ -2,6 +2,10 @@
 
 [简体中文](data-and-assets.md) | English
 
+0.12.0-preview.5: remove the new-file count cache, read/reuse metrics and direct memchr dependency. Git snapshots retain query results and filter-omission counts. File paste holds paths briefly in memory without persisting bodies, attachment copies or clipboard data; no user settings or font assets are added.
+
+0.12.0 preview adds no persisted fields or user assets. Cargo.lock pins image 0.25.10, pulldown-cmark 0.13.6 and egui_commonmark 0.24.0, and enables native text for existing resvg 0.45.1. Licenses follow the existing dependency inventory workflow. Encoded images are capped at 32 MiB; raster originals at 32 million pixels/16,384 per edge; decode allocation at 256 MiB, and main previews at 4,096 per edge. SVG is capped at 4 MiB/10,000 tags with external resource resolvers disabled. Markdown retains at most 16 local illustrations, each downsampled to 2,048 per edge and totaling 16 million pixels. Bodies, cursors and textures remain in memory and are released on close/switch; no file copies or remote image downloads. SVG text reuses embedded JetBrains Mono and system fonts from Windows Fonts without installing fonts or altering asset bytes.
+
 ## Data and recovery
 
 `%LOCALAPPDATA%/ai-terminal/sessions.json` stores session names, directories, Agent types, actual resume IDs, ordering, and UI preferences. 0.3.0 added optional `last_directory`; CMD/Bash and legacy Codex/Claude/Shell records coexist. Since 0.3.2, old Agent records load as PowerShell while preserving other metadata; only the selected shell opens automatically. Prompt metadata updates the working directory; running Agent identity and invocation IDs exist only in memory.
@@ -69,7 +73,7 @@ Published upstream terminal recordings use binary diffs, and Git EOL conversion 
 
 0.4.12 preview: the menu offers six colors plus No color, retaining blue/green/amber/pink/purple IDs and adding red. Legacy teal/orange IDs round-trip unchanged while rendering and menu selection map to blue/red. Session UUIDs, directories and order are untouched. Colors and the No color icon are drawn in code without new bitmap/font assets.
 
-0.4.12 Git adds only the boolean `ui.git_panel_open` preference, defaulting to collapsed for older records. Branch, path, line totals and commit metadata remain in the current in-memory snapshot. Untracked text is read temporarily to count lines; no contents, diffs, history cache or Git credentials are saved. Session data roots and user repositories are unchanged.
+0.4.12 Git adds only the boolean `ui.git_panel_open` preference, defaulting to collapsed for older records. Branch, path, line totals and commit metadata remain in the current in-memory snapshot. Untracked text is no longer read for supplemental line counting; no contents, diffs, history cache or Git credentials are saved. Session data roots and user repositories are unchanged.
 
 0.4.12-preview.3: `assets/fonts/Codicons.ttf`, original CSS glyph mapping and license come from Microsoft's official Codicons 0.0.45 npm package. SOURCE.json records original bytes, archive digest and the U+EC6F branch symbol. This is a UI icon font, neither a terminal-font option nor a system installation. Production appearance and probes share its definition; the helper never loads it. ZIP packaging copies Codicons-LICENSE.txt and validates it as a declared font license.
 
@@ -112,3 +116,5 @@ The 0.11.0 preview adds optional root-level groups: each has a UUID id, name and
 0.11.0-preview.3 adds ui.floating_border, defaulting to true even when absent from old settings. It is saved independently of opacity and main/floating zoom. In 0.11.0-preview.4 badges show black names on white without color or role fields; the first member is implicit in sessions order, with no role label. floating_opacity supports 0.0–1.0, retaining the 1.0 default/non-finite fallback and existing values. Badges and outlines never change lifecycle or task state.
 
 0.11.0 README native captures add session-groups.png and session-groups.en.png from session_groups_probe’s fixed three-member panel. The other twelve current workspace, history, diff, files, floating and settings images are refreshed. All use production components and isolated fixtures; copy unchanged bytes and record per-file version, language, dimensions and SHA-256. Preserve the original version provenance of the six historical Agent avatar images.
+
+0.12.0 README captures: readme_capture accepts files/history/diff/markdown/image as its fourth argument, an isolated output directory as the second and zh/en as the third. Markdown/image modes create only fixed bilingual documents and a transparent PNG in owned directories, render production read-only components and display fixed example paths. No user-project reads or model calls. Public PNG bytes remain unmodified, with per-file version, language, dimensions and hash in assets/readme/SOURCE.json.

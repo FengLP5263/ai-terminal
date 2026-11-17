@@ -25,6 +25,12 @@ const CASES: &[(Language, f32, Option<&str>)] = &[
     (Language::En, 1.0, Some("image.bin")),
     (Language::ZhCn, 1.0, Some("large.dat")),
     (Language::En, 1.0, Some("invalid.txt")),
+    (Language::ZhCn, 1.0, Some("transparent.png")),
+    (Language::En, 1.25, Some("photo.jpg")),
+    (Language::ZhCn, 1.0, Some("diagram.svg")),
+    (Language::ZhCn, 1.0, Some("docs/rich.md")),
+    (Language::En, 1.0, Some("large-next.txt")),
+    (Language::ZhCn, 1.0, Some("document.docx")),
     (Language::ZhCn, 1.0, None),
 ];
 #[path = "../src/platform.rs"]
@@ -87,7 +93,7 @@ impl eframe::App for Probe {
                             .collect::<Vec<_>>(),
                     )
                     .unwrap();
-                self.records.push(serde_json::json!({"image":name,"language":format!("{:?}",CASES[self.stage].0),"zoom":CASES[self.stage].1,"path":CASES[self.stage].2,"pty_pid":self.terminal.pty_id(),"lines":self.client.file.as_ref().and_then(|f|f.data.as_ref()).map(|d|d.content.lines.len())}));
+                self.records.push(serde_json::json!({"image":name,"language":format!("{:?}",CASES[self.stage].0),"zoom":CASES[self.stage].1,"path":CASES[self.stage].2,"pty_pid":self.terminal.pty_id(),"lines":self.client.file.as_ref().and_then(|f|f.data.as_ref()).map(|d|d.content.lines.len()),"page_offset":self.client.file.as_ref().and_then(|f|f.data.as_ref()).map(|d|d.page.cursor.offset),"image_preview":self.client.file.as_ref().and_then(|f|f.data.as_ref()).is_some_and(|d|d.image.is_some()),"markdown_preview":self.client.file.as_ref().and_then(|f|f.data.as_ref()).is_some_and(|d|d.markdown.is_some())}));
                 self.stage += 1;
                 self.frames = 0;
                 self.pending = false;
@@ -126,6 +132,14 @@ impl eframe::App for Probe {
                 egui::vec2(1160.0, 760.0) / ui.ctx().zoom_factor(),
             ));
         }
+        if path == Some("large-next.txt")
+            && self.frames > 2
+            && self.client.file.as_ref().is_some_and(|f| {
+                !f.loading && f.data.as_ref().is_some_and(|d| d.page.cursor.offset == 0)
+            })
+        {
+            self.client.next_page();
+        }
         let ctx = ui.ctx().clone();
         egui::Panel::top("project-header").show(ui, |ui| {
             git_ui::header_with_files(
@@ -152,8 +166,8 @@ impl eframe::App for Probe {
             &mut true,
         );
         assert!(actions.file.is_none());
-        if let Some(file) = &self.client.file {
-            project_ui::document(ui, file, Some(&self.root));
+        if self.client.file.is_some() {
+            self.view.document(ui, &mut self.client);
         } else {
             let view =
                 TerminalView::new(ui, &mut self.terminal).set_font(appearance::terminal_font(14.0));
@@ -221,10 +235,38 @@ fn main() -> eframe::Result {
     std::fs::write(root.join("scripts/legacy.ps1"), legacy).unwrap();
     std::fs::write(root.join("image.bin"), [0, 1, 2, 3]).unwrap();
     std::fs::write(root.join("invalid.txt"), [0xff]).unwrap();
-    std::fs::File::create(root.join("large.dat"))
-        .unwrap()
-        .set_len(ai_terminal::project_files::MAX_BYTES + 1)
+    std::fs::write(
+        root.join("large.dat"),
+        "// 中文 😀 · large text preview\n".repeat(80_000),
+    )
+    .unwrap();
+    std::fs::write(
+        root.join("large-next.txt"),
+        (1..=50_010)
+            .map(|n| format!("row {n}: 中文 😀 · next page\n"))
+            .collect::<String>(),
+    )
+    .unwrap();
+    std::fs::write(
+        root.join("document.docx"),
+        "Office documents are not opened.",
+    )
+    .unwrap();
+    let rgba = image::RgbaImage::from_fn(640, 320, |x, y| {
+        image::Rgba([
+            40 + (x / 4) as u8,
+            100 + (y / 4) as u8,
+            210,
+            if (x / 80 + y / 80) % 2 == 0 { 255 } else { 90 },
+        ])
+    });
+    rgba.save(root.join("transparent.png")).unwrap();
+    image::DynamicImage::ImageRgba8(rgba)
+        .into_rgb8()
+        .save(root.join("photo.jpg"))
         .unwrap();
+    std::fs::write(root.join("diagram.svg"), r##"<svg xmlns="http://www.w3.org/2000/svg" width="640" height="240"><rect width="640" height="240" rx="20" fill="#202b38"/><rect x="40" y="70" width="180" height="90" rx="8" fill="#326daa"/><path d="M230 115h150m-20-20 20 20-20 20" stroke="#80c0ef" stroke-width="4" fill="none"/><rect x="400" y="70" width="200" height="90" rx="8" fill="#365f4c"/><text x="60" y="122" fill="white" font-size="22">Project files</text><text x="422" y="122" fill="white" font-size="22">Native preview</text></svg>"##).unwrap();
+    std::fs::write(root.join("docs/rich.md"), "# 项目预览\n\n支持 **Markdown**、表格、代码块和项目内图片。\n\n| 类型 | 查看方式 |\n|---|---|\n| 文本 | 分页源码 |\n| 图片 | 缩放预览 |\n\n```json\n{\n  \"name\": \"ai-terminal\",\n  \"preview\": true,\n  \"count\": 42\n}\n```\n\n![透明图片](../transparent.png)\n\n[查看 Rust 文件](../src/main.rs)\n").unwrap();
     eframe::run_native(
         "ai-terminal project files preview",
         eframe::NativeOptions {

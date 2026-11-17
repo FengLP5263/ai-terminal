@@ -6,6 +6,49 @@ use egui::{
 };
 
 #[test]
+fn wrapped_multiline_labels_keep_complete_emoji_near_line_boundaries() {
+    let ctx = egui::Context::default();
+    appearance::setup(&ctx);
+    let _renderer = egui_term::TextRendererSession::new(&ctx);
+    for prefix in 0..24 {
+        for emoji in ["❤️", "👩🏽‍💻", "🇨🇳", "1️⃣"] {
+            let text = format!(
+                "{}{emoji} end\nC:/Projects/很长的目录/保持原文",
+                "a".repeat(prefix)
+            );
+            let output = ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(400.0, 500.0),
+                    )),
+                    ..Default::default()
+                },
+                |ui| {
+                    ui.set_max_width(120.0);
+                    ui_text::multiline_label(ui, &text);
+                },
+            );
+            let galley = output
+                .shapes
+                .iter()
+                .find_map(|s| match &s.shape {
+                    egui::Shape::Text(t)
+                        if t.galley.job.text.replace('\n', "") == text.replace('\n', "") =>
+                    {
+                        Some(&t.galley)
+                    }
+                    _ => None,
+                })
+                .unwrap();
+            assert!(galley.rows.len() > 2);
+            assert!(galley.size().x <= 121.0);
+            assert!(output.shapes.iter().any(|s|matches!(&s.shape,egui::Shape::Mesh(m) if m.texture_id!=egui::TextureId::default())),"wrapped emoji lost its native bitmap: {prefix} {emoji}");
+        }
+    }
+}
+
+#[test]
 fn emoji_clusters_have_single_slots_and_editing_copies_original_unicode() {
     let ctx = egui::Context::default();
     appearance::setup(&ctx);

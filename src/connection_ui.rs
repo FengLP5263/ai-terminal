@@ -11,7 +11,7 @@ pub fn show(ui: &mut egui::Ui, agent: Agent, status: &Status) -> egui::Response 
     let color = crate::floating::status_color(status.activity);
     let control = ui
         .add(
-            egui::Button::new(RichText::new(label).size(12.0).color(color))
+            egui::Button::new(RichText::new(label).color(color))
                 .frame(false)
                 .min_size(egui::vec2(0.0, chrome::CONTROL)),
         )

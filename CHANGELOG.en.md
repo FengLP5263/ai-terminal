@@ -4,6 +4,81 @@
 
 Record user-visible additions, improvements, fixes, and compatibility changes for each release; omit categories that do not apply. Review both languages together, use the same version entry in GitHub Releases, and ship both files in the ZIP. Historical summaries follow existing GitHub release notes and UTC publication dates; development versions without a separate release do not receive invented release dates.
 
+## [0.12.0] - 2026-11-17
+
+### Added
+
+- Read-only PNG, JPEG, GIF, WebP, BMP, ICO, TIFF and SVG previews with fit, actual-size, zoom and transparency checkerboard controls.
+- Markdown render/source switching, tables, syntax-colored code blocks and project-local images; paged large-text reading preserves line numbers, continued long lines and Unicode characters.
+
+### Changed
+
+- Git line totals follow Git diff. Untracked files show U without supplemental body reads, counting or dedicated caches. Before the first commit, only staged content contributes.
+- Worktree lists display up to 10,000 entries and paint visible rows only, separating display limits from count completeness. History rows no longer repeat copy buttons; hover details still copy full IDs.
+
+### Fixed
+
+- Copying files in Explorer now pastes one or more quoted paths into terminals, including Unicode, spaces and network paths, without Enter. Bitmap screenshots retain native CLI image paste.
+- Header session status inherits the surrounding font size. Session, header name/path, project-entry and group-name hover tips share native color emoji and preserve complete wrapped clusters.
+
+### Compatibility and upgrade
+
+- Existing sessions, groups, settings and terminal recovery remain compatible without data migration. File views remain read-only; Office documents are not previewed and remote images are not downloaded automatically.
+- Images/Markdown retain explicit size and complexity bounds; animated images show the first frame and Markdown structures can break across pages. Git queries retain six-second/2 MiB output limits; see the file and Git documentation.
+- Offline regressions and native terminal/UI checks passed, and the user accepted the preview. This does not establish every CLI attachment behavior or real paid-model turn.
+
+## [0.12.0-preview.5] - 2026-11-17
+
+Local development preview, not publicly released.
+
+### Changed
+
+- Git line totals follow Git diff only. Untracked files retain U entries without supplemental body reads, counting or caches; unborn repositories use staged content.
+- Remove repeated copy buttons from history rows; the hover card still copies full commit IDs.
+
+### Fixed
+
+- Explorer file-list paste inserts quoted paths for multiple files, Unicode and spaces without Enter or attachment copies. Bitmap image paste remains native to the CLI.
+- Header name/directory and project-button hover tips share native color-emoji rendering.
+
+## [0.12.0-preview.4] - 2026-11-16
+
+Local development preview, not publicly released; the date records this preview.
+
+### Fixed
+
+- Session hover tips use the same native color-emoji rendering as titles for complete Unicode clusters in names, paths, groups and status hints. Group-menu hover names share that path.
+- Multiline content and wrapping remain intact, covering skin modifiers, ZWJ sequences, flags, keycaps, expanded/collapsed sidebars and multiple zoom levels. Original names, status, font assets and terminal processes are unchanged.
+
+## [0.12.0-preview.3] - 2026-11-16
+
+Local development preview, not publicly released; the date records this preview.
+
+### Fixed
+
+- The header session status inherits the same font, size and zoom as Git metadata and the zoom control instead of forcing a 12-point size.
+- Existing multi-font, 100%/114%/200% size and single-row alignment checks now include status text; native Git captures also display a synthetic status.
+
+## [0.12.0-preview.2] - 2026-11-16
+
+Local development preview, not publicly released; the date records this preview.
+
+### Changed
+
+- Git new-file counting uses a fixed streaming buffer without the old 1 MiB per-file/8 MiB aggregate skip rules. Unchanged counts are reused, retaining cancellation and actual read-failure protection.
+- The working list displays up to 10,000 files and paints visible rows only. Totals include files outside that list; display truncation no longer marks counts incomplete. Actual omissions expose their count and reasons on hover.
+- Isolated regressions cover 128 MiB text, aggregates above 8 MiB, 10,001 files, binary data, cache invalidation, same-size/timestamp-preserving edits, locked-file recovery, cancellation and repository switching, alongside native window checks.
+
+## [0.12.0-preview.1] - 2026-11-16
+
+Local development preview, not publicly released; the date records this preview.
+
+### Added
+
+- Project files now preview images with zoom and a transparency checkerboard, plus rendered/source Markdown, tables, syntax-colored code blocks and project-local illustrations.
+- Large text loads in background pages instead of rejecting entire files above 2 MiB. Long lines continue in segments, with preserved line numbers and file-change detection across pages.
+- Viewing remains read-only; Office documents are not previewed. No automatic image downloads, file execution or out-of-project link reads; the current terminal and process remain connected.
+
 ## [0.11.1] - 2026-11-16
 
 ### Fixed

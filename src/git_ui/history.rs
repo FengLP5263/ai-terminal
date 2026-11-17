@@ -23,7 +23,7 @@ pub(super) fn show(
         let (rect, _) =
             ui.allocate_exact_size(egui::vec2(ui.available_width(), row_height), Sense::hover());
         let response = ui.interact(
-            egui::Rect::from_min_max(rect.min, egui::pos2(rect.right() - 28.0, rect.bottom())),
+            rect,
             Id::new(("git-commit-row", &commit.id)),
             Sense::click(),
         );
@@ -40,7 +40,7 @@ pub(super) fn show(
         let galley = egui::WidgetText::from(subject).into_galley(
             ui,
             Some(egui::TextWrapMode::Truncate),
-            (rect.width() - 55.0).max(1.0),
+            (rect.width() - super::HISTORY_INDENT - 8.0).max(1.0),
             font.clone(),
         );
         ui.painter().galley(
@@ -51,15 +51,6 @@ pub(super) fn show(
             galley,
             chrome::TEXT,
         );
-        let mut copy_ui = ui.new_child(
-            egui::UiBuilder::new()
-                .max_rect(egui::Rect::from_min_max(
-                    egui::pos2(rect.right() - 26.0, rect.top()),
-                    rect.right_bottom(),
-                ))
-                .layout(egui::Layout::left_to_right(egui::Align::Center)),
-        );
-        copy_id(&mut copy_ui, commit, "row", &mut view.copied);
         if response.clicked() {
             view.selected = if expanded {
                 None

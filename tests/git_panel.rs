@@ -19,6 +19,7 @@ fn fixture() -> Snapshot {
         deleted: 1,
         total_files: 1,
         partial: false,
+        omitted_files: 0,
         more: true,
         files: vec![FileChange {
             path: "src/终端.rs".into(),
@@ -631,7 +632,11 @@ fn history_hover_copy_and_expansion_use_real_widgets_without_changing_selection(
         )
     };
     frame(vec![]);
-    frame(vec![]);
+    let baseline = frame(vec![]);
+    assert!(
+        text_rect(&baseline, "\u{ebcc}").is_none(),
+        "History rows should not repeat copy controls"
+    );
     let row = ctx
         .read_response(egui::Id::new(("git-commit-row", &commit.id)))
         .unwrap()
@@ -851,6 +856,9 @@ fn header_shares_one_row_and_inherits_the_selected_font_and_ui_size() {
             ctx.set_zoom_factor(scale);
             let mut client = GitClient::new(ctx.clone());
             client.snapshot = Some(std::sync::Arc::new(fixture()));
+            let mut status = ai_terminal::status::Status::default();
+            status.activity = ai_terminal::status::Activity::Working;
+            let status_label = i18n::activity(i18n::locale(&ctx), status.activity);
             let mut open = false;
             let mut last = None;
             for _ in 0..3 {
@@ -869,7 +877,7 @@ fn header_shares_one_row_and_inherits_the_selected_font_and_ui_size() {
                                 name: "Session",
                                 directory: std::path::Path::new("C:/Projects/demo"),
                                 scale,
-                                connection: None,
+                                connection: Some((ai_terminal::model::Agent::Codex, &status)),
                             },
                             Some(&client),
                             &mut open,
@@ -886,6 +894,7 @@ fn header_shares_one_row_and_inherits_the_selected_font_and_ui_size() {
                 "feature/native-git *",
                 "+3",
                 "−1",
+                status_label,
             ] {
                 let rect =
                     text_rect(&output, text).unwrap_or_else(|| panic!("Header omitted {text}"));
@@ -1086,5 +1095,135 @@ fn panel_has_one_repository_header_and_non_repository_headers_have_no_git_placeh
         assert!(text_rect(&out, "Git repository").is_none());
         assert!(text_rect(&out, "\u{ec6f}").is_none());
         assert!(text_rect(&out, "C:/Plain-folder").is_some());
+    }
+}
+
+#[test]
+fn ten_thousand_file_rows_are_virtualized_and_display_limits_do_not_mark_totals_partial() {
+    let ctx = egui::Context::default();
+    appearance::setup(&ctx);
+    i18n::apply(&ctx, Language::En);
+    let mut snapshot = fixture();
+    snapshot.files = (0..10_000)
+        .map(|n| FileChange {
+            path: format!("files/{n:05}.txt"),
+            index: '?',
+            worktree: '?',
+            added: 1,
+            deleted: 0,
+            binary: false,
+            omitted: false,
+        })
+        .collect();
+    snapshot.total_files = 10_001;
+    snapshot.added = 10_001;
+    snapshot.deleted = 0;
+    let mut client = ai_terminal::git::GitClient::new(ctx.clone());
+    client.snapshot = Some(std::sync::Arc::new(snapshot));
+    let mut view = GitView::default();
+    let mut frame = |events, time| {
+        ctx.run_ui(
+            egui::RawInput {
+                screen_rect: Some(Rect::from_min_size(Pos2::ZERO, egui::vec2(640.0, 480.0))),
+                events,
+                time: Some(time),
+                ..Default::default()
+            },
+            |ui| {
+                ai_terminal::git_ui::summary(ui, Some(&client), &mut false);
+                view.contents(ui, client.snapshot.as_deref(), None, false, false, 50);
+            },
+        )
+    };
+    frame(vec![], 0.0);
+    let output = frame(vec![], 1.0);
+    assert!(text_rect(&output, "Files shown 10000 / 10001").is_some());
+    assert!(text_rect(&output, "≈").is_none());
+    assert!(text_rect(&output, "+10001").is_some());
+    assert!(
+        output.shapes.len() < 1000,
+        "10,000 rows must not all be painted"
+    );
+    assert!(
+        ctx.read_response(egui::Id::new(("git-working-file", "files/00000.txt")))
+            .is_some()
+    );
+    assert!(
+        ctx.read_response(egui::Id::new(("git-working-file", "files/09999.txt")))
+            .is_none()
+    );
+    frame(vec![Event::PointerMoved(egui::pos2(300.0, 300.0))], 2.0);
+    frame(
+        vec![Event::MouseWheel {
+            unit: egui::MouseWheelUnit::Point,
+            delta: egui::vec2(0.0, -1_000_000.0),
+            modifiers: Modifiers::NONE,
+            phase: egui::TouchPhase::Move,
+        }],
+        3.0,
+    );
+    for n in 4..8 {
+        frame(vec![], n as f64);
+    }
+    assert!(
+        ctx.read_response(egui::Id::new(("git-working-file", "files/09999.txt")))
+            .is_some(),
+        "the final displayed row must remain reachable"
+    );
+}
+
+#[test]
+fn header_name_and_directory_hover_keep_native_color_emoji() {
+    for zoom in [1.0, 1.14, 2.0] {
+        let ctx = egui::Context::default();
+        appearance::setup(&ctx);
+        ctx.set_zoom_factor(zoom);
+        let _renderer = egui_term::TextRendererSession::new(&ctx);
+        let mut tick = 0;
+        let mut frame = |events| {
+            tick += 1;
+            ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(Rect::from_min_size(Pos2::ZERO, egui::vec2(1000.0, 600.0))),
+                    events,
+                    time: Some(tick as f64 * 0.2),
+                    ..Default::default()
+                },
+                |ui| {
+                    ai_terminal::git_ui::header(
+                        ui,
+                        ai_terminal::git_ui::Header {
+                            name: "AI终端 ❤️ 👩🏽‍💻",
+                            directory: std::path::Path::new("C:/项目/🚀/文件"),
+                            scale: zoom,
+                            connection: None,
+                        },
+                        None,
+                        &mut false,
+                    );
+                },
+            )
+        };
+        frame(vec![]);
+        let baseline = frame(vec![]);
+        let title = text_rect(&baseline, "AI终端 ❤️ 👩🏽‍💻").unwrap();
+        frame(vec![Event::PointerMoved(title.center())]);
+        let mut output = frame(vec![]);
+        for _ in 0..10 {
+            output = frame(vec![]);
+        }
+        let text = output
+            .shapes
+            .iter()
+            .find_map(|s| match &s.shape {
+                egui::Shape::Text(t) if t.galley.job.text.contains("\nC:/项目/🚀/文件") => {
+                    Some(t)
+                }
+                _ => None,
+            })
+            .expect("Header tooltip");
+        assert!(text.galley.rows.len() >= 2);
+        let bounds = Rect::from_min_size(text.pos, text.galley.size());
+        assert!(output.shapes.iter().filter(|s| matches!(&s.shape,egui::Shape::Mesh(m) if m.texture_id!=egui::TextureId::default() && bounds.intersects(m.calc_bounds()))).count()>=3);
     }
 }

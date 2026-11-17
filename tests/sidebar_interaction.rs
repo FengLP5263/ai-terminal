@@ -20,6 +20,140 @@ struct Harness {
     active: &'static str,
     groups: Vec<ai_terminal::model::SessionGroup>,
 }
+
+#[test]
+fn session_tooltips_keep_multiline_unicode_and_use_native_color_emoji() {
+    use unicode_segmentation::UnicodeSegmentation;
+    for collapsed in [false, true] {
+        for zoom in [1.0, 1.14, 2.0] {
+            let ctx = egui::Context::default();
+            appearance::setup(&ctx);
+            ctx.set_zoom_factor(zoom);
+            let _renderer = egui_term::TextRendererSession::new(&ctx);
+            let icons = Icons::new(&ctx);
+            let entries = [Entry {
+                id: "a",
+                name: "大管家 ❤️ 👩🏽‍💻",
+                directory: std::path::Path::new("C:/项目/🚀"),
+                agent: Agent::Codex,
+                color: None,
+                activity: Activity::Idle,
+                unread: false,
+                hint: "就绪 · 最近事件 OSC701".into(),
+            }];
+            let groups = [ai_terminal::model::SessionGroup {
+                id: "team".into(),
+                name: "小队 🇨🇳 1️⃣".into(),
+                members: vec!["a".into()],
+            }];
+            let mut time = 0.0;
+            let mut frame = |events| {
+                time += 0.2;
+                ctx.run_ui(
+                    egui::RawInput {
+                        screen_rect: Some(Rect::from_min_size(
+                            Pos2::ZERO,
+                            egui::vec2(900.0, 600.0),
+                        )),
+                        time: Some(time),
+                        events,
+                        ..Default::default()
+                    },
+                    |ui| {
+                        let actions = sidebar::show_with_groups(
+                            ui,
+                            &entries,
+                            Some("a"),
+                            collapsed,
+                            238.0,
+                            &icons,
+                            &groups,
+                        );
+                        assert!(
+                            actions.select.is_none()
+                                && actions.rename.is_none()
+                                && actions.reorder.is_none()
+                        );
+                    },
+                )
+            };
+            for _ in 0..3 {
+                frame(vec![]);
+            }
+            let row = ctx
+                .read_response(egui::Id::new(("session-row", "a")))
+                .unwrap()
+                .rect;
+            frame(vec![Event::PointerMoved(row.center())]);
+            let mut output = frame(vec![]);
+            for _ in 0..10 {
+                output = frame(vec![]);
+            }
+            fn tooltip(shape: &egui::Shape) -> Option<&egui::epaint::TextShape> {
+                match shape {
+                    egui::Shape::Text(t) if t.galley.job.text.contains("C:/项目/🚀") => Some(t),
+                    egui::Shape::Vec(v) => v.iter().find_map(tooltip),
+                    _ => None,
+                }
+            }
+            let text = output
+                .shapes
+                .iter()
+                .find_map(|s| tooltip(&s.shape))
+                .expect("session tooltip must be visible");
+            let source = &text.galley.job.text;
+            assert!(
+                source.contains("大管家 ❤️ 👩🏽‍💻 · Codex")
+                    && source.contains("小队 🇨🇳 1️⃣")
+                    && source.contains("OSC701")
+            );
+            assert!(
+                text.galley.rows.len() >= 4,
+                "name, path, group and status must stay on separate lines"
+            );
+            for (start, cluster) in source
+                .grapheme_indices(true)
+                .filter(|(_, c)| ["❤️", "👩🏽‍💻", "🚀", "🇨🇳", "1️⃣"].contains(c))
+            {
+                let span = text
+                    .galley
+                    .job
+                    .sections
+                    .iter()
+                    .find(|s| s.byte_range.contains(&egui::text::ByteIndex(start)))
+                    .unwrap();
+                assert!(span.byte_range.end.0 >= start + cluster.len());
+                assert_eq!(
+                    span.format.color,
+                    egui::Color32::TRANSPARENT,
+                    "emoji must not use a monochrome font outline"
+                );
+            }
+            let bounds = Rect::from_min_size(text.pos, text.galley.size());
+            fn images(shape: &egui::Shape, bounds: Rect) -> usize {
+                match shape {
+                    egui::Shape::Mesh(m)
+                        if m.texture_id != egui::TextureId::default()
+                            && bounds.intersects(m.calc_bounds()) =>
+                    {
+                        1
+                    }
+                    egui::Shape::Vec(v) => v.iter().map(|s| images(s, bounds)).sum(),
+                    _ => 0,
+                }
+            }
+            assert!(
+                output
+                    .shapes
+                    .iter()
+                    .map(|s| images(&s.shape, bounds))
+                    .sum::<usize>()
+                    >= 5,
+                "tooltip emoji must use native bitmap meshes"
+            );
+        }
+    }
+}
 impl Harness {
     fn new() -> Self {
         let ctx = egui::Context::default();

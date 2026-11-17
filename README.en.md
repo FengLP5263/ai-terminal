@@ -68,13 +68,23 @@ Click the folder button in the terminal header to browse the current project in 
 
 Click a file to read its full content in the center with line numbers, syntax colors, indentation guides and color emoji. The tree marks the open file. Closing it returns to the original terminal while the Agent and background output keep running. See [project files](docs/files.en.md) for encoding support and read limits.
 
+Version 0.12.0 adds zoomable image viewing and rendered/source Markdown. Text above 2 MiB remains readable through pages. Word and similar Office documents are not previewed, and remote images are not downloaded automatically.
+
 ![AI Terminal project files: tree, standard folder icons and read-only syntax highlighting](assets/readme/project-files.en.png)
+
+Switch Markdown between rendered content and source, with syntax-colored code blocks and project-local images.
+
+![Rendered Markdown, tables, code colors and local images](assets/readme/markdown-preview.en.png)
+
+Fit images to the window, view actual size or zoom; a checkerboard shows transparent areas.
+
+![Read-only image preview, zoom and transparency checkerboard](assets/readme/image-preview.en.png)
 
 ## Inspect Git changes and history
 
 When the terminal directory belongs to a Git repository, the header shows its branch and line additions/deletions alongside the session name and path. Click the branch to open the right panel, then switch between Changes and History. Resize or collapse the panel while the terminal stays connected.
 
-Changes shows file status and net line totals against HEAD, combining staged, unstaged and untracked text. History shows commits reachable from the current branch with authors, dates and commit IDs; load 50 at a time, up to 300. A dot-and-line timeline supports hover details, full-ID copying and clicking to expand files changed in a commit. Changing the terminal directory or repository refreshes the view automatically, with Refresh also available.
+Changes shows file status and net line totals against HEAD, combining staged and unstaged changes; untracked files are listed as U without line counts. History shows commits reachable from the current branch with authors, dates and commit IDs; load 50 at a time, up to 300. A dot-and-line timeline supports hover details, full-ID copying and clicking to expand files changed in a commit. Changing the terminal directory or repository refreshes the view automatically, with Refresh also available.
 
 ![AI Terminal Git history with branch and line totals beside the terminal](assets/readme/git-history.en.png)
 

@@ -1,6 +1,14 @@
 # Runtime, configuration, and operations
 
+0.12.0-preview.5: terminal paste recognizes Windows CF_HDROP on demand, reads paths with DragQueryFileW, quotes each path and writes a space-separated list to the PTY. Without text, file lists take priority over image formats. It reads no file bodies, creates no temporary attachments, changes no clipboard data and sends no Enter. Bitmap screenshots retain native CLI image paste; attachment recognition belongs to the CLI. Lists are bounded to 1,024 items/65,536 UTF-16 units; invalid data falls back to existing paste behavior.
+
 [简体中文](runtime.md) | English
+
+0.12.0-preview.4: sidebar session and group-menu hover tips share ui_text's native color-emoji rendering. Multiline metadata wraps at word and complete grapheme boundaries, keeping flags, skin modifiers and ZWJ sequences together; accessibility retains the original text. Layout occurs only while tips are shown, without new production timers, status inference, font assets or terminal input.
+
+0.12.0-preview.5: with HEAD, Git reports the net diff against HEAD; unborn repositories use git diff --cached. Untracked bodies are not read or counted; filter-dependent omissions apply only to tracked entries. The preview.2 streaming counter/cache is removed. Each Git query retains its six-second/2 MiB output bounds; display caps and count completeness remain separate.
+
+0.12.0 preview: file requests carry a cancellation generation, byte offset, real line number and file length/modification stamp. Text pages are bounded to 2 MiB/20,000 rows with continued long-line segments. Markdown is bounded to 256 KiB/2,000 rows, 16,000 events and 32 nesting levels, falling back to source on complexity. Previous-page history retains at most 64 cursors; reload returns to the beginning. Decoding and syntax preparation run in the worker; UI neither holds terminal grid locks nor reads disk/waits for the worker. Markdown links are intercepted and classified: local targets use the same containment/link checks; HTTP(S)/mailto reach the system only on a click. Remote images and SVG external resources are not loaded.
 
 ## Supported environment
 

@@ -252,9 +252,88 @@ pub fn label_with_font(
 ) -> egui::Response {
     let size = font.size;
     let galley = layout_font_rows(ui.ctx(), text, font, color, width, 1);
+    label_galley(ui, text, galley, size, color)
+}
+
+/// Wrapped UI metadata with native color emoji and unchanged accessible source text.
+pub fn multiline_label(ui: &mut Ui, text: &str) -> egui::Response {
+    let font = ui
+        .style()
+        .override_font_id
+        .clone()
+        .unwrap_or_else(|| egui::TextStyle::Body.resolve(ui.style()));
+    let color = ui.visuals().text_color();
+    let size = font.size;
+    let natural = layout_font_rows(
+        ui.ctx(),
+        text,
+        font.clone(),
+        color,
+        f32::INFINITY,
+        usize::MAX,
+    );
+    let display = wrap_metadata(text, &natural, ui.available_width().max(1.0));
+    // Explicit breaks keep egui from splitting a multi-glyph emoji (e.g. a flag).
+    let galley = layout_font_rows(ui.ctx(), &display, font, color, f32::INFINITY, usize::MAX);
+    label_galley(ui, text, galley, size, color)
+}
+
+fn wrap_metadata(text: &str, natural: &Galley, width: f32) -> String {
+    let mut display = String::with_capacity(text.len());
+    let (mut index, mut used) = (0, 0.0);
+    let advance = |start, end| {
+        let from = natural.pos_from_cursor(egui::text::CCursor {
+            index: egui::text::CharIndex(start),
+            prefer_next_row: true,
+        });
+        let to = natural.pos_from_cursor(egui::text::CCursor {
+            index: egui::text::CharIndex(end),
+            prefer_next_row: false,
+        });
+        (to.left() - from.left()).max(0.0)
+    };
+    for word in text.split_word_bounds() {
+        let end = index + word.chars().count();
+        let word_width = if word.contains('\n') {
+            0.0
+        } else {
+            advance(index, end)
+        };
+        if word_width <= width && used > 0.0 && used + word_width > width {
+            display.push('\n');
+            used = 0.0;
+        }
+        for cluster in word.graphemes(true) {
+            let end = index + cluster.chars().count();
+            if cluster.contains('\n') {
+                display.push_str(cluster);
+                used = 0.0;
+            } else {
+                let cluster_width = advance(index, end);
+                if used > 0.0 && used + cluster_width > width {
+                    display.push('\n');
+                    used = 0.0;
+                }
+                display.push_str(cluster);
+                used += cluster_width;
+            }
+            index = end;
+        }
+    }
+    display
+}
+
+fn label_galley(
+    ui: &mut Ui,
+    source: &str,
+    galley: Arc<Galley>,
+    size: f32,
+    color: Color32,
+) -> egui::Response {
     let (rect, response) = ui.allocate_exact_size(galley.size(), egui::Sense::hover());
-    response
-        .widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Label, ui.is_enabled(), text));
+    response.widget_info(|| {
+        egui::WidgetInfo::labeled(egui::WidgetType::Label, ui.is_enabled(), source)
+    });
     ui.painter().galley(rect.min, galley.clone(), color);
     paint_emoji(ui.painter(), rect.min, &galley, size, color);
     response
