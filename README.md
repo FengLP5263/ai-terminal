@@ -6,7 +6,7 @@
 
 **给多个 AI 会话，一个清爽的工作空间。**
 
-在熟悉的终端里使用 Codex、Claude Code、Qoder CN、Kimi Code、ZCode 和 TRAE CLI，随时查看会话状态，需要时一键返回。
+在熟悉的终端里使用 Codex、Claude Code、Qoder／Qoder CN、Kimi Code、ZCode 和 TRAE CLI，随时查看会话状态，需要时一键返回。
 
 [![GitHub Release](https://img.shields.io/github/v/release/FengLP5263/ai-terminal?label=release)](https://github.com/FengLP5263/ai-terminal/releases/latest)
 [![Platform](https://img.shields.io/badge/platform-Windows%20x64-0078D4)](#平台支持)
@@ -32,7 +32,7 @@ AI 任务可能运行很久。打开多个窗口后，来回确认哪个会话�
 
 ![AI Terminal 浮窗示意](assets/readme/floating.png)
 
-> 截图使用 0.11.0 的真实原生组件；会话、终端文本、Git 元数据及任务状态均为展示样例，不包含真实用户数据或私人对话。点击图片可查看原始分辨率。
+> 截图使用真实原生组件；逐图版本与来源见 [SOURCE.json](assets/readme/SOURCE.json)。会话、终端文本、Git 元数据及任务状态均为展示样例，不包含真实用户数据或私人对话。点击图片可查看原始分辨率。
 
 ## 为多会话而设计
 
@@ -40,7 +40,7 @@ AI 任务可能运行很久。打开多个窗口后，来回确认哪个会话�
 | --- | --- |
 | **真正的终端** | 新建 PowerShell、CMD 或 Git Bash，在里面直接运行已安装的命令行工具。 |
 | **会话分组** | 右键会话新建或加入队伍，用紧凑的白底黑字工牌识别同组会话；浮窗显示组内第一个头像及简化工牌，悬停按“组名 × N”查看带原有配色的成员并点击切换。 |
-| **Agent 会话识别** | 启动 Codex、Claude Code、Qoder CN、Kimi Code、ZCode 或 TRAE CLI 后显示对应头像；其他命令仍可作为普通终端使用。 |
+| **Agent 会话识别** | 启动 Codex、Claude Code、Qoder／Qoder CN、Kimi Code、ZCode 或 TRAE CLI 后显示对应头像；其他命令仍可作为普通终端使用。 |
 | **任务状态** | 在侧栏和浮窗中查看支持的 Agent 的进行中、需要处理、完成或失败状态。状态来自支持的生命周期通知和进程退出，并非对所有 CLI 的通用推断。 |
 | **置顶浮窗** | 只显示会话头像和状态，一次最多显示 10 个；拖动头像区域可查看其余会话，点击头像回到会话；缩放独立于主窗口，可在设置或浮窗上的 Ctrl + 滚轮调整；背景透明度可在设置中即时调节，头像和状态标记保持清晰。 |
 | **整理自己的工作区** | 拖动会话排序、重命名、设置颜色、收起侧栏；使用 Ctrl + 滚轮调整整个界面大小。 |
@@ -80,6 +80,8 @@ Markdown 支持渲染与源码切换，代码块按语言着色，项目内插�
 
 ![图片只读预览、缩放及透明棋盘底色](assets/readme/image-preview.png)
 
+音视频文件支持原生播放／暂停、进度定位与音量；点击播放才开始，关闭预览或切换会话时停止。格式支持取决于 Windows 解码器。
+
 ## 查看 Git 更改与历史
 
 在 Git 仓库中工作时，终端顶部会与会话名称、路径一起显示当前分支及增删行数。点击分支名打开右侧 Git 面板，可在“更改”和“提交历史”之间切换；面板支持调宽和收起，终端会话继续运行。
@@ -111,6 +113,7 @@ Markdown 支持渲染与源码切换，代码块按语言着色，项目内插�
 | <img src="assets/readme/agent-codex.png" width="32" height="32" alt="Codex CLI"> | [Codex CLI](https://github.com/openai/codex) | `codex` | 支持 | 原生生命周期；旧版兼容 hook |
 | <img src="assets/readme/agent-claude.png" width="32" height="32" alt="Claude Code"> | [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview) | `claude` | 支持 | 会话级 hook |
 | <img src="assets/readme/agent-qoder-cn.png" width="32" height="32" alt="Qoder CN CLI"> | [Qoder CN CLI](https://docs.qoder.cn/en/cli/installation) | `qodercn` / `qoderclicn` | 支持 | 会话级 hook |
+| <img src="assets/readme/agent-qoder-cn.png" width="32" height="32" alt="Qoder CLI"> | [Qoder CLI](https://docs.qoder.com/cli/cli-reference) | `qoder` / `qodercli` | 支持 | 会话级 hook；通过公开 `qodercli` 入口与 IDE 区分。 |
 | <img src="assets/readme/agent-kimi.png" width="32" height="32" alt="Kimi Code CLI"> | [Kimi Code CLI](https://www.kimi.com/code/docs/) | `kimi` | 支持 | 原生生命周期（Kimi Code 2.5.0） |
 | <img src="assets/readme/agent-zcode.png" width="32" height="32" alt="ZCode"> | [ZCode](https://zcode.z.ai/) | `zcode` | 支持 | 会话级 hook：开始／工具／完成；有配置边界，见下文 |
 | <img src="assets/readme/agent-trae.png" width="32" height="32" alt="TRAE CLI"> | [TRAE CLI](https://docs.trae.cn/cli_about-trae-code-cli-2) | `traecli` | 支持 | 会话级 hook；需在 CLI 内审查信任 |
@@ -145,7 +148,7 @@ ZCode 本次实测的是社区发行 [zcode-app-cli](https://github.com/kingswor
 ```powershell
 cd 'C:\path\to\your-project'
 codex
-# 或运行 claude / qodercn / kimi / zcode / traecli
+# 或运行 claude / qoder / qodercn / kimi / zcode / traecli
 ```
 
 请事先自行安装并配置 [Codex CLI](https://github.com/openai/codex)、[Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview)、[Qoder CN CLI](https://docs.qoder.cn/cli/installation)、Kimi Code、ZCode 或 TRAE CLI。AI Terminal 沿用 CLI 自己的登录、模型、信任和权限设置。
@@ -154,7 +157,7 @@ codex
 
 在左上角齿轮中设置语言、终端字体和浮窗；悬停会话头像可查看信息，点击即可切换。浮窗可拖动位置，并可在设置中关闭。按住 <kbd>Ctrl</kbd> 滚动鼠标滚轮可缩放整个界面。
 
-在受管终端里交互式启动 `powershell`、`cmd` 或 `bash` 时，头像会跟随当前 Shell；`exit` 逐层恢复。启动 Codex／Claude／Qoder CN／Kimi Code／ZCode／TRAE CLI 时优先显示 Agent 头像，退出后恢复当前 Shell。单次脚本命令和 Agent 内部的工具命令不会因此改变 Shell 头像。
+在受管终端里交互式启动 `powershell`、`cmd` 或 `bash` 时，头像会跟随当前 Shell；`exit` 逐层恢复。启动 Codex／Claude／Qoder／Qoder CN／Kimi Code／ZCode／TRAE CLI 时优先显示 Agent 头像，退出后恢复当前 Shell。单次脚本命令和 Agent 内部的工具命令不会因此改变 Shell 头像。
 
 终端默认使用内嵌 **JetBrains Mono** 与系统**微软雅黑 UI**，已有字体选择保持不变；设置中还可选择 Cascadia Mono、Hack 及可用的 Windows 字体。保持原来的自然渲染方式，内置字体的常规、粗体、斜体和粗斜体随程序提供。来源和许可见[第三方说明](THIRD_PARTY_NOTICES.md)。
 
@@ -178,7 +181,7 @@ codex
 
 ### 怎么查看终端历史和粘贴图片？
 
-普通滚轮用于查看历史；全屏应用接管鼠标滚轮时可用 <kbd>Shift</kbd> + 滚轮查看本地历史。识别到 Codex／Claude Code／Qoder CN／Kimi Code／ZCode／TRAE CLI 时，可通过 <kbd>Ctrl</kbd> + <kbd>V</kbd> 或 <kbd>Shift</kbd> + <kbd>Insert</kbd> 将剪贴板图片交给 CLI 处理。
+普通滚轮用于查看历史；全屏应用接管鼠标滚轮时可用 <kbd>Shift</kbd> + 滚轮查看本地历史。识别到 Codex／Claude Code／Qoder／Qoder CN／Kimi Code／ZCode／TRAE CLI 时，可通过 <kbd>Ctrl</kbd> + <kbd>V</kbd> 或 <kbd>Shift</kbd> + <kbd>Insert</kbd> 将剪贴板图片交给 CLI 处理。
 
 ### 首次运行会在桌面创建快捷方式吗？
 

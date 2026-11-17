@@ -191,6 +191,7 @@ impl Session {
                     Some("codex") => Agent::Codex,
                     Some("claude") => Agent::Claude,
                     Some("qodercn") => Agent::QoderCn,
+                    Some("qoder" | "qodercli") => Agent::Qoder,
                     Some("kimi") => Agent::Kimi,
                     Some("zcode") => Agent::ZCode,
                     Some("traecli") => Agent::Trae,
@@ -240,7 +241,7 @@ impl Session {
                 return true;
             }
         }
-        if self.display_agent() == Agent::QoderCn {
+        if matches!(self.display_agent(), Agent::QoderCn | Agent::Qoder) {
             self.status.apply_qoder(event, viewing)
         } else {
             self.status.apply(event, viewing)
@@ -596,6 +597,7 @@ impl App {
         }
     }
     fn activate(&mut self, id: String, ctx: &egui::Context) {
+        self.project_view.release_document(ctx);
         self.terminal_focus_pending = true;
         self.active = Some(id.clone());
         if let Some(session) = self.sessions.iter_mut().find(|s| s.spec.id == id) {
@@ -609,6 +611,7 @@ impl App {
         // Selection is persisted on exit; switching terminals never writes to disk.
     }
     fn begin_shutdown(&mut self, ctx: &egui::Context) {
+        self.project_view.release_document(ctx);
         if self.closing.is_some() {
             return;
         }
@@ -2081,7 +2084,7 @@ Send-State 'state=clear'; Wait-Step 5
         session.codex_program(egui_term::CodexProgramStatus::Clear, false);
         assert_eq!(session.display_agent(), Agent::Shell);
         assert!(!session.status.native_lifecycle);
-        for agent in [Agent::Claude, Agent::QoderCn] {
+        for agent in [Agent::Claude, Agent::QoderCn, Agent::Qoder] {
             session.detected_agent = Some(agent);
             session.codex_program(egui_term::CodexProgramStatus::Working, false);
             assert_eq!(session.display_agent(), agent);
@@ -2121,7 +2124,13 @@ Send-State 'state=clear'; Wait-Step 5
     }
     #[test]
     fn foreground_hook_agents_follow_events_and_reject_stale_invocations() {
-        for agent in [Agent::ZCode, Agent::Claude, Agent::QoderCn, Agent::Trae] {
+        for agent in [
+            Agent::ZCode,
+            Agent::Claude,
+            Agent::QoderCn,
+            Agent::Qoder,
+            Agent::Trae,
+        ] {
             let mut session = Session::new(SessionSpec {
                 id: "one".into(),
                 name: "one".into(),
@@ -2147,10 +2156,13 @@ Send-State 'state=clear'; Wait-Step 5
             event.name = "Notification".into();
             event.notification_type = Some("permission_prompt".into());
             event.permission_mode = Some("auto".into());
-            assert_eq!(session.event(&event, false), agent != Agent::QoderCn);
+            assert_eq!(
+                session.event(&event, false),
+                !matches!(agent, Agent::QoderCn | Agent::Qoder)
+            );
             assert_eq!(
                 session.status.activity,
-                if agent == Agent::QoderCn {
+                if matches!(agent, Agent::QoderCn | Agent::Qoder) {
                     Activity::Working
                 } else {
                     Activity::Waiting
@@ -3090,6 +3102,7 @@ Send-State 'state=clear'; Wait-Step 5
             ("kimi", Agent::Kimi),
             ("zcode", Agent::ZCode),
             ("traecli", Agent::Trae),
+            ("qoder", Agent::Qoder),
         ] {
             assert!(session.event(&shell_metadata("ShellAgentStarted", source, source), false));
             assert_eq!(session.display_agent(), agent);

@@ -28,6 +28,7 @@ struct Probe {
     status: Status,
     output: PathBuf,
     synthetic: bool,
+    agent: Agent,
     input_probe: bool,
     typed: bool,
     input_checks: Vec<serde_json::Value>,
@@ -177,9 +178,9 @@ impl eframe::App for Probe {
         let ctx = ui.ctx().clone();
         let entries = [Entry {
             id: "qoder",
-            name: "Qoder CN 👋",
+            name: self.agent.label(),
             directory: std::path::Path::new("C:/Projects/example"),
-            agent: Agent::QoderCn,
+            agent: self.agent,
             color: None,
             activity: self.status.activity,
             unread: self.status.unread,
@@ -206,7 +207,7 @@ impl eframe::App for Probe {
                     } else if self.input_probe {
                         "Qoder CN unsent input / zoom / cancel — no Enter"
                     } else {
-                        "Qoder CN startup only — no prompt or trust confirmation"
+                        "Qoder CLI startup only — no prompt or trust confirmation"
                     });
                     ui.label(format!("{:?}", self.status.activity));
                 });
@@ -214,8 +215,8 @@ impl eframe::App for Probe {
                     groups: Vec::new(),
                     items: vec![floating::Item {
                         id: "qoder".into(),
-                        name: "Qoder CN 👋".into(),
-                        agent: Agent::QoderCn,
+                        name: self.agent.label().into(),
+                        agent: self.agent,
                         color: None,
                         activity: self.status.activity,
                         unread: self.status.unread,
@@ -437,10 +438,15 @@ fn main() -> eframe::Result {
             .nth(1)
             .expect("qoder_cn_probe output-directory [fixture|input|trace] [isolated-directory]"),
     );
+    let agent = if std::env::args().nth(2).as_deref() == Some("qoder") {
+        Agent::Qoder
+    } else {
+        Agent::QoderCn
+    };
     let synthetic = std::env::args().nth(2).as_deref() == Some("fixture");
     let input_probe = std::env::args().nth(2).as_deref() == Some("input");
     let trace = std::env::args().nth(2).as_deref() == Some("trace");
-    let directory = if trace {
+    let directory = if trace || agent == Agent::Qoder {
         std::env::args()
             .nth(3)
             .map(PathBuf::from)
@@ -450,7 +456,7 @@ fn main() -> eframe::Result {
     };
     std::fs::create_dir_all(&output).unwrap();
     eframe::run_native(
-        "ai-terminal Qoder CN probe",
+        "ai-terminal Qoder CLI probe",
         eframe::NativeOptions {
             renderer: eframe::Renderer::Glow,
             viewport: egui::ViewportBuilder::default()
@@ -477,9 +483,9 @@ fn main() -> eframe::Result {
             } else {
                 let spec = SessionSpec {
                     id: "qoder-cn-probe".into(),
-                    name: "Qoder CN".into(),
+                    name: agent.label().into(),
                     directory,
-                    agent: Agent::QoderCn,
+                    agent,
                     agent_session_id: None,
                     color: None,
                 };
@@ -505,6 +511,7 @@ fn main() -> eframe::Result {
                 status: Status::default(),
                 output,
                 synthetic,
+                agent,
                 input_probe,
                 typed: false,
                 input_checks: Vec::new(),

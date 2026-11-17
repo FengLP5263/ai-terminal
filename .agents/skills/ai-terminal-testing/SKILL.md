@@ -150,3 +150,7 @@ preview.6：git_repository 以真实隔离 Git 验证暂存＋未暂存的净差
 Git 规模原生核查（Windows）：`cargo build --offline --locked --release --bins --example git_count_probe` 后运行 `target/release/examples/git_count_probe.exe output/<unique-git-counts>`。四张正式组件图覆盖累计 15 MB 未跟踪文本、10,001 个新文件及独占锁前后；行数均不包含未跟踪正文，锁不触发遗漏。自身单个 PowerShell PTY 保持身份，不发模型请求或改用户项目。离线测试另覆盖已跟踪净差异、无 HEAD 的暂存区和列表虚拟化；原生示例仅支持 Windows。
 
 0.12.0 README 图：readme_capture 的第四参数支持 files／history／diff／markdown／image，第二参数为独立 output 目录，第三参数为 zh／en。新增 Markdown 与图片模式只在自身目录创建固定双语文档及透明 PNG，使用正式只读组件，主界面仍显示固定示例路径；不读用户项目或调用模型。公开图保持原始 PNG 字节，并在 assets/readme/SOURCE.json 逐文件记录版本、语言、尺寸与摘要。
+
+Qoder 国际版启动：构建 `cargo build --offline --locked --release --bins --example qoder_cn_probe`，运行 `target/release/examples/qoder_cn_probe.exe output/<unique-qoder> qoder <isolated-directory>`。只启动已安装的 qodercli，不发送提示、不登录或确认信任；核对共享头像，真实 hook 连接另行记录。tests/qoder.rs、App 状态归约及 PowerShell／CMD／Git Bash 伪 CLI 覆盖独立身份、恢复、只报告状态的 hook 及显式设置保留。
+
+原生媒体核查：构建 `cargo build --offline --locked --release --example media_probe`；在唯一 output 目录用本地样例生成器（如已安装 ffmpeg）生成六秒 WAV 和四秒 H.264 MP4，分别命名 `音频 😀.wav` 和 `视频 #1.mp4`；运行 `target/release/examples/media_probe.exe output/<unique-media>`。复用正式播放器，静音核对初始暂停、播放推进、暂停、跳转、播放结束、释放及不支持内容；核对 result.json 和三张原生 PNG。仅生成样例，不读用户媒体、不联网、不启动 Agent 或请求模型。tests/media_playback.rs 另覆盖不读正文的大文件分派及本地路径转义。

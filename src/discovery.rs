@@ -88,6 +88,8 @@ impl CliSearch {
             Agent::Codex => &["codex"],
             Agent::Claude => &["claude"],
             Agent::QoderCn => &["qodercn", "qoderclicn"],
+            // The public qodercli entry is unambiguous; qoder can also launch the IDE.
+            Agent::Qoder => &["qodercli"],
             Agent::Kimi => &["kimi"],
             Agent::ZCode => &["zcode"],
             Agent::Trae => &["traecli"],
@@ -275,6 +277,7 @@ fn common_directories(mut env: impl FnMut(&str) -> Option<OsString>) -> Vec<Path
         ("APPDATA", "npm"),
         ("LOCALAPPDATA", "pnpm"),
         ("USERPROFILE", ".local/bin"),
+        ("USERPROFILE", ".qoder/bin/qodercli"),
         ("USERPROFILE", ".bun/bin"),
         ("USERPROFILE", ".volta/bin"),
         ("USERPROFILE", "scoop/shims"),

@@ -192,12 +192,13 @@ impl Icons {
             Agent::Codex
             | Agent::Claude
             | Agent::QoderCn
+            | Agent::Qoder
             | Agent::Kimi
             | Agent::ZCode
             | Agent::Trae => {
                 let texture = match agent {
                     Agent::Codex => &self.codex,
-                    Agent::QoderCn => &self.qoder,
+                    Agent::QoderCn | Agent::Qoder => &self.qoder,
                     Agent::Kimi => &self.kimi,
                     Agent::ZCode => &self.zcode,
                     Agent::Trae => &self.trae,

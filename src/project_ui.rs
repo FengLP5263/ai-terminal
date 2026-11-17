@@ -548,6 +548,9 @@ impl FileView {
             self.preview.clear(ui.ctx());
             return false;
         };
+        if state.data.is_none() {
+            self.preview.clear(ui.ctx());
+        }
         let root = client.root.clone();
         let locale = i18n::locale(ui.ctx());
         let font = font(ui);

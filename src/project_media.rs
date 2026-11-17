@@ -16,6 +16,27 @@ pub const MAX_IMAGE_BYTES: u64 = 32 * 1024 * 1024;
 pub const MAX_SOURCE_PIXELS: u64 = 32 * 1024 * 1024;
 pub const MAX_INLINE_IMAGES: usize = 16;
 pub const MAX_INLINE_PIXELS: usize = 16 * 1024 * 1024;
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MediaKind {
+    Audio,
+    Video,
+}
+#[derive(Debug)]
+pub struct Playable {
+    pub path: PathBuf,
+    pub kind: MediaKind,
+}
+pub fn playable_path(path: &Path) -> Option<MediaKind> {
+    match extension(path).as_str() {
+        "mp3" | "wav" | "flac" | "ogg" | "opus" | "m4a" | "aac" | "wma" | "aif" | "aiff" => {
+            Some(MediaKind::Audio)
+        }
+        "mp4" | "m4v" | "mkv" | "avi" | "mov" | "webm" | "wmv" | "mpeg" | "mpg" => {
+            Some(MediaKind::Video)
+        }
+        _ => None,
+    }
+}
 #[derive(Debug)]
 pub struct PreviewImage {
     pub pixels: Arc<egui::ColorImage>,

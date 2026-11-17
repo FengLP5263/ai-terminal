@@ -4,6 +4,19 @@
 
 Record user-visible additions, improvements, fixes, and compatibility changes for each release; omit categories that do not apply. Review both languages together, use the same version entry in GitHub Releases, and ship both files in the ZIP. Historical summaries follow existing GitHub release notes and UTC publication dates; development versions without a separate release do not receive invented release dates.
 
+## [0.13.0] - 2026-11-17
+
+### Added
+
+- Support international Qoder CLI through managed `qoder` / `qodercli` entries, a distinct session identity, resume arguments and session-scoped task hooks, sharing the Qoder CN avatar.
+- Native audio/video previews in project files with play/pause, seeking and volume. Opening a file does not autoplay; closing the preview, switching sessions or exiting releases the player. Actual format support depends on installed Windows codecs.
+
+### Compatibility and validation
+
+- Existing sessions and preferences remain compatible; the international edition uses a distinct Qoder identity and reuses the existing avatar. User CLI authentication, configuration and trust remain under CLI control.
+- Media previews use Windows system codecs without a browser runtime or bundled codec pack. Video preview frames are limited to 1,920 pixels per edge and 30 fps; unsupported codecs or damaged files show an error. Missing optional media components do not prevent terminal startup.
+- The user accepted the local preview. Native Qoder 1.1.90 startup, synthetic hook/state regressions, WAV/MP3/H.264 MP4 playback controls and resource release were checked separately. No real model request was sent automatically.
+
 ## [0.12.0] - 2026-11-17
 
 ### Added

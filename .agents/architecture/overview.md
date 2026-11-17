@@ -96,3 +96,5 @@ preview.6：git/worktree.rs 按需读取 HEAD 与当前文件的净差异，与�
 0.10.0-preview.5：dialogs.rs 集中桌面弹窗的 18／16／14／12 字号层级和 36 点控件高度，settings.rs 共用标题及辅助文字常量；样式仍局限于弹窗。
 
 0.11.0 会话分组由 model 管理 UUID 导航元数据，sidebar 提供右键管理及组名。floating 将同组投影为会话顺序中的第一位，简化工牌和优先级最高的真实成员状态避免隐藏待处理信息；不产生“整组完成”事件。floating_group 是归属浮窗的可交互、非激活原生 viewport，仅共享成员元数据和有界激活消息；不共享终端正文或新增终端实例。
+
+0.13.0：Qoder 国际版作为独立 Agent::Qoder，复用 Qoder CN 的头像及显式 hook 状态归约。src/media_player.rs 使用 Windows Media Foundation Media Engine 播放项目内音视频，视频通过有界 WIC 帧拷贝绘制为现有 egui 纹理。只在打开媒体时动态载入系统媒体库；缺少组件不影响终端启动。播放器由当前只读文档独占，切换或关闭即销毁；没有浏览器运行时、额外视频窗口、后台媒体会话或模型代理。

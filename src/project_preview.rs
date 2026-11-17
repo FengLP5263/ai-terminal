@@ -64,6 +64,7 @@ pub struct View {
     uris: Vec<String>,
     note: Option<String>,
     pending_link: Option<std::path::PathBuf>,
+    player: Option<Result<crate::media_player::Player, String>>,
 }
 impl View {
     pub fn clear(&mut self, ctx: &egui::Context) {
@@ -74,6 +75,7 @@ impl View {
             ctx.forget_image(&uri);
         }
         self.images.0.lock().unwrap().clear();
+        self.player = None;
         self.identity = None;
         self.document = None;
         self.texture = None;
@@ -126,6 +128,26 @@ impl View {
         path: &Path,
     ) {
         self.select(ui.ctx(), path, data);
+        if let Some(media) = &data.media {
+            match self
+                .player
+                .get_or_insert_with(|| crate::media_player::Player::new(ui.ctx(), media))
+            {
+                Ok(player) => player.show(ui),
+                Err(error) => {
+                    let locale = i18n::locale(ui.ctx());
+                    ui.colored_label(
+                        chrome::WAITING,
+                        locale.text(
+                            "无法初始化音视频预览，请检查 Windows 媒体组件。",
+                            "Cannot initialize media preview. Check Windows media components.",
+                        ),
+                    );
+                    ui.weak(error.as_str());
+                }
+            }
+            return;
+        }
         let locale = i18n::locale(ui.ctx());
         let paged = data.page.next.is_some() || data.page.cursor.offset > 0;
         let mut previous = false;
