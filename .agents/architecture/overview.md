@@ -2,6 +2,10 @@
 
 简体中文 | [English](overview.en.md)
 
+0.12.0-preview.5：Git 行数只采用 Git diff 的结果，未跟踪文件仅显示 U；无 HEAD 时使用暂存区差异。不再读取新文件正文、自行计数或维护专用缓存／超时。工作区列表仍先取得总数再裁剪至 10,000 项，仅绘制可见行；后台查询、文件通知、合并唤醒和取消保持。
+
+0.12.0 预览：project_files 的单后台线程按页读取大文本，并调用 project_media 解码图片、准备 Markdown 与代码配色。project_preview 只呈现当前不可变结果、处理翻页和链接操作；project_ui 继续共用文件／Git 面板。图片纹理与 Markdown 缓存在切换／关闭文档时释放；不引入浏览器运行时、网络图片加载器或编辑功能。
+
 当前版本以 Cargo.toml 为准，初始化基线为 0.1.2。Windows x64、Rust 2024、eframe/egui 0.35、
 Alacritty 0.26；默认 glow/OpenGL，可选 wgpu/DX12 用于本机对照。依赖版本由 Cargo.lock 锁定。
 

@@ -1,5 +1,7 @@
 # egui_term 上游与本地补丁
 
+0.12.0-preview.5：终端粘贴按需读取 Windows CF_HDROP 文件列表，使用 DragQueryFileW 取得路径、逐项加引号并以空格分隔，无文字时优先于图片格式。不读文件正文、不制作附件副本、不改剪贴板、不发回车；位图仍保留 CLI 原生图片粘贴。限制 1,024 项／65,536 个 UTF-16 单元，异常整体回退既有路径；附件识别由 CLI 负责。
+
 简体中文 | [English](UPSTREAM.en.md) · [原始中英混排记录](UPSTREAM.md)
 
 上游：https://github.com/kemokempo/egui_term

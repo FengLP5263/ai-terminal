@@ -1,5 +1,7 @@
 # egui_term upstream and local patches
 
+0.12.0-preview.5: terminal paste reads Windows CF_HDROP on demand with DragQueryFileW, quoting and space-separating paths when no text is available, ahead of image formats. No file bodies, attachment copies, clipboard changes or Enter are produced; bitmap images retain native CLI paste. Lists are bounded to 1,024 entries/65,536 UTF-16 units, falling back as a whole on invalid data. Attachment recognition belongs to the CLI.
+
 [简体中文](UPSTREAM.zh.md) | English · [Original mixed-language record](UPSTREAM.md)
 
 Source: https://github.com/kemokempo/egui_term

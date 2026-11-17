@@ -3,7 +3,7 @@ use crate::git::{FilePatch, PatchKind, PatchLine, PatchSource, syntax};
 use std::{
     collections::{BTreeMap, VecDeque},
     fs,
-    io::Read,
+    io::{Read, Seek, SeekFrom},
     path::{Component, Path, PathBuf},
     sync::{
         Arc, Condvar, Mutex,
@@ -17,6 +17,8 @@ pub const MAX_DIRECTORIES: usize = 64;
 pub const MAX_BYTES: u64 = 2 * 1024 * 1024;
 pub const MAX_LINES: usize = 20_000;
 pub const MAX_CHARS: usize = 4000;
+pub const MARKDOWN_BYTES: u64 = 256 * 1024;
+pub const MARKDOWN_LINES: usize = 2000;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum FileError {
@@ -26,6 +28,10 @@ pub enum FileError {
     TooLarge,
     Binary,
     Encoding,
+    Unsupported,
+    Image(String),
+    ImageLimit,
+    Changed,
     Cancelled,
 }
 impl From<std::io::Error> for FileError {
@@ -58,6 +64,37 @@ pub struct Document {
     pub content: FilePatch,
     pub encoding: &'static str,
     pub bytes: usize,
+    pub page: Page,
+    pub image: Option<Arc<crate::project_media::PreviewImage>>,
+    pub markdown: Option<crate::project_media::Markdown>,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Stamp {
+    pub bytes: u64,
+    pub modified: Option<std::time::SystemTime>,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Cursor {
+    pub offset: u64,
+    pub line: u64,
+    pub continued: bool,
+    pub stamp: Option<Stamp>,
+}
+impl Default for Cursor {
+    fn default() -> Self {
+        Self {
+            offset: 0,
+            line: 1,
+            continued: false,
+            stamp: None,
+        }
+    }
+}
+#[derive(Debug)]
+pub struct Page {
+    pub cursor: Cursor,
+    pub next: Option<Cursor>,
+    pub total_bytes: u64,
 }
 #[derive(Clone, Default)]
 pub struct DirectoryState {
@@ -88,7 +125,7 @@ fn linked(metadata: &fs::Metadata) -> bool {
 fn relative(path: &Path) -> bool {
     path.components().all(|c| matches!(c, Component::Normal(_)))
 }
-fn resolve(root: &Path, path: &Path) -> Result<PathBuf, FileError> {
+pub(crate) fn resolve(root: &Path, path: &Path) -> Result<PathBuf, FileError> {
     if !relative(path) {
         return Err(FileError::OutsideProject);
     }
@@ -173,117 +210,274 @@ pub fn read_directory(
     });
     Ok(listing)
 }
-fn decode(bytes: &[u8]) -> Result<(String, &'static str), FileError> {
-    if bytes.starts_with(&[0xff, 0xfe]) || bytes.starts_with(&[0xfe, 0xff]) {
-        if !(bytes.len() - 2).is_multiple_of(2) {
-            return Err(FileError::Encoding);
+#[derive(Clone, Copy)]
+enum Encoding {
+    Utf8,
+    Le,
+    Be,
+}
+impl Encoding {
+    fn name(self) -> &'static str {
+        match self {
+            Self::Utf8 => "UTF-8",
+            Self::Le => "UTF-16 LE",
+            Self::Be => "UTF-16 BE",
         }
-        let le = bytes[0] == 0xff;
-        let units = bytes[2..]
-            .as_chunks::<2>()
-            .0
-            .iter()
-            .map(|b| {
-                if le {
-                    u16::from_le_bytes([b[0], b[1]])
-                } else {
-                    u16::from_be_bytes([b[0], b[1]])
-                }
-            })
-            .collect::<Vec<_>>();
-        let text = String::from_utf16(&units).map_err(|_| FileError::Encoding)?;
-        if text.contains('\0') {
-            return Err(FileError::Binary);
+    }
+    fn bytes(self, ch: char) -> usize {
+        match self {
+            Self::Utf8 => ch.len_utf8(),
+            _ => ch.len_utf16() * 2,
         }
-        Ok((text, if le { "UTF-16 LE" } else { "UTF-16 BE" }))
-    } else {
-        if bytes.contains(&0) {
-            return Err(FileError::Binary);
-        }
-        let bytes = bytes.strip_prefix(&[0xef, 0xbb, 0xbf]).unwrap_or(bytes);
-        Ok((
-            std::str::from_utf8(bytes)
-                .map_err(|_| FileError::Encoding)?
-                .into(),
-            "UTF-8",
-        ))
     }
 }
-pub fn read_file(
-    root: &Path,
-    path: &Path,
-    cancelled: impl Fn() -> bool,
-) -> Result<Document, FileError> {
-    if cancelled() {
-        return Err(FileError::Cancelled);
+fn decode_page(bytes: &[u8], encoding: Encoding, eof: bool) -> Result<String, FileError> {
+    match encoding {
+        Encoding::Utf8 => {
+            if bytes.contains(&0) {
+                return Err(FileError::Binary);
+            }
+            let valid = match std::str::from_utf8(bytes) {
+                Ok(text) => text,
+                Err(e) if !eof && e.error_len().is_none() => {
+                    std::str::from_utf8(&bytes[..e.valid_up_to()]).unwrap()
+                }
+                Err(_) => return Err(FileError::Encoding),
+            };
+            Ok(valid.into())
+        }
+        Encoding::Le | Encoding::Be => {
+            if eof && !bytes.len().is_multiple_of(2) {
+                return Err(FileError::Encoding);
+            }
+            let mut units = bytes
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .map(|b| match encoding {
+                    Encoding::Le => u16::from_le_bytes(*b),
+                    _ => u16::from_be_bytes(*b),
+                })
+                .collect::<Vec<_>>();
+            if !eof && units.last().is_some_and(|u| (0xd800..=0xdbff).contains(u)) {
+                units.pop();
+            }
+            let text = String::from_utf16(&units).map_err(|_| FileError::Encoding)?;
+            if text.contains('\0') {
+                return Err(FileError::Binary);
+            }
+            Ok(text)
+        }
     }
-    let full = resolve(root, path)?;
-    let metadata = fs::metadata(&full)?;
-    if !metadata.is_file() {
-        return Err(FileError::Binary);
-    }
-    if metadata.len() > MAX_BYTES {
-        return Err(FileError::TooLarge);
-    }
-    if cancelled() {
-        return Err(FileError::Cancelled);
-    }
-    let mut bytes = Vec::new();
-    fs::File::open(full)?
-        .take(MAX_BYTES + 1)
-        .read_to_end(&mut bytes)?;
-    if bytes.len() as u64 > MAX_BYTES {
-        return Err(FileError::TooLarge);
-    }
-    let (text, encoding) = decode(&bytes)?;
-    let mut content = FilePatch {
+}
+pub(crate) fn plain_content(path: &str) -> FilePatch {
+    FilePatch {
         source: PatchSource::WorkingTree,
-        path: path.to_string_lossy().into_owned(),
+        path: path.into(),
         lines: vec![],
         binary: false,
         partial: false,
         first_parent: false,
         max_columns: 0,
         presentation: Default::default(),
-    };
-    if !text.is_empty() {
-        for (index, raw) in text.split('\n').enumerate() {
-            if cancelled() {
-                return Err(FileError::Cancelled);
-            }
-            if index == MAX_LINES {
-                content.partial = true;
-                break;
-            }
-            let raw = raw.strip_suffix('\r').unwrap_or(raw);
-            content.partial |= raw.chars().count() > MAX_CHARS;
-            let text = syntax::display_text(&raw.chars().take(MAX_CHARS).collect::<String>());
-            content.max_columns = content
-                .max_columns
-                .max(text.chars().map(|c| if c.is_ascii() { 1 } else { 2 }).sum());
-            content.lines.push(PatchLine {
-                kind: PatchKind::Context,
-                old: None,
-                new: Some(index as u64 + 1),
-                text,
-            });
-        }
     }
-    content.presentation = syntax::prepare(&content.path, &content.lines, &cancelled);
+}
+fn push_segment(content: &mut FilePatch, text: &str, number: Option<u64>) {
+    let text = syntax::display_text(text);
+    content.max_columns = content
+        .max_columns
+        .max(text.chars().map(|c| if c.is_ascii() { 1 } else { 2 }).sum());
+    content.lines.push(PatchLine {
+        kind: PatchKind::Context,
+        old: None,
+        new: number,
+        text,
+    });
+}
+pub fn read_file(
+    root: &Path,
+    path: &Path,
+    cancelled: impl Fn() -> bool,
+) -> Result<Document, FileError> {
+    read_page(root, path, Cursor::default(), cancelled)
+}
+pub fn read_page(
+    root: &Path,
+    path: &Path,
+    cursor: Cursor,
+    cancelled: impl Fn() -> bool,
+) -> Result<Document, FileError> {
     if cancelled() {
         return Err(FileError::Cancelled);
     }
+    let full = resolve(root, path)?;
+    let mut file = fs::File::open(&full)?;
+    let metadata = file.metadata()?;
+    if !metadata.is_file() {
+        return Err(FileError::Binary);
+    }
+    let stamp = Stamp {
+        bytes: metadata.len(),
+        modified: metadata.modified().ok(),
+    };
+    if cursor.stamp.is_some_and(|old| old != stamp) || cursor.offset > stamp.bytes {
+        return Err(FileError::Changed);
+    }
+    if crate::project_media::unsupported(path) {
+        return Err(FileError::Unsupported);
+    }
+    if crate::project_media::image_path(path) {
+        let image = crate::project_media::read_image(root, path, false, &cancelled)?;
+        let mut content = plain_content(&path.to_string_lossy());
+        content.binary = true;
+        return Ok(Document {
+            content,
+            encoding: "",
+            bytes: metadata.len() as usize,
+            page: Page {
+                cursor,
+                next: None,
+                total_bytes: metadata.len(),
+            },
+            image: Some(Arc::new(image)),
+            markdown: None,
+        });
+    }
+    let mut header = [0; 3];
+    let n = file.read(&mut header)?;
+    let (encoding, bom) = if header[..n].starts_with(&[0xff, 0xfe]) {
+        (Encoding::Le, 2)
+    } else if header[..n].starts_with(&[0xfe, 0xff]) {
+        (Encoding::Be, 2)
+    } else {
+        (
+            Encoding::Utf8,
+            if header[..n].starts_with(&[0xef, 0xbb, 0xbf]) {
+                3
+            } else {
+                0
+            },
+        )
+    };
+    file.seek(SeekFrom::Start(cursor.offset))?;
+    let markdown = crate::project_media::markdown_path(path);
+    let budget = if markdown { MARKDOWN_BYTES } else { MAX_BYTES };
+    let row_limit = if markdown { MARKDOWN_LINES } else { MAX_LINES };
+    let mut bytes = Vec::new();
+    (&mut file).take(budget).read_to_end(&mut bytes)?;
+    if cancelled() {
+        return Err(FileError::Cancelled);
+    }
+    // Unknown extensions still display raster images detected by their actual signature.
+    if cursor.offset == 0 && image::guess_format(&bytes).is_ok() {
+        let image = crate::project_media::read_image(root, path, false, &cancelled)?;
+        let mut content = plain_content(&path.to_string_lossy());
+        content.binary = true;
+        return Ok(Document {
+            content,
+            encoding: "",
+            bytes: metadata.len() as usize,
+            page: Page {
+                cursor,
+                next: None,
+                total_bytes: metadata.len(),
+            },
+            image: Some(Arc::new(image)),
+            markdown: None,
+        });
+    }
+    let skip = if cursor.offset == 0 { bom } else { 0 };
+    let eof = cursor.offset + bytes.len() as u64 >= metadata.len();
+    let text = decode_page(&bytes[skip..], encoding, eof)?;
+    let mut content = plain_content(&path.to_string_lossy());
+    let mut segment = String::new();
+    let mut chars = 0;
+    let mut line = cursor.line;
+    let mut numbered = !cursor.continued;
+    let mut used_utf8 = 0;
+    let mut used_bytes = skip;
+    let mut at_line_start = !cursor.continued;
+    for ch in text.chars() {
+        if cancelled() {
+            return Err(FileError::Cancelled);
+        }
+        used_utf8 += ch.len_utf8();
+        used_bytes += encoding.bytes(ch);
+        if ch == '\n' {
+            // A full-width segment was already emitted; do not duplicate its row.
+            if !segment.is_empty() || numbered {
+                push_segment(
+                    &mut content,
+                    segment.strip_suffix('\r').unwrap_or(&segment),
+                    numbered.then_some(line),
+                );
+            }
+            segment.clear();
+            chars = 0;
+            line += 1;
+            numbered = true;
+            at_line_start = true;
+        } else {
+            segment.push(ch);
+            chars += 1;
+            at_line_start = false;
+            if chars == MAX_CHARS {
+                push_segment(&mut content, &segment, numbered.then_some(line));
+                segment.clear();
+                chars = 0;
+                numbered = false;
+            }
+        }
+        if content.lines.len() >= row_limit {
+            break;
+        }
+    }
+    let end = cursor.offset + used_bytes as u64;
+    if !segment.is_empty() || (eof && used_utf8 == text.len() && text.ends_with('\n')) {
+        push_segment(
+            &mut content,
+            segment.strip_suffix('\r').unwrap_or(&segment),
+            numbered.then_some(line),
+        );
+    }
+    let next = (end < metadata.len()).then_some(Cursor {
+        offset: end,
+        line,
+        continued: !at_line_start,
+        stamp: Some(stamp),
+    });
+    content.partial = next.is_some();
+    content.presentation = syntax::prepare(&content.path, &content.lines, &cancelled);
+    let prepared = if markdown {
+        crate::project_media::prepare_markdown(root, path, &text[..used_utf8], &cancelled)?
+    } else {
+        None
+    };
+    if cancelled() {
+        return Err(FileError::Cancelled);
+    }
+    let after = file.metadata()?;
+    if after.len() != stamp.bytes || after.modified().ok() != stamp.modified {
+        return Err(FileError::Changed);
+    }
     Ok(Document {
         content,
-        encoding,
-        bytes: bytes.len(),
+        encoding: encoding.name(),
+        bytes: used_bytes,
+        page: Page {
+            cursor,
+            next,
+            total_bytes: metadata.len(),
+        },
+        image: None,
+        markdown: prepared,
     })
 }
 
 #[derive(Clone, Copy)]
 enum Kind {
     Directory(u64),
-    File(u64),
+    File(u64, Cursor),
 }
 struct Request {
     epoch: u64,
@@ -322,6 +516,7 @@ pub struct FileClient {
     pub limit_reached: bool,
     shared: Arc<Shared>,
     next_directory: u64,
+    page_history: Vec<Cursor>,
 }
 impl FileClient {
     pub fn new(ctx: egui::Context) -> Self {
@@ -340,11 +535,11 @@ impl FileClient {
                 if state.stop.load(Ordering::Relaxed) { break; }
                 queue.requests.pop_front().unwrap()
             };
-            let cancelled=|| state.stop.load(Ordering::Relaxed) || state.epoch.load(Ordering::Relaxed)!=request.epoch || matches!(request.kind,Kind::File(ticket) if state.ticket.load(Ordering::Relaxed)!=ticket);
+            let cancelled=|| state.stop.load(Ordering::Relaxed) || state.epoch.load(Ordering::Relaxed)!=request.epoch || matches!(request.kind,Kind::File(ticket, _) if state.ticket.load(Ordering::Relaxed)!=ticket);
             if cancelled() { continue; }
             let data=match request.kind {
                 Kind::Directory(ticket)=>ResultData::Directory(ticket,read_directory(&request.root,&request.path,cancelled).map(Arc::new)),
-                Kind::File(ticket)=>ResultData::File(ticket,read_file(&request.root,&request.path,cancelled).map(Arc::new)),
+                Kind::File(ticket, cursor)=>ResultData::File(ticket,read_page(&request.root,&request.path,cursor,cancelled).map(Arc::new)),
             };
             if cancelled() { continue; }
             let mut queue=state.queue.lock().unwrap();
@@ -360,6 +555,7 @@ impl FileClient {
             revision: 0,
             limit_reached: false,
             next_directory: 0,
+            page_history: vec![],
             shared,
         }
     }
@@ -381,8 +577,8 @@ impl FileClient {
     fn request(&self, path: &Path, kind: Kind) {
         if let Some(root) = &self.root {
             let mut queue = self.shared.queue.lock().unwrap();
-            if matches!(kind, Kind::File(_)) {
-                queue.requests.retain(|r| !matches!(r.kind, Kind::File(_)));
+            if matches!(kind, Kind::File(..)) {
+                queue.requests.retain(|r| !matches!(r.kind, Kind::File(..)));
                 queue
                     .responses
                     .retain(|r| !matches!(r.data, ResultData::File(..)));
@@ -427,10 +623,12 @@ impl FileClient {
             error: None,
             loading: true,
         });
-        self.request(path, Kind::File(ticket));
+        self.page_history.clear();
+        self.request(path, Kind::File(ticket, Cursor::default()));
         self.revision += 1;
     }
     pub fn close_file(&mut self) {
+        self.page_history.clear();
         self.shared.ticket.fetch_add(1, Ordering::Relaxed);
         self.file = None;
         self.revision += 1;
@@ -457,13 +655,51 @@ impl FileClient {
         self.revision += 1;
     }
     pub fn reload_file(&mut self) {
+        self.page_history.clear();
         if let Some(state) = self.file.as_mut() {
             state.loading = true;
             state.error = None;
             let path = state.path.clone();
             let ticket = self.shared.ticket.fetch_add(1, Ordering::Relaxed) + 1;
-            self.request(&path, Kind::File(ticket));
+            self.request(&path, Kind::File(ticket, Cursor::default()));
             self.revision += 1;
+        }
+    }
+    pub fn can_previous_page(&self) -> bool {
+        !self.page_history.is_empty()
+    }
+    fn request_page(&mut self, cursor: Cursor) {
+        let Some(state) = self.file.as_mut() else {
+            return;
+        };
+        state.loading = true;
+        state.error = None;
+        let path = state.path.clone();
+        let ticket = self.shared.ticket.fetch_add(1, Ordering::Relaxed) + 1;
+        self.request(&path, Kind::File(ticket, cursor));
+        self.revision += 1;
+    }
+    pub fn next_page(&mut self) {
+        let Some(state) = self.file.as_ref().filter(|s| !s.loading) else {
+            return;
+        };
+        let Some(data) = &state.data else {
+            return;
+        };
+        let Some(cursor) = data.page.next else {
+            return;
+        };
+        if self.page_history.len() == 64 {
+            self.page_history.remove(0);
+        }
+        self.page_history.push(data.page.cursor);
+        self.request_page(cursor);
+    }
+    pub fn previous_page(&mut self) {
+        if self.file.as_ref().is_some_and(|s| !s.loading)
+            && let Some(cursor) = self.page_history.pop()
+        {
+            self.request_page(cursor);
         }
     }
     pub fn collapse(&mut self, path: &Path) {

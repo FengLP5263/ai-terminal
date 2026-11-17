@@ -2,6 +2,10 @@
 
 [简体中文](overview.md) | English
 
+0.12.0-preview.5: Git line totals come only from Git diff; untracked files show U without line counts, and unborn repositories use the index diff. Supplemental body reads, counting, dedicated caches and counting deadlines are removed. The worktree list still records totals before its 10,000-row display cap and paints visible rows only. Background queries, filesystem notifications, coalesced wakeups and cancellation remain.
+
+0.12.0 preview: the single project_files background worker pages large text and calls project_media for image decoding, Markdown preparation and code colors. project_preview presents the current immutable result and handles paging/link actions; project_ui retains the shared Files/Git panel. Image textures and Markdown caches are released on document switch/close. No browser runtime, remote image loader or editing is introduced.
+
 The current version is in `Cargo.toml`; the initial baseline was 0.1.2. Windows x64, Rust 2024, eframe/egui 0.35, and Alacritty 0.26 are used. The default renderer is glow/OpenGL; wgpu/DX12 is optional for local comparison. `Cargo.lock` pins dependencies.
 
 | Boundary | Responsibility |

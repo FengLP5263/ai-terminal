@@ -31,9 +31,9 @@ struct Capture {
     backend: TerminalBackend,
     files_client: FileClient,
     files_view: FileView,
-    files_root: PathBuf,
     files: bool,
     files_started: bool,
+    preview_path: &'static str,
     icons: Icons,
     snapshot: Snapshot,
     git: GitClient,
@@ -59,12 +59,12 @@ impl eframe::App for Capture {
     fn logic(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
         self.files_client.poll();
         if self.files && !self.files_started && self.began.elapsed() > Duration::from_millis(700) {
-            for path in ["src", "src/components", "docs", "tests"] {
+            for path in ["src", "src/components", "docs", "tests", "assets"] {
                 self.files_view
                     .expand(std::path::Path::new(path), &mut self.files_client);
             }
             self.files_client
-                .open_file(std::path::Path::new("src/components/SignIn.tsx"));
+                .open_file(std::path::Path::new(self.preview_path));
             self.files_started = true;
         }
         if self.captured || self.began.elapsed() > Duration::from_secs(18) {
@@ -190,8 +190,8 @@ impl eframe::App for Capture {
                     None,
                 );
                 ui.add_space(8.0);
-                if let Some(file) = &self.files_client.file {
-                    project_ui::document(ui, file, Some(&self.files_root));
+                if self.files_client.file.is_some() {
+                    self.files_view.document(ui, &mut self.files_client);
                 } else if let Some(patch) = &self.git.patch {
                     git_ui::diff::show(ui, patch);
                 } else {
@@ -245,7 +245,13 @@ fn main() -> eframe::Result {
     let english = std::env::args().nth(2).as_deref() == Some("en");
     let history = std::env::args().nth(3).as_deref() == Some("history");
     let diff = std::env::args().nth(3).as_deref() == Some("diff");
-    let files = std::env::args().nth(3).as_deref() == Some("files");
+    let mode = std::env::args().nth(3).unwrap_or_default();
+    let files = matches!(mode.as_str(), "files" | "markdown" | "image");
+    let preview_path = match mode.as_str() {
+        "markdown" => "docs/overview.md",
+        "image" => "assets/preview.png",
+        _ => "src/components/SignIn.tsx",
+    };
     let verify = output.clone();
     eframe::run_native(
         "ai-terminal public README capture",
@@ -350,6 +356,17 @@ fn main() -> eframe::Result {
             .unwrap();
             let job = platform::ProcessJob::attach(backend.pty_id()).unwrap();
             let files_root = output.join("web-app");
+            std::fs::create_dir_all(files_root.join("assets")).unwrap();
+            let preview = image::RgbaImage::from_fn(640, 360, |x, y| {
+                let inside = (i64::from(x) - 320).pow(2) + (i64::from(y) - 180).pow(2) < 155 * 155;
+                image::Rgba([
+                    (x / 3) as u8,
+                    (70 + y / 3) as u8,
+                    190,
+                    if inside { 255 } else { 0 },
+                ])
+            });
+            preview.save(files_root.join("assets/preview.png")).unwrap();
             std::fs::create_dir_all(files_root.join("src/components")).unwrap();
             std::fs::create_dir_all(files_root.join("docs")).unwrap();
             std::fs::create_dir_all(files_root.join("tests")).unwrap();
@@ -384,6 +401,12 @@ fn main() -> eframe::Result {
             ] {
                 std::fs::write(files_root.join(path), text).unwrap();
             }
+            let overview = if english {
+                "# Project overview ✨\n\nRead Markdown, code and project images in one workspace.\n\n## Preview support\n\n| Content | View |\n| --- | --- |\n| Markdown | Render or source |\n| Images | Fit, actual size and zoom |\n| Large text | Read page by page |\n\n```json\n{ \"project\": \"web-app\", \"mode\": \"read-only\" }\n```\n\n![Local project image](../assets/preview.png)\n"
+            } else {
+                "# 项目说明 ✨\n\n在同一个工作区阅读 Markdown、代码和项目图片。\n\n## 查看能力\n\n| 内容 | 查看方式 |\n| --- | --- |\n| Markdown | 渲染或源码 |\n| 图片 | 适应窗口、原尺寸与缩放 |\n| 大文本 | 按页继续阅读 |\n\n```json\n{ \"project\": \"web-app\", \"mode\": \"read-only\" }\n```\n\n![项目内图片](../assets/preview.png)\n"
+            };
+            std::fs::write(files_root.join("docs/overview.md"), overview).unwrap();
             // Only this owned display fixture is initialized; no user repository is queried.
             let git = ai_terminal::discovery::CliSearch::current()
                 .git()
@@ -553,9 +576,9 @@ fn main() -> eframe::Result {
                 backend,
                 files_client,
                 files_view: FileView::default(),
-                files_root,
                 files,
                 files_started: false,
+                preview_path,
                 icons,
                 snapshot,
                 git,
@@ -651,6 +674,7 @@ fn git_fixture() -> GitSnapshot {
         unborn: false,
         added: 57,
         deleted: 14,
+        omitted_files: 0,
         total_files: 6,
         files: [
             ("src/components/SignIn.tsx", ' ', 'M', 24, 6),

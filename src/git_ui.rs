@@ -134,11 +134,9 @@ pub fn summary(ui: &mut egui::Ui, client: Option<&GitClient>, open: &mut bool) -
                             "Git 刷新失败，点击面板查看",
                             "Git refresh failed; open the panel for details",
                         ));
-                } else if snapshot.is_some_and(|s| s.partial) {
-                    ui.label("≈").on_hover_text(locale.text(
-                        "部分文件未统计，或超过展示上限",
-                        "Some files are excluded or exceed display limits",
-                    ));
+                } else if let Some(snapshot) = snapshot.filter(|s| s.partial) {
+                    ui.label("≈")
+                        .on_hover_text(statistics_hint(snapshot, locale));
                 }
             }
         })
@@ -300,7 +298,12 @@ fn header_inner(
         chrome::TEXT,
         name_width,
     )
-    .on_hover_text(format!("{}\n{}", header.name, header.directory.display()));
+    .on_hover_ui(|ui| {
+        crate::ui_text::multiline_label(
+            ui,
+            &format!("{}\n{}", header.name, header.directory.display()),
+        );
+    });
     let left = rect.left() + name_width + gap;
     if right - left > 24.0 {
         let mut path_ui = child(ui, "terminal-header-directory", left, right - left);
@@ -311,7 +314,9 @@ fn header_inner(
             chrome::SECONDARY,
             right - left,
         )
-        .on_hover_text(header.directory.display().to_string());
+        .on_hover_ui(|ui| {
+            crate::ui_text::multiline_label(ui, &header.directory.display().to_string());
+        });
     }
     reset
 }
@@ -523,10 +528,12 @@ impl GitView {
             ui.weak(locale.text("尚无提交", "No commits yet"));
         }
         if snapshot.partial {
-            ui.weak(locale.text(
-                "部分文件未统计，或超过展示上限；总数不完整。",
-                "Some files are excluded or exceed display limits; totals are partial.",
-            ));
+            ui.weak(format!(
+                "{} {}",
+                snapshot.omitted_files,
+                locale.text("个文件未计入行数", "files excluded from line counts")
+            ))
+            .on_hover_text(statistics_hint(snapshot, locale));
         }
         if with_header {
             ui.separator();
@@ -544,36 +551,48 @@ impl GitView {
             ui.selectable_value(&mut self.history, true, locale.text("提交历史", "History"));
         });
         ui.separator();
-        egui::ScrollArea::vertical()
+        if !self.history && snapshot.files.len() < snapshot.total_files {
+            ui.weak(format!(
+                "{} {} / {}",
+                locale.text("显示文件", "Files shown"),
+                snapshot.files.len(),
+                snapshot.total_files
+            ));
+        }
+        let scroll = egui::ScrollArea::vertical()
             .id_salt(if self.history {
                 "git-history-scroll"
             } else {
                 "git-files-scroll"
             })
-            .auto_shrink([false, false])
-            .show(ui, |ui| {
-                if self.history {
-                    if snapshot.commits.is_empty() {
-                        ui.weak(
-                            locale.text("当前分支尚无提交。", "This branch has no commits yet."),
-                        );
-                    }
-                    history::show(ui, self, snapshot, &mut actions);
-                    if snapshot.more && limit < MAX_COMMITS {
-                        actions.more = ui
-                            .button(locale.text("加载更多提交", "Load more commits"))
-                            .clicked();
-                    } else if snapshot.more {
-                        ui.weak(locale.text(
-                            "已显示最近 300 条提交。",
-                            "Showing the most recent 300 commits.",
-                        ));
-                    }
-                } else {
-                    if snapshot.files.is_empty() {
-                        ui.label(locale.text("工作区干净", "Working tree clean"));
-                    }
-                    for file in &snapshot.files {
+            .auto_shrink([false, false]);
+        if self.history {
+            scroll.show(ui, |ui| {
+                if snapshot.commits.is_empty() {
+                    ui.weak(locale.text("当前分支尚无提交。", "This branch has no commits yet."));
+                }
+                history::show(ui, self, snapshot, &mut actions);
+                if snapshot.more && limit < MAX_COMMITS {
+                    actions.more = ui
+                        .button(locale.text("加载更多提交", "Load more commits"))
+                        .clicked();
+                } else if snapshot.more {
+                    ui.weak(locale.text(
+                        "已显示最近 300 条提交。",
+                        "Showing the most recent 300 commits.",
+                    ));
+                }
+            });
+        } else {
+            if snapshot.files.is_empty() {
+                ui.label(locale.text("工作区干净", "Working tree clean"));
+            }
+            scroll.show_rows(
+                ui,
+                files::row_height(ui),
+                snapshot.files.len(),
+                |ui, rows| {
+                    for file in &snapshot.files[rows] {
                         let response = files::show(
                             ui,
                             files::FileRow {
@@ -598,11 +617,19 @@ impl GitView {
                                 Some((crate::git::PatchSource::WorkingTree, file.path.clone()));
                         }
                     }
-                }
-            });
+                },
+            );
+        }
         actions
     }
 }
+fn statistics_hint(snapshot: &crate::git::Snapshot, locale: i18n::Locale) -> String {
+    format!("{} {}", snapshot.omitted_files, locale.text(
+        "个文件依赖内容过滤器，未执行外部程序，未计入行数。",
+        "files require content filters; external code was not run and their line counts are excluded."
+    ))
+}
+
 fn display_text(text: &str, limit: usize) -> String {
     let mut chars = text.chars();
     let mut result: String = chars
@@ -627,4 +654,34 @@ fn date(timestamp: i64) -> String {
     let month = mp + if mp < 10 { 3 } else { -9 };
     let year = year + i64::from(month <= 2);
     format!("{year:04}-{month:02}-{day:02}")
+}
+
+#[cfg(test)]
+mod statistics_tests {
+    use super::*;
+    #[test]
+    fn actual_omissions_have_localized_reasons_without_confusing_them_with_display_limits() {
+        let mut snapshot = crate::git::Snapshot {
+            root: Default::default(),
+            git_dir: Default::default(),
+            common_dir: Default::default(),
+            branch: String::new(),
+            detached: false,
+            unborn: false,
+            added: 0,
+            deleted: 0,
+            total_files: 10_001,
+            files: vec![],
+            partial: true,
+            omitted_files: 0,
+            commits: vec![],
+            more: false,
+        };
+        snapshot.omitted_files = 2;
+        let en = statistics_hint(&snapshot, i18n::Locale::En);
+        assert!(en.contains("2 files require") && en.contains("content filter"));
+        let zh = statistics_hint(&snapshot, i18n::Locale::ZhCn);
+        assert!(zh.contains("内容过滤器") && zh.contains("未执行外部程序"));
+        assert!(!en.contains("10001") && !en.contains("display limit"));
+    }
 }

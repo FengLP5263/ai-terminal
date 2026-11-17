@@ -1,5 +1,7 @@
 # External integrations and related repositories
 
+0.12.0-preview.5: terminal paste recognizes Windows CF_HDROP on demand, reads paths with DragQueryFileW, quotes each path and writes a space-separated list to the PTY. Without text, file lists take priority over image formats. It reads no file bodies, creates no temporary attachments, changes no clipboard data and sends no Enter. Bitmap screenshots retain native CLI image paste; attachment recognition belongs to the CLI. Lists are bounded to 1,024 items/65,536 UTF-16 units; invalid data falls back to existing paste behavior.
+
 [简体中文](integrations.md) | English
 
 | Integration | Ownership and coordination |

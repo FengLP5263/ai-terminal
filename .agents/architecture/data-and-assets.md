@@ -2,6 +2,10 @@
 
 简体中文 | [English](data-and-assets.en.md)
 
+0.12.0-preview.5：删除新文件计数缓存、读取量／复用量记录及直接 memchr 依赖；Git 快照仅保留 Git 查询结果和过滤器遗漏数量。文件粘贴只在内存中短暂保留路径，不保存正文、附件副本或剪贴板内容；无新增用户配置或字体资产。
+
+0.12.0 预览不新增持久化字段或用户资产。Cargo.lock 固定 image 0.25.10、pulldown-cmark 0.13.6、egui_commonmark 0.24.0，并为既有 resvg 0.45.1 开启原生文字支持；许可证随既有依赖清单流程归档。当前图片编码最多 32 MiB，栅格原图最多 32 百万像素／单边 16,384，解码分配上限 256 MiB，主图缩至单边 4,096；SVG 最多 4 MiB／10,000 个标签且外部资源解析器禁用。Markdown 至多 16 张本地插图，每张缩至 2,048，合计最多 16 百万像素。正文、分页游标和纹理仅在内存中，关闭／切换后释放，无文件副本或远程图片下载。SVG 文字沿用内嵌 JetBrains Mono 和 Windows Fonts 中的系统字体，不安装字体或改变资产字节。
+
 ## 数据与恢复
 
 %LOCALAPPDATA%/ai-terminal/sessions.json 保存会话名称、目录、Agent 类型、实际 resume ID、列表顺序和 UI 偏好。
@@ -88,7 +92,7 @@ Kimi Code 使用官方仓库文档所用的 316×316 PNG，ZCode 使用官方仓
 
 0.4.12 预览：颜色菜单为六色加无颜色，沿用 `blue`、`green`、`amber`、`pink`、`purple` 并新增 `red`。旧 `teal`、`orange` 原 ID 可往返保存，显示及菜单选择分别映射到蓝／红，不改写会话 UUID、目录或顺序。颜色和无颜色图标均为代码绘制，无新增图片或字体资产。
 
-0.4.12 Git 面板仅新增 `ui.git_panel_open` 布尔偏好，旧记录默认收起；分支、路径、行数和提交元数据只在当前后台快照内存中存在。未跟踪文本只临时读取以计行，不保存正文、差异、历史缓存或 Git 凭据；不更改会话数据根目录或用户仓库。
+0.4.12 Git 面板仅新增 `ui.git_panel_open` 布尔偏好，旧记录默认收起；分支、路径、行数和提交元数据只在当前后台快照内存中存在。未跟踪文本不再额外读取计行，不保存正文、差异、历史缓存或 Git 凭据；不更改会话数据根目录或用户仓库。
 
 0.4.12-preview.3：`assets/fonts/Codicons.ttf`、原始 CSS 字形映射及许可来自微软官方 Codicons 0.0.45 npm 包；SOURCE.json 记录原始字节、归档摘要和 U+EC6F 分支符号。该字体仅用于 UI 图标，不进入终端字体选项、不安装到系统。正式 appearance 与探针共用同一字体定义；helper 不加载。ZIP 复制 Codicons-LICENSE.txt 并计入字体许可校验。
 
@@ -131,3 +135,5 @@ Seti 按官方 VS Code 文件图标的 150% 尺寸规范校准图标族的显示
 0.11.0-preview.3 新增 ui.floating_border，默认 true，旧配置缺失时同样开启。开关与浮窗背景透明度、主窗／浮窗缩放分别保存。0.11.0-preview.4 工牌只显示组名，统一白底黑字，不新增配色或角色字段；首位由 sessions 顺序自然体现，不显示角色标签。floating_opacity 支持 0.0–1.0，默认及非有限值回退仍为 1.0；旧数值保留。工牌及边框不改变生命周期或任务状态。
 
 0.11.0 README 原生截图新增中英文 session-groups.png／session-groups.en.png，来自 session_groups_probe 的固定三成员面板；其余十二张当前工作区、历史、差异、文件、浮窗和设置图同步刷新。全部使用正式组件及隔离样例，原样复制并逐文件登记版本、语言、尺寸与 SHA-256；历史六枚 Agent 头像的来源记录保留原版本。
+
+0.12.0 README 图：readme_capture 的第四参数支持 files／history／diff／markdown／image，第二参数为独立 output 目录，第三参数为 zh／en。新增 Markdown 与图片模式只在自身目录创建固定双语文档及透明 PNG，使用正式只读组件，主界面仍显示固定示例路径；不读用户项目或调用模型。公开图保持原始 PNG 字节，并在 assets/readme/SOURCE.json 逐文件记录版本、语言、尺寸与摘要。

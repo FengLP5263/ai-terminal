@@ -4,7 +4,7 @@ use crate::{
     git::GitClient,
     git_ui::{Actions, GitView},
     i18n,
-    project_files::{Entry, EntryKind, FileClient, FileError, FileState},
+    project_files::{Entry, EntryKind, FileClient, FileError},
 };
 use egui::{Color32, FontFamily, FontId, RichText};
 use std::{
@@ -78,11 +78,16 @@ pub fn project_button(
     let pos = egui::pos2(left, response.rect.center().y - galley.size().y / 2.0);
     painter.galley(pos, galley.clone(), color);
     crate::ui_text::paint_emoji(&painter, pos, &galley, font.size, color);
-    response.on_hover_text(format!(
-        "{}\n{}",
-        i18n::tr(ui.ctx(), "浏览项目文件", "Browse project files"),
-        root.display()
-    ))
+    response.on_hover_ui(|ui| {
+        crate::ui_text::multiline_label(
+            ui,
+            &format!(
+                "{}\n{}",
+                i18n::tr(ui.ctx(), "浏览项目文件", "Browse project files"),
+                root.display()
+            ),
+        );
+    })
 }
 fn tab(ui: &mut egui::Ui, glyph: &str, label: &str, selected: bool, width: f32) -> egui::Response {
     let font = font(ui);
@@ -116,7 +121,11 @@ pub fn error_message(error: &FileError, locale: i18n::Locale) -> String {
         FileError::Io(message)=>format!("{}: {message}",locale.text("无法读取","Could not read")),
         FileError::Link=>locale.text("链接不会自动跟随，请在对应目录的会话中查看。","Links are not followed automatically. Browse the target directory in its own session.").into(),
         FileError::OutsideProject=>locale.text("此路径不在当前项目中。","This path is outside the current project.").into(),
-        FileError::TooLarge=>locale.text("文件超过 2 MiB，暂不支持预览。","Files larger than 2 MiB cannot be previewed.").into(),
+        FileError::TooLarge=>locale.text("图片超过 32 MiB，无法预览。","Images larger than 32 MiB cannot be previewed.").into(),
+        FileError::ImageLimit=>locale.text("图片超出预览的尺寸或资源上限。","Image exceeds preview dimensions or resource limits.").into(),
+        FileError::Image(message)=>format!("{}: {message}",locale.text("无法解码图片","Cannot decode image")),
+        FileError::Unsupported=>locale.text("此文档格式暂不支持预览。","Preview is unavailable for this document format.").into(),
+        FileError::Changed=>locale.text("文件已更改，请重新加载后查看。","File has changed. Reload to continue viewing.").into(),
         FileError::Binary=>locale.text("此文件不支持文本预览。","Text preview is unavailable for this file.").into(),
         FileError::Encoding=>locale.text("无法准确解码此文件。支持 UTF-8 和带 BOM 的 UTF-16。","Cannot decode this file accurately. UTF-8 and UTF-16 with BOM are supported.").into(),
         FileError::Cancelled=>String::new(),
@@ -134,6 +143,7 @@ pub struct FileView {
     revision: Option<u64>,
     locale: Option<&'static str>,
     rows: Vec<Row>,
+    preview: crate::project_preview::View,
 }
 impl FileView {
     pub fn expand(&mut self, path: &Path, client: &mut FileClient) {
@@ -529,79 +539,79 @@ pub fn panel(
 }
 
 /// Returns true only when the user closes the document; rendering never writes a project file.
-pub fn document(ui: &mut egui::Ui, state: &FileState, root: Option<&Path>) -> bool {
-    let locale = i18n::locale(ui.ctx());
-    let font = font(ui);
-    ui.style_mut().override_font_id = Some(font.clone());
-    let close;
-    let (row, _) = ui.allocate_exact_size(
-        egui::vec2(ui.available_width(), chrome::CONTROL),
-        egui::Sense::hover(),
-    );
-    {
-        let mut header = ui.new_child(
-            egui::UiBuilder::new()
-                .id_salt("project-document-header")
-                .max_rect(row)
-                .layout(egui::Layout::right_to_left(egui::Align::Center)),
+impl FileView {
+    pub fn release_document(&mut self, ctx: &egui::Context) {
+        self.preview.clear(ctx);
+    }
+    pub fn document(&mut self, ui: &mut egui::Ui, client: &mut FileClient) -> bool {
+        let Some(state) = client.file.clone() else {
+            self.preview.clear(ui.ctx());
+            return false;
+        };
+        let root = client.root.clone();
+        let locale = i18n::locale(ui.ctx());
+        let font = font(ui);
+        ui.style_mut().override_font_id = Some(font.clone());
+        let close;
+        let (row, _) = ui.allocate_exact_size(
+            egui::vec2(ui.available_width(), chrome::CONTROL),
+            egui::Sense::hover(),
         );
-        let ui = &mut header;
-        close = chrome::icon_button(
-            ui,
-            egui::Id::new("project-document-close"),
-            chrome::ActionIcon::Close,
-            locale.text("返回终端", "Return to terminal"),
-        )
-        .clicked();
-        ui.weak(locale.text("只读", "Read only"));
-        if state.loading {
-            ui.label("…");
-        }
-        let width = ui.available_width().max(0.0);
-        ui.allocate_ui_with_layout(
-            egui::vec2(width, chrome::CONTROL),
-            egui::Layout::left_to_right(egui::Align::Center),
-            |ui| {
-                ui.set_width(width);
-                file_icons::icon(&state.path.to_string_lossy(), false).show(ui, font.size);
-                ui.add(
-                    egui::Label::new(
-                        RichText::new(state.path.to_string_lossy().replace('\\', "/")).strong(),
+        {
+            let mut header = ui.new_child(
+                egui::UiBuilder::new()
+                    .id_salt("project-document-header")
+                    .max_rect(row)
+                    .layout(egui::Layout::right_to_left(egui::Align::Center)),
+            );
+            let ui = &mut header;
+            close = chrome::icon_button(
+                ui,
+                egui::Id::new("project-document-close"),
+                chrome::ActionIcon::Close,
+                locale.text("返回终端", "Return to terminal"),
+            )
+            .clicked();
+            ui.weak(locale.text("只读", "Read only"));
+            if state.loading {
+                ui.label("…");
+            }
+            let width = ui.available_width().max(0.0);
+            ui.allocate_ui_with_layout(
+                egui::vec2(width, chrome::CONTROL),
+                egui::Layout::left_to_right(egui::Align::Center),
+                |ui| {
+                    ui.set_width(width);
+                    file_icons::icon(&state.path.to_string_lossy(), false).show(ui, font.size);
+                    ui.add(
+                        egui::Label::new(
+                            RichText::new(state.path.to_string_lossy().replace('\\', "/")).strong(),
+                        )
+                        .truncate(),
                     )
-                    .truncate(),
-                )
-                .on_hover_text(
-                    root.map(|r| r.join(&state.path))
-                        .unwrap_or_else(|| state.path.clone())
-                        .display()
-                        .to_string(),
-                );
-            },
-        );
-    }
-    ui.separator();
-    if let Some(error) = &state.error {
-        ui.colored_label(chrome::WAITING, error_message(error, locale));
-    }
-    if let Some(data) = &state.data {
-        ui.weak(format!(
-            "{} · {} {}",
-            data.encoding,
-            data.content.lines.len(),
-            locale.text("行", "lines")
-        ));
-        if data.content.partial {
-            ui.weak(locale.text("显示上限：20,000 行、每行 4,000 个字符；超出部分已省略。","Display limits: 20,000 lines and 4,000 characters per line; excess content is omitted."));
+                    .on_hover_text(
+                        root.as_ref()
+                            .map(|r| r.join(&state.path))
+                            .unwrap_or_else(|| state.path.clone())
+                            .display()
+                            .to_string(),
+                    );
+                },
+            );
         }
-        if data.content.lines.is_empty() {
-            ui.weak(locale.text("文件内容为空。", "File is empty."));
+        ui.separator();
+        if let Some(error) = &state.error {
+            ui.colored_label(chrome::WAITING, error_message(error, locale));
+            if ui.button(locale.text("重新加载", "Reload")).clicked() {
+                client.reload_file();
+            }
         }
-        crate::git_ui::diff::body(
-            ui,
-            &data.content,
-            ("project-document", root, &state.path),
-            true,
-        );
+        if let Some(data) = &state.data {
+            self.preview.show(ui, client, data, &state.path);
+        }
+        if close {
+            self.preview.clear(ui.ctx());
+        }
+        close
     }
-    close
 }
