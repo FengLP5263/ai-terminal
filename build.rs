@@ -53,6 +53,10 @@ fn main() {
         compiled.display()
     );
     println!("cargo:rustc-link-arg-examples={}", compiled.display());
+    println!(
+        "cargo:rustc-link-arg-bin=ai-terminal-cli={}",
+        compiled.display()
+    );
 }
 
 fn stage_native_console(root: &std::path::Path, out: &std::path::Path) {

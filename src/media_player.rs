@@ -283,6 +283,9 @@ mod native {
         pub fn paused(&self) -> bool {
             unsafe { self.engine.IsPaused().as_bool() || self.engine.IsEnded().as_bool() }
         }
+        pub fn current_volume(&self) -> f64 {
+            unsafe { self.engine.GetVolume() }
+        }
         pub fn play(&self) -> windows::core::Result<()> {
             unsafe { self.engine.Play() }
         }

@@ -2,6 +2,7 @@
 # ai-terminal 成对 POSIX 入口；原生 GUI 当前仅支持 Windows。
 #
 # 常用检查：
+#    sh scripts/posix/project.sh skill-package                                      # 构建可移植 Agent Skill ZIP
 #    sh scripts/posix/project.sh governance                                       # 可移植静态治理检查
 #    sh scripts/posix/project.sh verify-package -Path output/packages/demo.zip    # 跨平台只读 ZIP 校验
 #    sh scripts/posix/project.sh check                                            # Git Bash 委托 Windows；macOS/Linux 明确不支持原生检查
@@ -28,6 +29,8 @@ cd "$repo_root"
 case "$action" in
     --help|-h) sed -n '2,/^set -eu/p' "$0" | sed '$d'; exit 0 ;;
     governance) [ "$#" -eq 0 ] || { echo 'governance takes no arguments' >&2; exit 2; };run_python scripts/check-repository.py;exit $? ;;
+    skill-package) [ "$#" -eq 0 ] || { echo 'skill-package takes no arguments' >&2;exit 2; };run_python scripts/skill_bundle.py build;exit $? ;;
+    verify-skills) [ "$#" -eq 2 ] && [ "$1" = '-Path' ] || { echo 'verify-skills -Path ZIP required' >&2;exit 2; };run_python scripts/skill_bundle.py verify --path "$2";exit $? ;;
     verify-package) [ "$#" -eq 2 ] && [ "$1" = '-Path' ] || { echo 'verify-package -Path ZIP required' >&2;exit 2; };run_python scripts/package.py verify "$2";exit $? ;;
     verify-installer) [ "$#" -eq 2 ] && [ "$1" = '-Path' ] || { echo 'verify-installer -Path JSON required' >&2;exit 2; };run_python scripts/installer.py verify "$2";exit $? ;;
 esac

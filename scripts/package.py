@@ -54,6 +54,8 @@ def sha(path):return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 def source_identity(root=ROOT):
     inputs=[root/'build.rs',root/'Cargo.toml',root/'Cargo.lock',root/'vendor/egui_term/Cargo.toml',root/'vendor/egui-winit/Cargo.toml',root/'vendor/egui_glow/Cargo.toml']+list((root/'src').rglob('*.rs'))+list((root/'vendor/egui_term/src').rglob('*.rs'))+list((root/'vendor/egui-winit/src').rglob('*.rs'))+[p for p in (root/'vendor/egui_glow/src').rglob('*') if p.is_file()]+list((root/'assets/fonts').iterdir())+list((root/'assets/icons').iterdir())+list((root/'assets/branding').iterdir())+[p for p in (root/'assets/windows/conpty').rglob('*') if p.is_file()]
     inputs += [root/name for name in CHANGELOGS]
+    inputs += [p for p in (root/'skills/ai-terminal').rglob('*') if p.is_file()]
+    inputs += [root/name for name in ['docs/cli.md','docs/cli.en.md','docs/skills.md','docs/skills.en.md']]
     inputs += [p for p in (root/'assets/syntaxes').rglob('*') if p.is_file()]
     inputs += [p for p in (root/'assets/file-icons').rglob('*') if p.is_file()]
     for crate in ['alacritty_terminal', 'vte']:
@@ -88,6 +90,7 @@ def verify_archive(path):
         if not {'ai-terminal.exe','ai-terminal-hook.exe','LICENSE.txt','Hack-LICENSE.txt','egui-term-LICENSE.txt'}.issubset(expected):
             raise ValueError('program/helper/license incomplete')
         if manifest.get('format_version',1)>=2 and not NATIVE_REQUIRED.issubset(expected):raise ValueError('native console runtime/license incomplete')
+        if 'management_cli' in manifest and not {'ai-terminal-cli.exe','skills/ai-terminal/SKILL.md','docs/cli.md','docs/skills.md'}.issubset(expected):raise ValueError('management CLI/skill incomplete')
         if 'fonts' in manifest and not {'Cascadia-LICENSE.txt','FONT-SOURCE.json'}.issubset(expected):raise ValueError('font license/provenance incomplete')
         if any(name not in expected for name in manifest.get('fonts',{}).get('licenses',[])):raise ValueError('declared font license missing')
         if 'syntaxes' in manifest and not {'Syntax-LICENSES.json','SYNTAX-SOURCE.json'}.issubset(expected):raise ValueError('syntax license/provenance incomplete')
@@ -221,7 +224,10 @@ def build(allow_dirty=False):
     folder=ROOT/'output/packages'/label;folder.mkdir(parents=True,exist_ok=False)
     # Cargo metadata is authoritative, including CARGO_TARGET_DIR / build.target-dir.
     target=Path(json.loads(command(cargo+['metadata','--no-deps','--locked','--offline','--format-version','1']).stdout)['target_directory'])/'release'
-    for name in ['ai-terminal.exe','ai-terminal-hook.exe']:shutil.copy2(target/name,folder/name)
+    for name in ['ai-terminal.exe','ai-terminal-hook.exe','ai-terminal-cli.exe']:shutil.copy2(target/name,folder/name)
+    shutil.copytree(ROOT/'skills/ai-terminal',folder/'skills/ai-terminal')
+    (folder/'docs').mkdir()
+    for name in ['cli.md','cli.en.md','skills.md','skills.en.md']:shutil.copy2(ROOT/'docs'/name,folder/'docs'/name)
     for name in CHANGELOGS:shutil.copy2(ROOT/name,folder/name)
     native=native_console_assets(folder)
     icon_notices(folder)
@@ -229,11 +235,14 @@ def build(allow_dirty=False):
     syntaxes=syntax_notices(folder)
     for source,destination in [('LICENSE','LICENSE.txt'),('vendor/egui_term/LICENSE','egui-term-LICENSE.txt'),('assets/fonts/LICENSE.md','Hack-LICENSE.txt'),('assets/icons/LICENSE-lobe-icons','Lobe-Icons-LICENSE.txt'),('THIRD_PARTY_NOTICES.md','THIRD_PARTY_NOTICES.md')]:shutil.copy2(ROOT/source,folder/destination)
     shutil.copy2(ROOT/'THIRD_PARTY_NOTICES.en.md',folder/'THIRD_PARTY_NOTICES.en.md')
-    (folder/'README.txt').write_text('ai-terminal '+version+'\n\n请完整解压。ai-terminal.exe、ai-terminal-hook.exe、conpty.dll 和 OpenConsole.exe 必须放在同一目录。双击 ai-terminal.exe 默认进入 PowerShell；左上角＋可新建 PowerShell、CMD 或 Git Bash，在终端中输入 codex、claude、qoder、qodercn、kimi、zcode 或 traecli。\n会话数据在 %LOCALAPPDATA%/ai-terminal；退出只回收本程序拥有的会话进程。\nCodex 默认使用原生状态与共享 agents 总览；旧版没有原生通知时，可显式运行 codex --no-daemon 并在 /hooks 审查兼容 hook。共享后台任务由 Codex 自身管理。Kimi 使用原生任务状态；TRAE 在 /hooks 审查本次任务 hook；社区 ZCode 使用无凭据基础设置快照接入开始／工具／完成，自定义配置时跳过接入。真实模型回合待用户验收，限制见双语更新日志。版本、源码与原生组件身份见 manifest.json；许可证随包携带。\n\nExtract the complete archive. Keep ai-terminal.exe, ai-terminal-hook.exe, conpty.dll and OpenConsole.exe together. Double-click ai-terminal.exe for PowerShell; use + for PowerShell, CMD or Git Bash, then run codex, claude, qoder, qodercn, kimi, zcode or traecli.\nSession data: %LOCALAPPDATA%/ai-terminal. Exit closes only owned sessions. Codex uses native lifecycle and the shared agents overview by default. Older CLIs without native events can run codex --no-daemon and review compatibility hooks in /hooks. Codex owns shared background tasks. Kimi uses native task events. Review TRAE session hooks in /hooks. Community ZCode uses a credential-free basic settings snapshot for start/tools/completion and skips injection for custom configuration. Real model-turn acceptance remains with the user; see the bilingual changelog for limitations. See manifest.json and the included licenses for source/runtime identity.\n',encoding='utf-8')
+    (folder/'README.txt').write_text('ai-terminal '+version+'\n\n请完整解压。ai-terminal.exe、ai-terminal-hook.exe、ai-terminal-cli.exe、conpty.dll 和 OpenConsole.exe 必须放在同一目录。双击 ai-terminal.exe 默认进入 PowerShell；左上角＋可新建 PowerShell、CMD 或 Git Bash，在终端中输入 codex、claude、qoder、qodercn、kimi、zcode 或 traecli。\n会话数据在 %LOCALAPPDATA%/ai-terminal；退出只回收本程序拥有的会话进程。\nCodex 默认使用原生状态与共享 agents 总览；旧版没有原生通知时，可显式运行 codex --no-daemon 并在 /hooks 审查兼容 hook。共享后台任务由 Codex 自身管理。Kimi 使用原生任务状态；TRAE 在 /hooks 审查本次任务 hook；社区 ZCode 使用无凭据基础设置快照接入开始／工具／完成，自定义配置时跳过接入。真实模型回合待用户验收，限制见双语更新日志。版本、源码与原生组件身份见 manifest.json；许可证随包携带。\n\nExtract the complete archive. Keep ai-terminal.exe, ai-terminal-hook.exe, ai-terminal-cli.exe, conpty.dll and OpenConsole.exe together. Double-click ai-terminal.exe for PowerShell; use + for PowerShell, CMD or Git Bash, then run codex, claude, qoder, qodercn, kimi, zcode or traecli.\nSession data: %LOCALAPPDATA%/ai-terminal. Exit closes only owned sessions. Codex uses native lifecycle and the shared agents overview by default. Older CLIs without native events can run codex --no-daemon and review compatibility hooks in /hooks. Codex owns shared background tasks. Kimi uses native task events. Review TRAE session hooks in /hooks. Community ZCode uses a credential-free basic settings snapshot for start/tools/completion and skips injection for custom configuration. Real model-turn acceptance remains with the user; see the bilingual changelog for limitations. See manifest.json and the included licenses for source/runtime identity.\n',encoding='utf-8')
+    with (folder/'README.txt').open('a',encoding='utf-8',newline='\n') as guide:
+        guide.write('\n原生管理 CLI / Native management CLI: ai-terminal-cli.exe --help\nAgent Skill: skills/ai-terminal/SKILL.md; CLI: docs/cli.md / docs/cli.en.md; docs/skills.md / docs/skills.en.md.\n')
     dependencies(cargo,folder)
     head=command(['git','rev-parse','--verify','HEAD'],check=False)
     manifest={'format_version':2,'version':version,'platform':'windows-x64','git_commit':head.stdout.strip() if head.returncode==0 else None,'dirty':dirty,'rustc':command(['rustc','-V']).stdout.strip(),'source_sha256':source_identity(),'source_scope':'Cargo manifests/lock, build.rs, production Rust, local egui_glow sources/shaders, winit build sources/assets, alacritty_terminal/vte manifests/sources, font/icon/branding/native-console assets','native_console':native,'build':'cargo build --locked --release','published':False,'files':{}}
-    manifest['source_scope']+=', bilingual changelog'
+    manifest['source_scope']+=', bilingual changelog, public management skill and CLI documentation'
+    manifest['management_cli']={'schema_version':1,'executable':'ai-terminal-cli.exe','skill':'skills/ai-terminal/SKILL.md'}
     manifest['source_scope']+=', syntax license/provenance assets'
     manifest['syntaxes']=syntaxes
     manifest['fonts']=fonts

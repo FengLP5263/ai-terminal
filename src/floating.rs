@@ -128,6 +128,11 @@ impl FloatingBar {
     pub fn dismiss(&self) {
         self.hint.lock().unwrap().clear();
     }
+    /// Explicit placement differs from a saved position observed during dragging.
+    pub fn reposition(&self, ctx: &egui::Context, position: [f32; 2]) {
+        *self.placement_request.lock().unwrap() = Some(position);
+        ctx.request_repaint_of(viewport_id());
+    }
     pub fn set_scale(&self, ctx: &egui::Context, scale: f32) {
         let scale = if scale.is_finite() {
             scale.clamp(
@@ -629,6 +634,15 @@ pub fn centered_geometry_at_scale(
     scale: f32,
 ) -> ([f32; 2], f32) {
     let result = placement(ctx, count, saved, true, scale);
+    (result.pixels, result.width)
+}
+pub fn geometry_at_scale(
+    ctx: &egui::Context,
+    count: usize,
+    saved: Option<[f32; 2]>,
+    scale: f32,
+) -> ([f32; 2], f32) {
+    let result = placement(ctx, count, saved, false, scale);
     (result.pixels, result.width)
 }
 

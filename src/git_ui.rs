@@ -321,6 +321,10 @@ fn header_inner(
     reset
 }
 impl GitView {
+    pub fn select_commit(&mut self, id: &str) {
+        self.history = true;
+        self.selected = Some(id.into());
+    }
     pub fn set_history(&mut self, history: bool) {
         self.history = history;
     }

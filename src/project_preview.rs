@@ -67,6 +67,30 @@ pub struct View {
     player: Option<Result<crate::media_player::Player, String>>,
 }
 impl View {
+    /// Select the same prepared document as the native viewer, including while minimized.
+    pub fn prepare(&mut self, ctx: &egui::Context, path: &Path, data: &Arc<Document>) {
+        self.select(ctx, path, data);
+    }
+    pub fn set_source(&mut self, source: bool) {
+        self.source = source;
+    }
+    pub fn set_zoom(&mut self, zoom: Option<f32>) {
+        self.zoom = zoom;
+    }
+    pub fn controls(&self) -> (bool, Option<f32>) {
+        (self.source, self.zoom)
+    }
+    #[cfg(windows)]
+    pub fn media_player(
+        &mut self,
+        ctx: &egui::Context,
+        media: &crate::project_media::Playable,
+    ) -> Result<&mut crate::media_player::Player, String> {
+        self.player
+            .get_or_insert_with(|| crate::media_player::Player::new(ctx, media))
+            .as_mut()
+            .map_err(|e| e.clone())
+    }
     pub fn clear(&mut self, ctx: &egui::Context) {
         if self.identity.is_none() {
             return;

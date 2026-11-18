@@ -1,0 +1,4 @@
+interface:
+  display_name: "AI Terminal"
+  short_description: "管理原生会话与团队、设置浮窗、查看项目文件，并按任务显式操作终端"
+  default_prompt: "使用 $ai-terminal 为当前主会话创建并分组一个协作团队。"

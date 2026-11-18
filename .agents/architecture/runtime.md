@@ -261,3 +261,12 @@ Windows 原生程序支持 `ai-terminal.exe --settings`，直接显示同一个�
 0.11.0 原生浮窗修复：floating_native 只对自身胶囊 HWND 移除系统标题栏、菜单、缩放按钮与边缘样式；WM_STYLECHANGING 在系统应用样式前过滤这些装饰，避免 DWM 非客户区绘制关闭后回退为旧式外框。保留已有 alpha、事件驱动几何、移动／DPI 路径和应用细边框，不修改主窗口、其他进程或用户会话。
 
 0.13.0：受管 qoder／qodercli 入口解析公开 qodercli，避免与 IDE 的 qoder 启动器混淆；参数、显式 --settings 和 CLI 自有认证／信任保留。Windows Media Engine 异步读取本地媒体，默认暂停；播放时仅按需更新进度，暂停后无应用计时刷新。播放列表和远程 URL 文件不接入。关闭文件、切换项目／会话和退出时先关闭引擎，再释放 WIC 位图、纹理与 COM／Media Foundation；视频与普通控件共用 egui 图层和裁切，菜单／弹窗不受原生视频表面遮挡。预览帧单边最多 1,920 像素、最多 30 帧／秒，仅有新帧时上传；原尺寸超过 16,384 或 64 百万像素时拒绝预览。
+
+
+## 管理器控制通道（0.14.0 预览）
+
+管理 CLI 与 hook 桥分离，使用 127.0.0.1 随机端口及进程级随机凭据；runtime/control.json 只保存当前 Windows 用户 DPAPI 密文。正常退出删除描述文件，崩溃遗留按连接失败处理。AI_TERMINAL_CONTROL_ENDPOINT、AI_TERMINAL_CONTROL_TOKEN、AI_TERMINAL_CONTROL_INSTANCE 和 AI_TERMINAL_CLI 仅传入自身会话环境；不写用户 PATH。current 由 AI_TERMINAL_SESSION 识别；显式 --data-dir 覆盖继承目标，跨实例清除调用者。新主程序以数据目录的原生命名互斥对象阻止双写；旧版本不具备该保护，不能共用目录并行运行。
+
+控制请求 256 KiB、响应 1 MiB、32 项待处理队列、16 项连接队列、4 个连接线程，读取／排队有截止时间；后台 ROOT 唤醒而非空闲轮询。元数据修改与启动／关闭分开；运行会话关闭需要 force，后台只回收该 Session 所有的资源。修改回执有界保留 64 项／4 MiB，不跨重启；超时先查回执与现状。详情见 docs/cli.md。
+
+0.14.0-preview.2：src/control/actions.rs 与 cli/native.rs 定义原生控制命令，src/app/control/native.rs 在 App::logic 执行设置、窗口／浮窗、面板、文件／Git 只读查看、媒体及显式终端 I/O。设置完整校验并原子保存后应用，不重启 PTY。文件／Git 复用有界后台读取，返回 loading、error 与分页；媒体复用当前文档拥有的原生引擎。终端读取仅当前 viewport；输入最多 64 KiB，只有显式请求才传递，不作为状态推断来源。回执保存 SHA-256 请求指纹与无正文确认，读取响应不缓存。截图只捕获本实例主窗口，PNG 编码在后台执行，不覆盖已有文件；输出是显式请求的制品而非自动日志。能力由 instance capabilities 发现；旧管理器通过 Info 预检明确拒绝新命令。

@@ -15,6 +15,33 @@ use std::{
 
 pub const CWD_PREFIX: &str = "ai-terminal-cwd;";
 
+/// Use the same owned session shim as an interactive Agent launch, without typing.
+pub fn build_agent(
+    spec: &SessionSpec,
+    agent: Agent,
+    bridge: &Bridge,
+    runtime: &Path,
+    helper: &Path,
+) -> Result<Launch, String> {
+    let name = match agent {
+        Agent::Codex => "codex.exe",
+        Agent::Claude => "claude.exe",
+        Agent::Qoder => "qodercli.exe",
+        Agent::QoderCn => "qoderclicn.exe",
+        Agent::Kimi => "kimi.exe",
+        Agent::ZCode => "zcode.exe",
+        Agent::Trae => "traecli.exe",
+        _ => return Err("Choose an Agent; use session start for a Shell".into()),
+    };
+    CliSearch::current().resolve(agent)?;
+    let mut launch = build(spec, bridge, runtime, helper)?;
+    let bin = PathBuf::from(&launch.environment["AI_TERMINAL_SHIM_DIR"]);
+    let (executable, arguments) = launch::pty_command(&bin.join(name), Vec::new(), helper)?;
+    launch.executable = executable;
+    launch.arguments = arguments;
+    Ok(launch)
+}
+
 pub fn build(
     spec: &SessionSpec,
     bridge: &Bridge,

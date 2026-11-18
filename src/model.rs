@@ -262,7 +262,7 @@ pub fn assign_group(groups: &mut Vec<SessionGroup>, session: &str, target: Optio
     true
 }
 
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Workspace {
     #[serde(default)]
     pub sessions: Vec<SessionSpec>,
