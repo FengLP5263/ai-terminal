@@ -4,6 +4,27 @@
 
 Record user-visible additions, improvements, fixes, and compatibility changes for each release; omit categories that do not apply. Review both languages together, use the same version entry in GitHub Releases, and ship both files in the ZIP. Historical summaries follow existing GitHub release notes and UTC publication dates; development versions without a separate release do not receive invented release dates.
 
+## [0.15.0] - 2026-11-18
+
+### Added
+
+- Add CLI `session resume` for an explicit Agent conversation ID. Manager session UUIDs and Agent conversation IDs are validated separately; `agent_resume` capability checks reject unsupported older managers.
+- Add independent Skill/minimum CLI version and protocol metadata, clearer team startup/resume guidance, and version/checksum verification in Skill and software archives.
+
+### Improved and fixed
+
+- Persist right-side Files/Git visibility and the selected tab per session. Legacy global preferences migrate only to their original active session; switching preserves running terminals.
+- Receive explicit Codex async-question OSC9 notices and prioritize a yellow unread marker in the existing sidebar/floating status slot. Preserve actual work state and clear on view; bells and ordinary text never imply questions.
+- Prioritize group floating attention over unread completion over running work. Viewed completion does not obscure another member's running indication.
+- Center images horizontally and vertically in a scrollable canvas, use a centered compact audio player, and place video controls below the picture. Standard controls include play/pause, time, seek dragging, mute restoration and replay after EOF, with responsive narrow layouts.
+
+### Compatibility and validation
+
+- Preserve sessions, groups, directories, colors and running processes. The new panel map reads legacy data; question unread state stays in memory. Control protocol schema remains 1.
+- `session resume` requires the newer CLI and an `agent_resume` manager. The base Skill remains compatible with CLI 0.14.0; older clients check Help first and use the documented explicit Shell restoration flow. No automatic `--last`, trust acceptance, model request or replacement of a live Agent is added.
+- Early question notices require Codex OSC9 and the corresponding notification types; the application does not rewrite personal Codex settings. Media continues to use Windows codecs, starts paused and releases the player on close/file changes.
+- The user accepted the preview UI. Offline regressions, isolated native CLI/event fixtures, wide/narrow captures and generated local-media playback checks are recorded separately; synthetic notices are not presented as real model-turn validation.
+
 ## [0.14.0] - 2026-11-18
 
 ### Added

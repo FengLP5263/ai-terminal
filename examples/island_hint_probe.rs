@@ -302,6 +302,7 @@ mod windows {
                                 color: None,
                                 activity: Activity::Idle,
                                 unread: false,
+                                question_unread: false,
                             },
                             Item {
                                 id: "zcode".into(),
@@ -310,6 +311,7 @@ mod windows {
                                 color: None,
                                 activity: fixture(true).activity,
                                 unread: true,
+                                question_unread: false,
                             },
                         ],
                         active: Some("zcode".into()),

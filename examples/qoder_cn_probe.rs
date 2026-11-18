@@ -184,6 +184,7 @@ impl eframe::App for Probe {
             color: None,
             activity: self.status.activity,
             unread: self.status.unread,
+            question_unread: self.status.question_unread,
             hint: "Native startup".into(),
         }];
         sidebar::show(
@@ -220,6 +221,7 @@ impl eframe::App for Probe {
                         color: None,
                         activity: self.status.activity,
                         unread: self.status.unread,
+                        question_unread: self.status.question_unread,
                     }],
                     active: Some("qoder".into()),
                     locale: Locale::En,

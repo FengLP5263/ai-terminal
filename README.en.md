@@ -80,7 +80,7 @@ Fit images to the window, view actual size or zoom; a checkerboard shows transpa
 
 ![Read-only image preview, zoom and transparency checkerboard](assets/readme/image-preview.en.png)
 
-Audio/video files have native play/pause, seek and volume controls. Playback starts only when you click Play; closing the preview or switching sessions stops it. Format availability depends on Windows codecs.
+Images and media are centered in the content area. Audio uses a compact player, with video controls below the picture; native controls provide play/pause, seeking, mute and volume. Playback starts only when you click Play; closing the preview or switching sessions stops it. Format availability depends on Windows codecs.
 
 ## Inspect Git changes and history
 
@@ -193,7 +193,7 @@ The default data directory is `%LOCALAPPDATA%/ai-terminal`. It stores session me
 
 ## CLI and Agent Skill
 
-0.14.0 provides a native management CLI for session creation, names, colors, grouping, ordering and explicit member-Agent startup, plus native settings, floating/window controls, file/Git viewing, media playback and explicit terminal interaction. Batch plans support validation, dry runs and atomic persistence while preserving existing terminals. [CLI documentation](docs/cli.en.md) · [Agent Skill package](docs/skills.en.md). Managers through 0.13.0 do not expose this API.
+The manager provides a native management CLI for session creation, names, colors, grouping, ordering and explicit member-Agent startup, plus native settings, floating/window controls, file/Git viewing, media playback and explicit terminal interaction. Batch plans support validation, dry runs and atomic persistence while preserving existing terminals. [CLI documentation](docs/cli.en.md) · [Agent Skill package](docs/skills.en.md). Managers through 0.13.0 do not expose this API. Version 0.15.0 adds explicit history restoration, per-session Files/Git panels, improved question notices and centered image/media previews.
 
 
 Run these commands inside a terminal created by this version:
@@ -204,6 +204,8 @@ ai-terminal-cli floating set --enabled true --transparency 0
 ```
 
 The full Windows package includes the CLI. Download the standalone Skill ZIP from the release page, extract it, and place the ai-terminal folder in your Agent's skill directory. User PATH is unchanged; owned sessions inherit this instance's CLI automatically. See the linked guides for external terminal use and installation details.
+
+The development Skill adds independent version.json metadata with its version, minimum CLI version and source. Software and Skills can update separately; check manager capabilities before using new commands, since updating a Skill does not upgrade the software. See [Skill versions and upgrades](docs/skills.en.md#versions-and-upgrades).
 
 ## Develop from source
 

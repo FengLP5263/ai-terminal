@@ -457,10 +457,47 @@ fn driver(output: &Path, leader: &str, steps: &mpsc::Sender<Step>) -> Value {
         "后台修改已同步"
     );
     ok(output, &["session", "activate", leader]);
-    ok(
-        output,
-        &["session", "run", front, "--agent", "codex", "--activate"],
+    let conversation = "a1234567-1234-4234-8234-123456789abc";
+    let leader_pid = ok(output, &["session", "show", leader])["process_id"].clone();
+    ok(output, &["panel", "open", "files"]);
+    ok(output, &["session", "activate", back]);
+    assert_eq!(
+        ok(output, &["session", "show", back])["project_panel"],
+        "closed"
     );
+    ok(output, &["panel", "open", "git"]);
+    capture(steps, "session-back-git.png");
+    ok(output, &["session", "activate", leader]);
+    assert_eq!(
+        ok(output, &["session", "show", leader])["project_panel"],
+        "files"
+    );
+    assert_eq!(
+        ok(output, &["session", "show", leader])["process_id"],
+        leader_pid
+    );
+    capture(steps, "session-leader-files.png");
+    ok(output, &["session", "activate", back]);
+    assert_eq!(
+        ok(output, &["session", "show", back])["project_panel"],
+        "git"
+    );
+    ok(output, &["session", "stop", back, "--force"]);
+    ok(output, &["session", "activate", leader]);
+    let resumed = ok(
+        output,
+        &[
+            "session",
+            "resume",
+            front,
+            "--agent",
+            "codex",
+            "--conversation-id",
+            conversation,
+        ],
+    );
+    assert_eq!(resumed["resume_requested"]["conversation_id"], conversation);
+    assert_eq!(resumed["readiness"], "process_started");
     let caller_path = output.join("fixture-caller.json");
     let deadline = Instant::now() + Duration::from_secs(8);
     while !caller_path.is_file() {
@@ -473,6 +510,19 @@ fn driver(output: &Path, leader: &str, steps: &mpsc::Sender<Step>) -> Value {
     let caller: Value = serde_json::from_slice(&std::fs::read(&caller_path).unwrap()).unwrap();
     assert_eq!(caller["info"]["result"]["caller_session"], front);
     assert_eq!(caller["info"]["instance_id"], info["instance_id"]);
+    assert_eq!(caller["args"], json!(["resume", conversation]));
+    until(output, &["session", "show", front], |v| {
+        v["activity"] == "working" && v["question_unread"] == true
+    });
+    capture(steps, "async-question-unread.png");
+    ok(output, &["session", "activate", front]);
+    let viewed = ok(output, &["session", "show", front]);
+    assert_eq!(viewed["question_unread"], false);
+    assert_eq!(viewed["activity"], "working");
+    std::fs::write(output.join("fixture-show-blocking-question"), b"ready").unwrap();
+    until(output, &["session", "show", front], |v| {
+        v["activity"] == "waiting"
+    });
     assert_eq!(
         cli(output, &["session", "run", front, "--agent", "codex"]).0,
         5
@@ -493,7 +543,7 @@ fn driver(output: &Path, leader: &str, steps: &mpsc::Sender<Step>) -> Value {
     let native = native_driver(output, leader);
     let final_state = ok(output, &["workspace", "show"]);
     assert_eq!(final_state["sessions"].as_array().unwrap().len(), 1);
-    json!({"ok":true,"native_controls":native,"synthetic_agent":true,"model_requests":false,"system_input":false,"checks":["external_instance","current_is_caller","batch_dry_run","batch_commit_and_save","receipt_deduplication","revision_conflict","group_global_order","native_team_screenshot","minimized_background_mutation","explicit_agent_shim_launch","inherited_instance_and_session","live_run_refused","live_close_requires_force","native_agent_screenshot","owned_agent_process_cleanup","unstarted_member_close"],"final_workspace":final_state})
+    json!({"ok":true,"native_controls":native,"synthetic_agent":true,"model_requests":false,"system_input":false,"checks":["external_instance","current_is_caller","batch_dry_run","batch_commit_and_save","receipt_deduplication","revision_conflict","group_global_order","native_team_screenshot","minimized_background_mutation","session_panel_isolation","panel_switch_preserves_pty","explicit_agent_shim_resume","exact_conversation_id_received","native_question_waiting","async_question_unread","question_view_preserves_working","inherited_instance_and_session","live_run_refused","live_close_requires_force","native_agent_screenshot","owned_agent_process_cleanup","unstarted_member_close"],"final_workspace":final_state})
 }
 #[cfg(windows)]
 fn alive(pid: u32) -> bool {
@@ -517,6 +567,8 @@ fn alive(_pid: u32) -> bool {
 fn main() -> eframe::Result {
     if std::env::current_exe().unwrap().file_stem().unwrap() == "codex" {
         println!("LOCAL AGENT STAND-IN — no model request or trust approval");
+        let arguments: Vec<_> = std::env::args().skip(1).collect();
+        println!("Explicit Agent arguments: {}", arguments.join(" "));
         let result = std::process::Command::new(std::env::var_os("AI_TERMINAL_CLI").unwrap())
             .args(["instance", "info"])
             .output()
@@ -525,9 +577,25 @@ fn main() -> eframe::Result {
         let root = PathBuf::from(std::env::var_os("AI_TERMINAL_CLI_PROBE").unwrap());
         std::fs::write(
             root.join("fixture-caller.json"),
-            serde_json::to_vec(&json!({"pid":std::process::id(),"info":info})).unwrap(),
+            serde_json::to_vec(&json!({"pid":std::process::id(),"info":info,"args":arguments}))
+                .unwrap(),
         )
         .unwrap();
+        use std::io::Write;
+        print!(
+            "\x1b]7501;state=working:app=codex\x1b\\\x1b]9;Question: synthetic unread question\x07"
+        );
+        std::io::stdout().flush().unwrap();
+        let deadline = Instant::now() + Duration::from_secs(20);
+        while !root.join("fixture-show-blocking-question").exists() {
+            assert!(
+                Instant::now() < deadline,
+                "driver did not finish unread-question check"
+            );
+            std::thread::sleep(Duration::from_millis(30));
+        }
+        print!("\x1b]7501;state=blocked:app=codex:kind=question\x1b\\");
+        std::io::stdout().flush().unwrap();
         std::thread::sleep(Duration::from_secs(60));
         return Ok(());
     }

@@ -2,6 +2,8 @@
 //! Engine I/O and decoding are asynchronous. Only the active preview owns a player.
 use crate::project_media::{MediaKind, Playable};
 use std::path::Path;
+#[cfg(windows)]
+mod controls;
 
 /// Pass a Unicode filesystem path to MF directly. Percent-encoded file URLs
 /// are treated as literal paths by some Windows source handlers (notably WAV).
@@ -208,6 +210,7 @@ mod native {
         kind: MediaKind,
         error: Option<String>,
         seek_preview: Option<f64>,
+        unmuted_volume: f64,
     }
     impl Player {
         pub fn new(ctx: &egui::Context, media: &Playable) -> Result<Self, String> {
@@ -252,6 +255,7 @@ mod native {
                 kind: media.kind,
                 error: None,
                 seek_preview: None,
+                unmuted_volume: 1.0,
             };
             unsafe {
                 player.engine.SetAutoPlay(false)?;
@@ -386,100 +390,141 @@ mod native {
             }
             Ok(())
         }
-        pub fn show(&mut self, ui: &mut egui::Ui) {
-            let locale = crate::i18n::locale(ui.ctx());
-            if self.failed() || self.error.is_some() {
-                ui.colored_label(crate::chrome::WAITING, locale.text("无法播放此文件，编码不受支持、文件损坏或系统媒体组件不可用。", "Cannot play this file. Its codec may be unsupported, the file may be damaged, or Windows media components may be unavailable."));
-                if let Some(error) = &self.error {
-                    ui.weak(error);
-                }
-                return;
-            }
-            let duration = self.duration();
-            let ready = duration.is_finite() && duration > 0.0;
-            let mut action = Ok(());
-            ui.horizontal_wrapped(|ui| {
-                let paused = self.paused();
-                if ui
-                    .add_enabled(
-                        ready,
-                        egui::Button::new(locale.text(
-                            if paused { "播放" } else { "暂停" },
-                            if paused { "Play" } else { "Pause" },
-                        )),
-                    )
-                    .clicked()
-                {
+        fn show_transport(&mut self, ui: &mut egui::Ui) {
+            let paused = self.paused();
+            let actions = controls::show(
+                ui,
+                controls::State {
+                    paused,
+                    position: self.position(),
+                    duration: self.duration(),
+                    volume: self.current_volume(),
+                },
+                &mut self.seek_preview,
+            );
+            let action = (|| -> windows::core::Result<()> {
+                if actions.toggle_play {
                     if unsafe { self.engine.IsEnded().as_bool() } {
-                        action = self.seek(0.0);
+                        self.seek(0.0)?;
                     }
-                    if action.is_ok() {
-                        action = if paused { self.play() } else { self.pause() };
+                    if paused { self.play()? } else { self.pause()? }
+                }
+                if let Some(position) = actions.seek {
+                    self.seek(position)?;
+                }
+                if actions.toggle_mute {
+                    let current = self.current_volume();
+                    if current > 0.0 {
+                        self.unmuted_volume = current;
+                        self.volume(0.0)?;
+                    } else {
+                        self.volume(self.unmuted_volume)?;
                     }
                 }
-                ui.label(format!(
-                    "{} / {}",
-                    time_label(self.position()),
-                    time_label(duration)
-                ));
-                let mut position = self
-                    .seek_preview
-                    .unwrap_or_else(|| self.position().max(0.0));
-                let seek = ui.add_enabled(
-                    ready,
-                    egui::Slider::new(&mut position, 0.0..=if ready { duration } else { 1.0 })
-                        .show_value(false),
-                );
-                if seek.changed() {
-                    self.seek_preview = Some(position);
+                if let Some(volume) = actions.volume {
+                    self.volume(volume)?;
+                    if volume > 0.0 {
+                        self.unmuted_volume = volume;
+                    }
                 }
-                if seek.drag_stopped() || (seek.changed() && !seek.dragged()) {
-                    action = self.seek(position);
-                    self.seek_preview = None;
-                }
-                ui.label(locale.text("音量", "Volume"));
-                let mut volume = unsafe { self.engine.GetVolume() };
-                if ui
-                    .add(egui::Slider::new(&mut volume, 0.0..=1.0).show_value(false))
-                    .changed()
-                {
-                    action = self.volume(volume);
-                }
-            });
+                Ok(())
+            })();
             if let Err(error) = action {
                 let _ = self.pause();
                 self.error = Some(error.to_string());
+                ui.ctx().request_repaint();
             }
-            if !ready {
-                ui.weak(locale.text("正在读取媒体信息…", "Loading media information…"));
-            }
-            if self.kind == MediaKind::Audio {
-                ui.vertical_centered(|ui| {
-                    ui.add_space(48.0);
-                    crate::file_icons::icon("audio.wav", false).show(ui, 48.0);
-                    ui.weak(locale.text("音频预览", "Audio preview"));
+        }
+        pub fn show(&mut self, ui: &mut egui::Ui) {
+            let locale = crate::i18n::locale(ui.ctx());
+            if self.failed() || self.error.is_some() {
+                let available = ui.available_rect_before_wrap();
+                let rect = egui::Rect::from_center_size(
+                    available.center(),
+                    egui::vec2(available.width().min(560.0), 120.0),
+                );
+                ui.scope_builder(egui::UiBuilder::new().max_rect(rect).layout(egui::Layout::top_down(egui::Align::Center)), |ui| {
+                    ui.colored_label(crate::chrome::WAITING, locale.text("无法播放此文件，编码不受支持、文件损坏或系统媒体组件不可用。", "Cannot play this file. Its codec may be unsupported, the file may be damaged, or Windows media components may be unavailable."));
+                    if let Some(error) = &self.error {
+                        ui.weak(error);
+                    }
                 });
-            } else {
-                if let Err(error) = self.video_frame(ui.ctx()) {
-                    let _ = self.pause();
-                    self.error = Some(error.to_string());
-                }
-                let available = ui.available_size().max(egui::vec2(1.0, 1.0));
-                if let Some(texture) = &self.texture {
-                    let scale = (available.x / self.frame_size[0] as f32)
-                        .min(available.y / self.frame_size[1] as f32);
-                    let size =
-                        egui::vec2(self.frame_size[0] as f32, self.frame_size[1] as f32) * scale;
-                    let (area, _) = ui.allocate_exact_size(available, egui::Sense::hover());
-                    let rect = egui::Rect::from_center_size(area.center(), size);
-                    ui.painter().image(
-                        texture.id(),
-                        rect,
-                        egui::Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1.0, 1.0)),
-                        egui::Color32::WHITE,
-                    );
-                }
+                return;
             }
+            let audio = self.kind == MediaKind::Audio;
+            if !audio && let Err(error) = self.video_frame(ui.ctx()) {
+                let _ = self.pause();
+                self.error = Some(error.to_string());
+                ui.ctx().request_repaint();
+            }
+            egui::ScrollArea::both()
+                .id_salt("native-media-preview")
+                .auto_shrink([false, false])
+                .show_viewport(ui, |ui, viewport| {
+                    let width =
+                        (viewport.width() - 32.0).clamp(180.0, if audio { 560.0 } else { 1100.0 });
+                    let control_height = controls::height(width);
+                    let (canvas, _) = ui.allocate_exact_size(
+                        egui::vec2(
+                            viewport.width().max(212.0),
+                            viewport
+                                .height()
+                                .max(control_height + if audio { 32.0 } else { 80.0 }),
+                        ),
+                        egui::Sense::hover(),
+                    );
+                    let controls = if audio {
+                        egui::Rect::from_center_size(
+                            canvas.center(),
+                            egui::vec2(width, control_height),
+                        )
+                    } else {
+                        let original = if self.frame_size[0] > 0 && self.frame_size[1] > 0 {
+                            egui::vec2(self.frame_size[0] as f32, self.frame_size[1] as f32)
+                        } else {
+                            egui::vec2(16.0, 9.0)
+                        };
+                        let scale = (width / original.x)
+                            .min((canvas.height() - control_height - 44.0) / original.y)
+                            .max(0.0);
+                        let picture_size = original * scale;
+                        let group = egui::Rect::from_center_size(
+                            canvas.center(),
+                            egui::vec2(width, picture_size.y + 12.0 + control_height),
+                        );
+                        let picture = egui::Rect::from_min_size(
+                            egui::pos2(group.center().x - picture_size.x / 2.0, group.top()),
+                            picture_size,
+                        );
+                        ui.painter().rect_filled(picture, 6.0, egui::Color32::BLACK);
+                        if let Some(texture) = &self.texture {
+                            ui.painter().image(
+                                texture.id(),
+                                picture,
+                                egui::Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1.0, 1.0)),
+                                egui::Color32::WHITE,
+                            );
+                        } else {
+                            ui.painter().text(
+                                picture.center(),
+                                egui::Align2::CENTER_CENTER,
+                                locale.text("正在准备视频画面…", "Preparing video…"),
+                                egui::FontId::proportional(14.0),
+                                crate::chrome::SECONDARY,
+                            );
+                        }
+                        egui::Rect::from_min_size(
+                            egui::pos2(group.left(), picture.bottom() + 12.0),
+                            egui::vec2(width, control_height),
+                        )
+                    };
+                    ui.scope_builder(
+                        egui::UiBuilder::new()
+                            .max_rect(controls)
+                            .layout(egui::Layout::top_down(egui::Align::Min)),
+                        |ui| self.show_transport(ui),
+                    );
+                });
             if !self.paused() {
                 ui.ctx().request_repaint_after(Duration::from_millis(
                     if self.kind == MediaKind::Video {

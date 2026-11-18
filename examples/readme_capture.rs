@@ -146,6 +146,7 @@ impl eframe::App for Capture {
                 color: item.color,
                 activity: item.activity,
                 unread: item.unread,
+                question_unread: item.question_unread,
                 hint: String::new(),
             })
             .collect();
@@ -565,6 +566,7 @@ fn main() -> eframe::Result {
                     color,
                     activity,
                     unread: matches!(activity, Activity::Completed | Activity::Waiting),
+                    question_unread: false,
                 })
                 .collect(),
                 active: Some("readme-0".into()),

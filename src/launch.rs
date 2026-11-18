@@ -203,7 +203,7 @@ pub fn codex_legacy_overrides() -> Vec<String> {
 /// Enable explicit user-attention notifications only within this managed Codex invocation.
 pub fn codex_notification_overrides() -> Vec<String> {
     vec![
-        "tui.notifications=['approval-requested','plan-mode-prompt']".into(),
+        "tui.notifications=['approval-requested','plan-mode-prompt','async-question']".into(),
         "tui.notification_method='osc9'".into(),
         "tui.notification_condition='always'".into(),
     ]

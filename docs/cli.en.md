@@ -24,6 +24,8 @@ ai-terminal-cli session run $r.result.results[0].id --agent codex --json
 
 Creation does not start a process. session start launches a Shell; session run launches a selected Agent only when no terminal is running. A restart does not automatically run Agents again. Login, trust and model tasks retain the CLI's own interaction; the manager does not submit prompts or approve permissions.
 
+Continuing existing work requires the Agent's historical conversation; starting its process does not restore that conversation. Unreleased changes add `session resume <manager-UUID> --agent codex --conversation-id <Codex-UUID>`. Check agent_resume capability first; the 0.14.0 release does not support it. See the [session reference](../skills/ai-terminal/references/sessions.en.md#starting-versus-resuming-a-conversation) for distinct IDs, safe restoration from an existing Shell and verification.
+
 External callers use the full executable path and, if needed, --data-dir to select manager metadata, not the project directory. User PATH is unchanged; owned child processes temporarily receive the executable path and AI_TERMINAL_CLI. current identifies the caller, not GUI selection. External callers query full UUIDs first.
 
 ## Commands and teams
@@ -52,6 +54,12 @@ ai-terminal-cli file open --path README.md
 - [Terminal interaction](../skills/ai-terminal/references/terminal.en.md): explicit viewport reads, text/keys/local scrolling, stop/restart and unread acknowledgement.
 
 Commands reuse native implementations. Settings validate/save before immediate application. Files/Git/media queue asynchronous work; inspect loading/error and actual results. The CLI does not operate system file pickers, installation/uninstallation, other applications or the user's clipboard, and adds no Git writes absent from the GUI. See `--help` for the complete command list.
+
+Unreleased changes persist the right-side Files/Git panel by manager session UUID. Switching restores that session's Files tab, Git tab or closed state; new sessions start closed. CLI panel open/close affects the selected session only.
+
+Unreleased changes also separate question notices from lifecycle. Explicit Codex OSC9 `Question:` events show a yellow unread marker in the sidebar/floating bar while the Agent can remain Working. session list/show expose question_unread; viewing/acknowledge clears the notice without implying an answer. Question contents are never retained.
+
+Codex 0.167 Auto notifications may use only a bell for unrecognized terminals, carrying no typed question information. Users can choose `tui.notification_method = "osc9"` in Codex; `tui.notification_condition = "always"` also emits while the terminal remains focused. Custom notification allowlists need async-question. The manager edits no user config and injects no -c options that would disable Codex's shared daemon. Sources: [question notifications](https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/tui/src/chatwidget/notifications.rs), [notification backends](https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/tui/src/notifications/mod.rs).
 
 ## Build and verify
 

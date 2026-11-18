@@ -44,6 +44,9 @@ pub struct HookEvent {
 pub struct Status {
     pub activity: Activity,
     pub unread: bool,
+    /// An explicit question notification that has not been viewed. Independent
+    /// of lifecycle: an asynchronous question can coexist with Working.
+    pub question_unread: bool,
     pub session_id: Option<String>,
     pub turn_id: Option<String>,
     pub last_event: Option<String>,
@@ -213,6 +216,12 @@ impl Status {
 
     /// The managed Codex TUI emitted a user-facing attention notification.
     pub fn codex_attention(&mut self, question: bool) {
+        self.codex_attention_when_viewing(question, false);
+    }
+    pub fn codex_attention_when_viewing(&mut self, question: bool, viewing: bool) {
+        if question && !viewing {
+            self.question_unread = true;
+        }
         if self.native_lifecycle {
             return;
         }
@@ -234,6 +243,7 @@ impl Status {
 
     pub fn acknowledge(&mut self) {
         self.unread = false;
+        self.question_unread = false;
     }
 
     pub fn codex_program(&mut self, state: egui_term::CodexProgramStatus, viewing: bool) {
@@ -299,6 +309,56 @@ mod tests {
         assert!(!status.unread);
         status.codex_program(Native::Auth, false);
         assert_eq!(status.activity, Activity::Waiting);
+    }
+
+    #[test]
+    fn native_question_waits_through_late_hooks_until_codex_reports_resumption() {
+        use egui_term::CodexProgramStatus as Native;
+        let mut status = Status::default();
+        status.codex_program(Native::Working, false);
+        status.codex_program(Native::Question, false);
+        assert_eq!(status.activity, Activity::Waiting);
+        assert!(!status.unread);
+        // Old hook events cannot overwrite the explicit native question.
+        assert!(!status.apply(&event("PreToolUse", "other-tool"), false));
+        assert!(!status.apply(&event("Stop", "older-turn"), false));
+        assert_eq!(status.activity, Activity::Waiting);
+        status.acknowledge();
+        assert_eq!(status.activity, Activity::Waiting);
+        status.codex_program(Native::Working, false);
+        assert_eq!(status.activity, Activity::Working);
+        status.codex_program(Native::Done, false);
+        assert_eq!(status.activity, Activity::Completed);
+        assert!(status.unread);
+    }
+
+    #[test]
+    fn async_question_attention_is_independent_of_work_and_clears_on_view() {
+        use egui_term::CodexProgramStatus as Native;
+        let mut status = Status::default();
+        status.codex_program(Native::Working, false);
+        status.codex_attention_when_viewing(true, false);
+        assert_eq!(status.activity, Activity::Working);
+        assert!(status.question_unread);
+        assert!(!status.unread);
+        status.codex_program(Native::Working, false);
+        assert!(
+            status.question_unread,
+            "another work report must preserve the unread notification"
+        );
+        status.acknowledge();
+        assert!(!status.question_unread);
+        assert_eq!(status.activity, Activity::Working);
+        status.codex_attention_when_viewing(true, true);
+        assert!(
+            !status.question_unread,
+            "an already-visible question is not unread"
+        );
+        status.codex_attention_when_viewing(false, false);
+        assert!(
+            !status.question_unread,
+            "approval is not an asynchronous question"
+        );
     }
     fn event(name: &str, turn: &str) -> HookEvent {
         HookEvent {

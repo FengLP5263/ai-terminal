@@ -55,3 +55,5 @@ Tabler 原件必须保持 .gitattributes 的 -text 规则：SVG 和 LICENSE.txt 
 
 
 0.14.0 预览新增 ai-terminal-cli.exe、skills/ai-terminal 与 docs 下双语 CLI／技能说明；manifest.management_cli 声明时必须核对这些成员。源码身份覆盖公开技能和说明，不能只复制新 EXE。skill-package 生成独立技能 ZIP，verify-skills 回读逐文件身份与安全成员；旧格式软件 ZIP 保持可校验。
+
+未发布：独立技能 ZIP 从 skills/ai-terminal/version.json 读取技能版本，软件版本仅记录构建环境，不再代替技能版本。schema 2 manifest、技能内版本与最低 CLI 版本须一致；软件 ZIP 的 management_cli 也声明并核对这些版本。保留已发布旧格式包的校验，不覆盖旧制品。

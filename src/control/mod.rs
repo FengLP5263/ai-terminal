@@ -64,6 +64,12 @@ pub enum Command {
         agent: Agent,
         activate: bool,
     },
+    Resume {
+        id: String,
+        agent: Agent,
+        conversation_id: String,
+        activate: bool,
+    },
     Close {
         id: String,
         force: bool,
@@ -146,6 +152,39 @@ impl ApiError {
     }
 }
 pub type ApiResult<T> = Result<T, ApiError>;
+
+/// Agent conversation IDs are opaque metadata, never shell commands or prompts.
+pub fn resume_arguments(agent: Agent, conversation_id: &str) -> ApiResult<Vec<String>> {
+    if conversation_id.is_empty()
+        || conversation_id.len() > 256
+        || !conversation_id.as_bytes()[0].is_ascii_alphanumeric()
+        || !conversation_id
+            .bytes()
+            .all(|c| c.is_ascii_alphanumeric() || c == b'-' || c == b'_')
+    {
+        return Err(ApiError::new(
+            "invalid_argument",
+            "Invalid Agent conversation ID",
+        ));
+    }
+    if agent == Agent::Codex && uuid::Uuid::parse_str(conversation_id).is_err() {
+        return Err(ApiError::new(
+            "invalid_argument",
+            "Codex conversation ID must be a UUID",
+        ));
+    }
+    let option = match agent {
+        Agent::Codex | Agent::Trae => "resume",
+        Agent::Claude | Agent::Qoder | Agent::QoderCn => "--resume",
+        _ => {
+            return Err(ApiError::new(
+                "unsupported_command",
+                "This Agent has no supported resume entry",
+            ));
+        }
+    };
+    Ok(vec![option.into(), conversation_id.into()])
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Response {

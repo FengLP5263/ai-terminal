@@ -273,6 +273,37 @@ fn image_controls_and_text_page_buttons_remain_inside_the_read_only_view() {
     assert!(text_rect(&output, "Fit").is_some());
     assert!(text_rect(&output, "100%").is_some());
     assert!(text_rect(&output, "Read only").is_some());
+    for (width, zoom) in [(800.0, 1.0), (1200.0, 1.33), (1600.0, 2.0)] {
+        f.ctx.set_zoom_factor(zoom);
+        f.frame(vec![], width);
+        let output = f.frame(vec![], width);
+        let manager = f.ctx.tex_manager();
+        let manager = manager.read();
+        let image = output
+            .shapes
+            .iter()
+            .find_map(|shape| {
+                if let egui::Shape::Mesh(mesh) = &shape.shape
+                    && manager
+                        .meta(mesh.texture_id)
+                        .is_some_and(|meta| meta.name == "project-image")
+                {
+                    Some((mesh.calc_bounds(), shape.clip_rect))
+                } else {
+                    None
+                }
+            })
+            .expect("The loaded image must be drawn");
+        assert!(
+            (image.0.center().x - image.1.center().x).abs() < 1.0,
+            "Image must be centered horizontally"
+        );
+        assert!(
+            (image.0.center().y - image.1.center().y).abs() < 1.0,
+            "Image must be centered vertically"
+        );
+    }
+    f.ctx.set_zoom_factor(1.0);
     std::fs::write(f.root.path().join("large.txt"), "row\n".repeat(20_004)).unwrap();
     f.client.open_file(Path::new("large.txt"));
     wait(&mut f.client, |c| {

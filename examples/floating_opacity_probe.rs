@@ -193,6 +193,7 @@ impl eframe::App for Probe {
                             Activity::Idle
                         },
                         unread: n == 2,
+                        question_unread: false,
                     })
                     .collect(),
                 active: Some("0".into()),

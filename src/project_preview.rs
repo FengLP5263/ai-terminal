@@ -329,7 +329,7 @@ impl View {
                 },
             )
         });
-        let available = ui.available_size().max(egui::vec2(1.0, 1.0));
+        let available = (ui.available_size() - egui::Vec2::splat(32.0)).max(egui::vec2(1.0, 1.0));
         let original = egui::vec2(image.original[0] as f32, image.original[1] as f32);
         let scale = self.zoom.unwrap_or_else(|| {
             (available.x / original.x)
@@ -339,8 +339,11 @@ impl View {
         let size = original * scale;
         egui::ScrollArea::both()
             .id_salt(("project-image", &self.identity))
-            .show(ui, |ui| {
-                let (rect, _) = ui.allocate_exact_size(size, egui::Sense::hover());
+            .auto_shrink([false, false])
+            .show_viewport(ui, |ui, viewport| {
+                let (canvas, _) =
+                    ui.allocate_exact_size(viewport.size().max(size), egui::Sense::hover());
+                let rect = egui::Rect::from_center_size(canvas.center(), size);
                 ui.painter().image(
                     checker.id(),
                     rect,

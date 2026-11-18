@@ -9,6 +9,8 @@ description: "使用 ai-terminal-cli 控制运行中的 AI Terminal：会话、�
 
 通过管理器执行操作，让界面与保存的数据同步。需要支持管理 CLI 的 Windows 版本；0.13.0 及以前没有此接口。命令默认输出 UTF-8 JSON，可显式加 `--json`。
 
+本技能的独立版本、最低 CLI 版本和来源见 [version.json](version.json)。先核对实例能力；技能更新不会给正在运行的旧管理器增加接口。
+
 ## 选择入口与实例
 
 在受管会话中直接运行 `ai-terminal-cli instance info --json`；若 PATH 不可用，PowerShell 用 `& $env:AI_TERMINAL_CLI instance info --json`。从外部终端调用时使用完整程序路径，必要时加 `--data-dir <目录>` 指定管理器的数据目录，不能填项目目录。先核对返回的版本、实例、数据目录和 caller_session。
@@ -17,7 +19,7 @@ description: "使用 ai-terminal-cli 控制运行中的 AI Terminal：会话、�
 
 ## 按任务读取
 
-- 查询、创建、改名、配色、启动、切换、关闭：读 [会话命令](references/sessions.md)。
+- 查询、创建、改名、配色、启动、恢复历史对话、切换、关闭：读 [会话命令](references/sessions.md)。
 - 建组、改组、解散和排序：读 [分组命令](references/groups.md)。
 - 批量建队伍、引用当前主会话、预演及启动成员：读 [团队编排](references/teams.md)。
 - 语言／字体／缩放、窗口、侧栏与浮窗：读 [原生设置](references/settings.md)。
@@ -30,6 +32,7 @@ description: "使用 ai-terminal-cli 控制运行中的 AI Terminal：会话、�
 1. 查询现状并确定目标 UUID。以用户要求为范围，不改其他会话。
 2. 多项元数据修改用 workspace apply；先 dry-run 检查，再按需附 if_revision 提交。参数错误整批不变；预演生成的 UUID 是临时的，应使用实际提交返回的 UUID。
 3. 新会话默认未启动。用户要求启动 Agent 时，单独用 session run；只启动 Shell 则用 session start。run 只接受没有运行终端的会话，不把命令打进正在交互的 CLI。
+   用户要继续已有任务时，先确定对应的 Agent 对话 ID，再按会话参考恢复。打开空白 Agent 或收到 process_started 都不代表已经进入原对话。
 4. 检查退出码和 JSON 的 ok/error，不能只检查输出存在。启动回执仅表示进程已建立；状态继续来自原生生命周期，不代表登录、hook、模型或任务就绪。
 5. 回读会话或工作区，报告实际创建的会话、组、顺序和启动结果。
 

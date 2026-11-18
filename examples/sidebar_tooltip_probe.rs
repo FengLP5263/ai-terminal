@@ -156,6 +156,7 @@ impl eframe::App for Probe {
             color: Some(SessionColor::Green),
             activity: Activity::Idle,
             unread: false,
+            question_unread: false,
             hint: "就绪 · 最近事件 OSC701".into(),
         }];
         let groups = [SessionGroup {

@@ -224,3 +224,11 @@ target/release/examples/cli_probe.exe output/<全新目录>
 ```
 
 POSIX 同名 skill-package／verify-skills 动作可跨平台执行，原生 CLI／GUI 仍只支持 Windows。cli_probe 在独立目录中暂存本次二进制，以真实 CLI 子进程调用正式 App：覆盖团队预演／提交、重复回执、版本冲突、最小化后台修改、Agent shim 启动与调用者身份、强关确认和自身进程回收，追加原生设置、浮窗透明度、文件分页／Markdown／图片、合成静音 WAV 播放和只读 Git、显式测试输入与停止／重启，生成三张原生 PNG 与 result.json。Agent 为本地替身，不执行模型、用户 profile 或系统输入。完整 Windows ZIP 携带 CLI、公开技能与双语使用文档；旧格式 ZIP 校验兼容保留。
+
+0.15.0 的 cli_probe 还校验恢复参数和准确对话 ID、文件／Git 面板跨会话独立及原 PTY 保留，增加 session-back-git.png 和 session-leader-files.png。独立 Skill 使用自己的 version.json 和 schema 2 manifest，最低 CLI 版本与构建时软件版本分开记录；旧已发布技能包继续可校验。
+
+cli_probe 的 Agent 替身还发送明确的 working → blocked/question，校验 waiting 与黄色截图；不将它写成真实 Codex 模型提问已验收。
+
+异步提问阶段增加 async-question-unread.png：后台替身以明确 OSC9 Question 通知设置独立未读标记，保持 working；查看后清除标记但不停止工作，再验证阻塞等待。与 Codex 是否选择 OSC9 后端的用户设置分开验证。
+
+多媒体预览的 media_probe 还验证标准控件的实际点击、静音恢复和结束后重播，生成宽／窄音频及视频共四张布局图，以及不支持文件截图；只向自身 egui 窗口注入合成输入，播放保持静音。图片布局回归在 project_ui 中检查实际纹理的居中与缩放。

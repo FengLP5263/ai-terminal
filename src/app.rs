@@ -28,6 +28,7 @@ const YELLOW: Color32 = Color32::from_rgb(235, 184, 82);
 struct Session {
     terminal_id: u64,
     spec: SessionSpec,
+    project_panel: model::ProjectPanel,
     status: Status,
     backend: Option<TerminalBackend>,
     job: Option<crate::platform::ProcessJob>,
@@ -51,6 +52,7 @@ impl Session {
         Self {
             terminal_id: 0,
             spec,
+            project_panel: Default::default(),
             status: Status::default(),
             backend: None,
             job: None,
@@ -382,6 +384,12 @@ impl App {
             }
         }
         let mut preferences = workspace.ui.normalize();
+        workspace
+            .session_panels
+            .get(workspace.active.as_deref().unwrap_or_default())
+            .copied()
+            .unwrap_or_default()
+            .apply(&mut preferences);
         let actual_font =
             ai_terminal::appearance::set_terminal_font(&cc.egui_ctx, preferences.terminal_font);
         let shortcut_attempted = ai_terminal::shortcut::ensure_first_run(
@@ -435,7 +443,20 @@ impl App {
             helper: std::env::current_exe()
                 .map(|p| p.with_file_name("ai-terminal-hook.exe"))
                 .map_err(|e| e.to_string()),
-            sessions: workspace.sessions.into_iter().map(Session::new).collect(),
+            sessions: workspace
+                .sessions
+                .into_iter()
+                .map(|spec| {
+                    let panel = workspace
+                        .session_panels
+                        .get(&spec.id)
+                        .copied()
+                        .unwrap_or_default();
+                    let mut session = Session::new(spec);
+                    session.project_panel = panel;
+                    session
+                })
+                .collect(),
             groups: workspace.groups,
             group_edit: None,
             group_name: String::new(),
@@ -506,6 +527,7 @@ impl App {
         let workspace = Workspace {
             sessions: self.sessions.iter().map(|s| s.spec.clone()).collect(),
             groups: self.groups.clone(),
+            session_panels: self.session_panel_states(),
             active: self.active.clone(),
             last_directory: self.last_directory.clone(),
             ui: self.preferences,
@@ -526,6 +548,15 @@ impl App {
         index: usize,
         ctx: &egui::Context,
         agent: Option<Agent>,
+    ) {
+        self.start_session_with_agent_arguments(index, ctx, agent, Vec::new());
+    }
+    fn start_session_with_agent_arguments(
+        &mut self,
+        index: usize,
+        ctx: &egui::Context,
+        agent: Option<Agent>,
+        arguments: Vec<String>,
     ) {
         let Some(bridge) = self.bridge.as_ref() else {
             return;
@@ -549,9 +580,10 @@ impl App {
                     .into());
                 }
                 let mut launch = if let Some(agent) = agent {
-                    ai_terminal::shell::build_agent(
+                    ai_terminal::shell::build_agent_with_arguments(
                         &session.spec,
                         agent,
+                        arguments,
                         bridge,
                         &self.directory.join("runtime"),
                         helper,
@@ -658,21 +690,37 @@ impl App {
         }
         self.sync_visibility();
     }
+    fn terminal_surface_visible(&self) -> bool {
+        self.can_draw
+            && !self.confirm_exit
+            && self.git.as_ref().is_none_or(|g| g.patch.is_none())
+            && self.project_files.file.is_none()
+            && self.closing.is_none()
+    }
     fn sync_visibility(&self) {
+        let visible = self.terminal_surface_visible();
         for s in &self.sessions {
             if let Some(b) = &s.backend {
-                b.set_visible(
-                    self.can_draw
-                        && !self.confirm_exit
-                        && self.git.as_ref().is_none_or(|g| g.patch.is_none())
-                        && self.project_files.file.is_none()
-                        && self.closing.is_none()
-                        && self.active.as_deref() == Some(&s.spec.id),
-                );
+                b.set_visible(visible && self.active.as_deref() == Some(&s.spec.id));
             }
         }
     }
     fn activate(&mut self, id: String, ctx: &egui::Context) {
+        if self.active.as_deref() != Some(&id) {
+            if let Some(previous) = self
+                .sessions
+                .iter_mut()
+                .find(|s| Some(&s.spec.id) == self.active.as_ref())
+            {
+                previous.project_panel = model::ProjectPanel::from_settings(self.preferences);
+            }
+            self.sessions
+                .iter()
+                .find(|s| s.spec.id == id)
+                .map(|s| s.project_panel)
+                .unwrap_or_default()
+                .apply(&mut self.preferences);
+        }
         self.project_view.release_document(ctx);
         self.terminal_focus_pending = true;
         self.active = Some(id.clone());
@@ -694,6 +742,7 @@ impl App {
         let workspace = Workspace {
             sessions: self.sessions.iter().map(|s| s.spec.clone()).collect(),
             groups: self.groups.clone(),
+            session_panels: self.session_panel_states(),
             active: self.active.clone(),
             last_directory: self.last_directory.clone(),
             ui: self.preferences,
@@ -879,6 +928,7 @@ impl App {
                     color: s.spec.color,
                     activity: s.status.activity,
                     unread: s.status.unread,
+                    question_unread: s.status.question_unread,
                 })
                 .collect(),
             active: self.active.clone(),
@@ -941,6 +991,7 @@ impl App {
     }
     fn receive_events(&mut self, ctx: &egui::Context) {
         let focused = ctx.input(|i| i.viewport().focused.unwrap_or(false));
+        let question_viewed = focused && self.terminal_surface_visible();
         let mut git_prompt = false;
         if let Some(bridge) = &self.bridge {
             for event in bridge.receiver.try_iter().take(256) {
@@ -997,7 +1048,11 @@ impl App {
                             .as_ref()
                             .and_then(|b| b.take_codex_attention(&title))
                     {
-                        session.status.codex_attention(question);
+                        let viewing =
+                            question_viewed && self.active.as_deref() == Some(&session.spec.id);
+                        session
+                            .status
+                            .codex_attention_when_viewing(question, viewing);
                     }
                 }
                 PtyEvent::Title(title) if session.spec.agent.is_shell() => {
@@ -1057,7 +1112,10 @@ impl App {
                 .iter_mut()
                 .find(|s| Some(&s.spec.id) == self.active.as_ref())
         {
-            session.status.acknowledge();
+            session.status.unread = false;
+            if question_viewed {
+                session.status.question_unread = false;
+            }
         }
     }
     fn preferences_changed(&mut self, ctx: &egui::Context) {
@@ -1084,8 +1142,9 @@ impl App {
                 color: s.spec.color,
                 activity: s.status.activity,
                 unread: s.status.unread,
+                question_unread: s.status.question_unread,
                 hint: format!(
-                    "{}{}",
+                    "{}{}{}",
                     if s.backend.is_some() || s.status.activity != Activity::Unknown {
                         i18n::activity(locale, s.status.activity)
                     } else {
@@ -1099,7 +1158,12 @@ impl App {
                             t.elapsed().as_secs(),
                             locale.text("秒前", "seconds ago")
                         ))
-                        .unwrap_or_default()
+                        .unwrap_or_default(),
+                    if s.status.question_unread {
+                        locale.text(" · 有未查看的提问", " · Unread question")
+                    } else {
+                        ""
+                    }
                 ),
             })
             .collect();

@@ -179,31 +179,51 @@ fn request_fingerprints_use_sha256_without_retaining_input() {
 #[test]
 fn newer_cli_preflights_old_manager_without_sending_a_native_mutation() {
     use std::{sync::Arc, time::Duration};
-    let dir = tempfile::tempdir().unwrap();
-    let server = control::ControlServer::start(dir.path(), Arc::new(|| {})).unwrap();
-    let path = dir.path().to_owned();
-    let client = std::thread::spawn(move || {
-        std::process::Command::new(env!("CARGO_BIN_EXE_ai-terminal-cli"))
-            .args(["--data-dir", path.to_str().unwrap(), "floating", "show"])
-            .output()
-            .unwrap()
-    });
-    let pending = server
-        .receiver
-        .recv_timeout(Duration::from_secs(4))
-        .unwrap();
-    assert!(matches!(pending.request.action, control::Command::Info));
-    pending
-        .reply
-        .send(control::Response::new(
-            &pending.request.request_id,
-            &server.descriptor.instance_id,
-            Ok(serde_json::json!({"version":"0.14.0-preview.1"})),
-        ))
-        .unwrap();
-    let result = client.join().unwrap();
-    assert_eq!(result.status.code(), Some(2));
-    let value: serde_json::Value = serde_json::from_slice(&result.stdout).unwrap();
-    assert_eq!(value["error"]["code"], "unsupported_command");
-    assert!(server.receiver.try_recv().is_err());
+    for (arguments, info) in [
+        (
+            vec!["floating", "show"],
+            serde_json::json!({"version":"0.14.0-preview.1"}),
+        ),
+        (
+            vec![
+                "session",
+                "resume",
+                "current",
+                "--agent",
+                "codex",
+                "--conversation-id",
+                "a1234567-1234-4234-8234-123456789abc",
+            ],
+            serde_json::json!({"version":"0.14.0","capabilities":{"native_controls":true}}),
+        ),
+    ] {
+        let dir = tempfile::tempdir().unwrap();
+        let server = control::ControlServer::start(dir.path(), Arc::new(|| {})).unwrap();
+        let path = dir.path().to_owned();
+        let client = std::thread::spawn(move || {
+            std::process::Command::new(env!("CARGO_BIN_EXE_ai-terminal-cli"))
+                .args(["--data-dir", path.to_str().unwrap()])
+                .args(arguments)
+                .output()
+                .unwrap()
+        });
+        let pending = server
+            .receiver
+            .recv_timeout(Duration::from_secs(4))
+            .unwrap();
+        assert!(matches!(pending.request.action, control::Command::Info));
+        pending
+            .reply
+            .send(control::Response::new(
+                &pending.request.request_id,
+                &server.descriptor.instance_id,
+                Ok(info),
+            ))
+            .unwrap();
+        let result = client.join().unwrap();
+        assert_eq!(result.status.code(), Some(2));
+        let value: serde_json::Value = serde_json::from_slice(&result.stdout).unwrap();
+        assert_eq!(value["error"]["code"], "unsupported_command");
+        assert!(server.receiver.try_recv().is_err());
+    }
 }

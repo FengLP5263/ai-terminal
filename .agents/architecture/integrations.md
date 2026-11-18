@@ -92,3 +92,5 @@ Kimi Code 2.5.0 使用自身 pi-tui 的 OSC 7501 `app=kimi-code`；仅受管入�
 0.14.0 预览：其他 Agent 可通过 ai-terminal-cli 管理导航、会话所属进程生命周期和团队编排，能力范围与用户授权一致。session run 仅在没有运行终端的会话中调用现有公开 CLI／shim，不向已有终端注入输入、不发送提示词、不接受信任或权限。preview.1 查询仅导航和状态元数据；preview.2 的显式内容接口见下文，不暴露 hook token 或账号。CLI 接口和消费技能分别见 docs/cli.md 与 skills/ai-terminal/SKILL.md。
 
 0.14.0-preview.2：src/control/actions.rs 与 cli/native.rs 定义原生控制命令，src/app/control/native.rs 在 App::logic 执行设置、窗口／浮窗、面板、文件／Git 只读查看、媒体及显式终端 I/O。设置完整校验并原子保存后应用，不重启 PTY。文件／Git 复用有界后台读取，返回 loading、error 与分页；媒体复用当前文档拥有的原生引擎。终端读取仅当前 viewport；输入最多 64 KiB，只有显式请求才传递，不作为状态推断来源。回执保存 SHA-256 请求指纹与无正文确认，读取响应不缓存。截图只捕获本实例主窗口，PNG 编码在后台执行，不覆盖已有文件；输出是显式请求的制品而非自动日志。能力由 instance capabilities 发现；旧管理器通过 Info 预检明确拒绝新命令。
+
+0.15.0：session resume 只使用已有的 Codex／TRAE resume ID、Claude／Qoder／Qoder CN --resume ID 入口。管理器 UUID 与 Agent 对话 ID 分开校验；Codex 要求 UUID，其他已接入恢复入口只接受有界 ASCII 标识。Kimi／ZCode 明确不支持，不转为任意启动参数。CLI 不读取外部 Agent 的私有历史数据库、提示词或凭据，也不宣称 process_started 已验证对话恢复。
