@@ -31,3 +31,8 @@ Git Bash 加载系统／用户登录配置后再追加会话集成，保留提�
 0.4.10 的字体目录与设置共用 FontChoice；改动不能重启运行终端。内置字体保持来源字节，系统字体仅从 Windows Fonts 读取，不安装或复制。安装版源在 scripts/installer，独立于 Rust GUI／helper；编译工具通过忽略目录或 AI_TERMINAL_NSIS 配置，固定身份后才运行。命令见 scripts/README.md。
 
 通用功能图标优先复用已集成的微软 Codicons，保持字号和缩放一致；新资产保留官方来源、原始许可和哈希。
+
+
+管理 CLI 在 src/control，App 接入位于 src/app/control.rs；控制台入口 src/bin/ai-terminal-cli.rs 不初始化 GUI。改动要同步 docs/cli、docs/skills 与面向用户的 skills/ai-terminal 双语参考，不能把开发技能当作产品使用技能。build/release 同时生成三个 EXE；用户会话只临时继承本机实例能力。
+
+CLI 原生操作回归由 cli_probe 扩展覆盖：通过真实外部 CLI 核对最小化设置、浮窗 50% 透明度、原 PTY PID、文件分页／Markdown／图片、合成本地静音 WAV 播放／暂停／跳转、只读 Git、显式样例输入和停止／重启。新增原生命令必须走 App::logic，读取内容不写回执，不能在 ctx.input 内再次获取 Context 锁。

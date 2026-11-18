@@ -18,3 +18,10 @@ SemVer treats 0.y.z as initial development without a stable public API promise. 
 Before release, record the previous stable tag, full scope, change level and target version. Cargo.toml, Cargo.lock, bilingual CHANGELOG, installer version, artifact names and app-v<version> tags must agree. Run existing governance, tests and archive verification, and build from a reviewed clean mainline commit. GitHub Releases reuse that entry plus actual validation and asset hashes. Permissions and PR flow remain governed by [Git workflow](../.agents/skills/ai-terminal-git-workflow/SKILL.en.md).
 
 Do not overwrite or rename published versions, tags or artifacts. Fix issues in a new version. Historical public releases and delivered local previews retain their original versions. The local 0.4.12-preview.N development is consolidated into stable 0.5.0; no stable 0.4.12 is published.
+
+
+## Release display titles
+
+GitHub Release display titles use `AI Terminal <SemVer>`, for example `AI Terminal 0.13.0`, with fixed project-name capitalization and one space before the version. Keep feature summaries in the bilingual Chinese/English body rather than the title.
+
+Display titles are presentation metadata and historical formatting may be normalized at the user's request. Published version numbers, `app-v<SemVer>` tags, commit targets, asset filenames and contents remain subject to the immutable identity rules above. Verify the display title, corresponding tag and bilingual body after publication.

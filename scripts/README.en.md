@@ -198,3 +198,17 @@ Native Git scale checks (Windows): build with `cargo build --offline --locked --
 Qoder international startup: build `cargo build --offline --locked --release --bins --example qoder_cn_probe`, then run `target/release/examples/qoder_cn_probe.exe output/<unique-qoder> qoder <isolated-directory>`. Starts installed qodercli without a prompt, login or trust approval; checks the reused avatar and records actual hook connectivity separately. `tests/qoder.rs`, App reducer tests and PowerShell/CMD/Git Bash fixture tests cover identity, resume, advisory hooks and explicit settings.
 
 Native media: build `cargo build --offline --locked --release --example media_probe`. In a unique output directory generate a six-second WAV and four-second H.264 MP4 with a local fixture generator (for example an existing ffmpeg), named `音频 😀.wav` and `视频 #1.mp4`; run `target/release/examples/media_probe.exe output/<unique-media>`. Uses the real production player, muted, to check initial pause, playback progression, pause, seek, end-of-file, release and unsupported input. Inspect result.json and three native PNGs. Generated fixtures only; no user media, network, Agent or model requests. `tests/media_playback.rs` additionally checks large-file dispatch without body reads and escaped local paths.
+
+
+## Management CLI and Skill
+
+build/release produce ai-terminal.exe, ai-terminal-hook.exe and the console ai-terminal-cli.exe. See [CLI documentation](../docs/cli.en.md); no user/system PATH configuration is written.
+
+```powershell
+.\scripts\windows\project.ps1 skill-package
+.\scripts\windows\project.ps1 verify-skills -Path output/skills/<archive>.zip
+cargo build --offline --locked --release --bins --example cli_probe
+target/release/examples/cli_probe.exe output/<fresh-directory>
+```
+
+Matching POSIX skill-package/verify-skills actions are portable; the native CLI/GUI still require Windows. cli_probe stages only its own binaries and calls the production App through real CLI subprocesses. It covers team preview/commit, duplicate receipts, revision conflicts, minimized updates, Agent shim startup/caller identity, running-close protection and owned-process cleanup, producing three native PNGs and result.json. The Agent is a local stand-in: no model request, user profile or system input. Full Windows ZIPs include the CLI, public Skill and bilingual usage documentation, while verification remains compatible with older archives. Extended checks cover native settings/floating transparency, file pagination/Markdown/images, synthetic muted WAV playback, read-only Git, explicit fixture input, stop and restart.

@@ -24,3 +24,8 @@ Pinned native console assets live in assets/windows/conpty. build.rs stages conp
 For 0.4.10, the font catalog and Settings share FontChoice; changes must preserve running terminals. Embedded fonts retain original bytes, while system fonts are read only from Windows Fonts, never installed/copied. Installer sources live in scripts/installer independently of the Rust GUI/helper. Configure the pinned compiler under ignored tooling or AI_TERMINAL_NSIS; see scripts/README.en.md.
 
 Prefer the integrated Microsoft Codicons for general feature icons, keeping size and zoom consistent. Preserve official provenance, original licenses and hashes for new assets.
+
+
+Management lives in src/control and src/app/control.rs; the console entry src/bin/ai-terminal-cli.rs does not initialize GUI resources. Keep docs/cli, docs/skills and public skills/ai-terminal references bilingual and synchronized; development skills are separate from product usage. build/release produce three executables, and owned sessions inherit only a process-local instance capability.
+
+cli_probe native-control coverage uses the real external CLI for minimized settings, 50% floating transparency, preserved PTY PID, file pagination/Markdown/images, synthetic muted WAV playback/pause/seek, read-only Git, explicit fixture input and stop/restart. New commands execute in App::logic; read contents never enter receipts. Never reacquire Context locks inside ctx.input.

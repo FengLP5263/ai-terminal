@@ -87,3 +87,8 @@ Kimi Code 2.5.0 使用自身 pi-tui 的 OSC 7501 `app=kimi-code`；仅受管入�
 0.4.12：Git for Windows 另作为可选只读工具，提供当前目录的分支、状态与历史；不捆绑、自动安装或访问远端。不把查看仓库视为修改代码、提交或同步的授权；不持久化文件正文、提交历史或凭据。界面和限制见 [Git 面板](../../docs/git.md)。
 
 0.13.0：Qoder 国际版通过公开 qodercli（受管 Shell 同时提供 qoder／qodercli）接入，独立于 Qoder CN；不将 IDE 的 qoder 命令视为 CLI。复用会话级 --settings、--resume 及 Qoder hook 事件，不覆盖显式设置、不写用户配置或确认信任。本机 1.1.90 的真实启动、合成 hook 和真实模型回合分别记录。官方接口见 https://docs.qoder.com/cli/cli-reference 与 https://docs.qoder.com/cli/hooks 。Windows 音视频解码使用系统 Media Foundation，不引入其他源码仓库。
+
+
+0.14.0 预览：其他 Agent 可通过 ai-terminal-cli 管理导航、会话所属进程生命周期和团队编排，能力范围与用户授权一致。session run 仅在没有运行终端的会话中调用现有公开 CLI／shim，不向已有终端注入输入、不发送提示词、不接受信任或权限。preview.1 查询仅导航和状态元数据；preview.2 的显式内容接口见下文，不暴露 hook token 或账号。CLI 接口和消费技能分别见 docs/cli.md 与 skills/ai-terminal/SKILL.md。
+
+0.14.0-preview.2：src/control/actions.rs 与 cli/native.rs 定义原生控制命令，src/app/control/native.rs 在 App::logic 执行设置、窗口／浮窗、面板、文件／Git 只读查看、媒体及显式终端 I/O。设置完整校验并原子保存后应用，不重启 PTY。文件／Git 复用有界后台读取，返回 loading、error 与分页；媒体复用当前文档拥有的原生引擎。终端读取仅当前 viewport；输入最多 64 KiB，只有显式请求才传递，不作为状态推断来源。回执保存 SHA-256 请求指纹与无正文确认，读取响应不缓存。截图只捕获本实例主窗口，PNG 编码在后台执行，不覆盖已有文件；输出是显式请求的制品而非自动日志。能力由 instance capabilities 发现；旧管理器通过 Info 预检明确拒绝新命令。

@@ -18,6 +18,8 @@ fn main() -> eframe::Result {
         .map(|a| std::path::PathBuf::from(&a[1]))
         .unwrap_or_else(ai_terminal::model::data_directory);
     let smoke = args.iter().any(|a| a == "--smoke-test");
+    let _manager_lease = ai_terminal::control::ManagerLease::acquire(&config)
+        .map_err(|e| eframe::Error::AppCreation(Box::new(e)))?;
     let idle_benchmark = args.iter().any(|a| a == "--idle-benchmark");
     let viewport = egui::ViewportBuilder::default()
         .with_inner_size([1160.0, 760.0])

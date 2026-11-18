@@ -12,7 +12,7 @@
 [![Platform](https://img.shields.io/badge/platform-Windows%20x64-0078D4)](#平台支持)
 [![License](https://img.shields.io/badge/license-MIT-5c8a66)](LICENSE)
 
-[下载使用](#快速开始) · [功能介绍](#为多会话而设计) · [Git 工作区](#查看-git-更改与历史) · [支持的 Agent](#支持的-agent) · [更新日志](CHANGELOG.md) · [常见问题](#常见问题) · [参与贡献](CONTRIBUTING.md)
+[下载使用](#快速开始) · [功能介绍](#为多会话而设计) · [Git 工作区](#查看-git-更改与历史) · [支持的 Agent](#支持的-agent) · [CLI 与技能](#cli-与-agent-技能) · [更新日志](CHANGELOG.md) · [常见问题](#常见问题) · [参与贡献](CONTRIBUTING.md)
 
 简体中文 | [English](README.en.md)
 
@@ -139,7 +139,7 @@ ZCode 本次实测的是社区发行 [zcode-app-cli](https://github.com/kingswor
 
 ### 1. 下载并启动
 
-从 [GitHub Releases](https://github.com/FengLP5263/ai-terminal/releases/latest) 下载 Windows x64 ZIP，**完整解压**后运行 `ai-terminal.exe`。0.4.3 起请将 `ai-terminal.exe`、`ai-terminal-hook.exe`、`conpty.dll` 和 `OpenConsole.exe` 保留在同一目录。运行发行包不需要安装 Rust、Python 或 Electron。
+从 [GitHub Releases](https://github.com/FengLP5263/ai-terminal/releases/latest) 下载 Windows x64 ZIP，**完整解压**后运行 `ai-terminal.exe`。请将 `ai-terminal.exe`、`ai-terminal-hook.exe`、`ai-terminal-cli.exe`、`conpty.dll` 和 `OpenConsole.exe` 保留在同一目录。运行发行包不需要安装 Rust、Python 或 Electron。
 
 ### 2. 创建终端，启动 Agent
 
@@ -190,6 +190,20 @@ codex
 ### 会保存我的对话或 API Key 吗？
 
 默认数据位于 `%LOCALAPPDATA%/ai-terminal`，保存会话元数据、界面偏好及临时 hook 配置；不保存提示词、对话正文或 API Key。各 CLI 自己的数据和配置由其各自管理。
+
+## CLI 与 Agent 技能
+
+0.14.0 提供独立原生管理 CLI，可让主 Agent 创建会话、改名配色、分组排序，并显式启动成员 Agent；还支持原生设置、浮窗、窗口、文件／Git 查看、媒体播放及显式终端交互。批量计划支持完整校验、预演和一次保存，已有终端保持运行。[CLI 文档](docs/cli.md) · [Agent 技能包](docs/skills.md)。0.13.0 及以前的管理器不提供此接口。
+
+
+在本版本创建的终端中直接运行：
+
+```powershell
+ai-terminal-cli instance capabilities --json
+ai-terminal-cli floating set --enabled true --transparency 0
+```
+
+CLI 随完整 Windows 软件包交付；Agent 技能可从发行页下载独立 Skill ZIP，解压后将 ai-terminal 文件夹放入对应 Agent 的技能目录。命令不会修改用户级 PATH，受管会话会自动继承本实例的 CLI 入口。外部终端的调用方式与技能安装细节见上方文档。
 
 ## 从源码开发
 

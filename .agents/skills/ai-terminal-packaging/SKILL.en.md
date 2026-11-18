@@ -41,3 +41,6 @@ Include the 0.4.9 local alacritty_terminal/vte manifests and Rust sources in sou
 Launch user-review ZIPs from their actual extracted package with session metadata copied into a unique output directory, using `ai-terminal.exe --data-dir <directory> --settings`. Do not rely on AI_TERMINAL_DATA_DIR. Verify normalized settings were saved in that directory, record the source-copy hash and new process, and retain running user applications.
 
 Keep Tabler originals under .gitattributes -text rules: SVGs and LICENSE.txt must still match SOURCE.json byte-for-byte after Windows branch checkouts. Restore original bytes from hash-verified Git blobs after automatic line-ending conversion; do not change hashes to accept transformed assets.
+
+
+0.14.0 preview adds ai-terminal-cli.exe, skills/ai-terminal and bilingual CLI/Skill guides under docs; manifest.management_cli requires these members. Source identity includes public skills/guides; do not copy only the new executable. skill-package creates a standalone Skill ZIP and verify-skills checks member safety and per-file identity. Older software archives remain verifiable.

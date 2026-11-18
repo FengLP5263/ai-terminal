@@ -210,3 +210,17 @@ Git 规模原生核查（Windows）：`cargo build --offline --locked --release 
 Qoder 国际版启动：构建 `cargo build --offline --locked --release --bins --example qoder_cn_probe`，运行 `target/release/examples/qoder_cn_probe.exe output/<unique-qoder> qoder <isolated-directory>`。只启动已安装的 qodercli，不发送提示、不登录或确认信任；核对共享头像，真实 hook 连接另行记录。tests/qoder.rs、App 状态归约及 PowerShell／CMD／Git Bash 伪 CLI 覆盖独立身份、恢复、只报告状态的 hook 及显式设置保留。
 
 原生媒体核查：构建 `cargo build --offline --locked --release --example media_probe`；在唯一 output 目录用本地样例生成器（如已安装 ffmpeg）生成六秒 WAV 和四秒 H.264 MP4，分别命名 `音频 😀.wav` 和 `视频 #1.mp4`；运行 `target/release/examples/media_probe.exe output/<unique-media>`。复用正式播放器，静音核对初始暂停、播放推进、暂停、跳转、播放结束、释放及不支持内容；核对 result.json 和三张原生 PNG。仅生成样例，不读用户媒体、不联网、不启动 Agent 或请求模型。tests/media_playback.rs 另覆盖不读正文的大文件分派及本地路径转义。
+
+
+## 管理 CLI 与技能
+
+build/release 同时构建 ai-terminal.exe、ai-terminal-hook.exe 和控制台 ai-terminal-cli.exe。产品 CLI 见[命令文档](../docs/cli.md)，不向用户／系统 PATH 写入配置。
+
+```powershell
+.\scripts\windows\project.ps1 skill-package
+.\scripts\windows\project.ps1 verify-skills -Path output/skills/<包名>.zip
+cargo build --offline --locked --release --bins --example cli_probe
+target/release/examples/cli_probe.exe output/<全新目录>
+```
+
+POSIX 同名 skill-package／verify-skills 动作可跨平台执行，原生 CLI／GUI 仍只支持 Windows。cli_probe 在独立目录中暂存本次二进制，以真实 CLI 子进程调用正式 App：覆盖团队预演／提交、重复回执、版本冲突、最小化后台修改、Agent shim 启动与调用者身份、强关确认和自身进程回收，追加原生设置、浮窗透明度、文件分页／Markdown／图片、合成静音 WAV 播放和只读 Git、显式测试输入与停止／重启，生成三张原生 PNG 与 result.json。Agent 为本地替身，不执行模型、用户 profile 或系统输入。完整 Windows ZIP 携带 CLI、公开技能与双语使用文档；旧格式 ZIP 校验兼容保留。
