@@ -138,6 +138,7 @@ impl eframe::App for Probe {
             }
             2 if elapsed > 4.0 => {
                 self.snapshot.items[0].activity = Activity::Completed;
+                self.snapshot.items[0].question_unread = false;
                 self.stage = 3;
                 ctx.request_repaint_of(floating::viewport_id());
             }
@@ -269,6 +270,7 @@ fn main() -> eframe::Result {
                     color: None,
                     activity,
                     unread: true,
+                    question_unread: i == 0,
                 })
                 .chain((6..12).map(|i| Item {
                     id: format!("session-{i}"),
@@ -277,6 +279,7 @@ fn main() -> eframe::Result {
                     color: None,
                     activity: Activity::Idle,
                     unread: false,
+                    question_unread: false,
                 }))
                 .collect(),
                 active: Some("session-0".into()),

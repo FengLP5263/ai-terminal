@@ -23,6 +23,18 @@ pub fn build_agent(
     runtime: &Path,
     helper: &Path,
 ) -> Result<Launch, String> {
+    build_agent_with_arguments(spec, agent, Vec::new(), bridge, runtime, helper)
+}
+
+/// Explicit, validated resume arguments use the same session-scoped shim.
+pub fn build_agent_with_arguments(
+    spec: &SessionSpec,
+    agent: Agent,
+    arguments: Vec<String>,
+    bridge: &Bridge,
+    runtime: &Path,
+    helper: &Path,
+) -> Result<Launch, String> {
     let name = match agent {
         Agent::Codex => "codex.exe",
         Agent::Claude => "claude.exe",
@@ -36,7 +48,7 @@ pub fn build_agent(
     CliSearch::current().resolve(agent)?;
     let mut launch = build(spec, bridge, runtime, helper)?;
     let bin = PathBuf::from(&launch.environment["AI_TERMINAL_SHIM_DIR"]);
-    let (executable, arguments) = launch::pty_command(&bin.join(name), Vec::new(), helper)?;
+    let (executable, arguments) = launch::pty_command(&bin.join(name), arguments, helper)?;
     launch.executable = executable;
     launch.arguments = arguments;
     Ok(launch)

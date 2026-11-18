@@ -101,3 +101,8 @@ Font comparison can select a system CJK family (default Microsoft YaHei UI); fam
 Unreleased terminal-link fix: dispatch opening before the general command grid lock, read the hovered target under one short lock, then release it before calling the detached system launcher. This removes a self-deadlock in ProcessLink(Open) and keeps the PTY reader free to drain output. Hover, clear, input and mouse protocols retain their behavior. A bounded child-process regression uses an injected launcher to verify the real backend without opening a browser.
 
 未发布的终端链接修复：打开动作在通用命令网格锁之前分发，只在一段短锁内读取悬停目标，释放后再交给脱离等待的系统启动器。消除 ProcessLink(Open) 的自锁，避免同时阻塞 PTY 输出排空；悬停、清除、输入与鼠标协议保持原有行为。有截止时间的子进程回归注入启动器，验证真实后端而不打开浏览器。
+
+Unreleased: recognize Codex 0.167 explicit OSC9 `Question:` asynchronous-question notifications alongside `Plan mode prompt:` through the existing bounded, invocation-scoped, coalesced-wakeup channel. Only the question kind is retained, never titles or question contents. Ordinary output, OSC2 titles and bells never imply a question. The host presents lifecycle and unread-question attention independently.
+
+
+未发布：识别 Codex 0.167 的显式 OSC9 `Question:` 异步提问通知，与旧 `Plan mode prompt:` 共用有界、按调用代次隔离且合并唤醒的提醒通道。仅保留 question 类型，不保存标题或问题正文；普通输出、OSC2 标题和铃声不推断为提问。生命周期与未查看提问提醒由宿主分别呈现。

@@ -17,3 +17,5 @@ Replace angle-bracket placeholders before running. Obtain UUIDs from list/create
 Member display order follows the global session list, not the members argument order. Keep the primary session before the other members globally so it becomes the floating-bar representative; use session move or a batch plan to make this explicit. There is no additional leader-role field or group-completed state. Floating reminders still reflect actual member lifecycle states.
 
 Dissolving removes only membership, preserving sessions, processes, histories and relative order. Reassignment, renaming and recoloring do not restart terminals. Use workspace apply to create a group, assign multiple members and order them together; see [Team orchestration](teams.en.md).
+
+Unreleased floating aggregation retains the group's first avatar and prioritizes attention (unread failure, blocking input or unseen questions), then unread completion, then running work. Viewed completion does not obscure running work. An asynchronous question's yellow unread marker is independent of actual Working state and implies neither blocking nor completion of the team.

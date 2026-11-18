@@ -183,15 +183,16 @@ impl vte::Perform for Collector {
         if params.first() != Some(&b"9".as_slice()) {
             return;
         }
-        let (kind, bit) = if message.starts_with(b"Plan mode prompt:") {
-            ("question", 2)
-        } else if message.starts_with(b"Approval requested")
-            || message.starts_with(b"Codex wants to edit")
-        {
-            ("approval", 1)
-        } else {
-            return;
-        };
+        let (kind, bit) =
+            if message.starts_with(b"Plan mode prompt:") || message.starts_with(b"Question:") {
+                ("question", 2)
+            } else if message.starts_with(b"Approval requested")
+                || message.starts_with(b"Codex wants to edit")
+            {
+                ("approval", 1)
+            } else {
+                return;
+            };
         if self.epoch.load(Ordering::Acquire) != self.observed_epoch
             || self.pending.fetch_or(bit, Ordering::AcqRel) & bit != 0
         {
@@ -457,6 +458,19 @@ mod tests {
         assert!(
             matches!(rx.try_recv(), Ok((42, PtyEvent::Title(value))) if value.ends_with(";question")),
             "a new question must not be hidden by a pending approval"
+        );
+        collector.pending.fetch_and(!2, Ordering::AcqRel);
+        for fragment in [
+            b"\x1b]9;Ques".as_slice(),
+            b"tion: private question details\x1b\\".as_slice(),
+        ] {
+            parser.advance(&mut collector, fragment);
+        }
+        let (_, question) = rx.try_recv().unwrap();
+        assert!(
+            matches!(question, PtyEvent::Title(value)
+            if value.ends_with(";question") && !value.contains("private")),
+            "async question notifications must be identified without retaining their text"
         );
         assert_eq!(id, 42);
         assert!(

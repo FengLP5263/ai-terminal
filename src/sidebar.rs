@@ -19,6 +19,7 @@ pub struct Entry<'a> {
     pub color: Option<SessionColor>,
     pub activity: Activity,
     pub unread: bool,
+    pub question_unread: bool,
     pub hint: String,
 }
 
@@ -223,7 +224,26 @@ impl Icons {
 
 /// Shared status indicator used by the sidebar and floating session rail.
 pub fn paint_status(ui: &egui::Ui, avatar: Rect, activity: Activity, unread: bool, fill: Color32) {
-    paint_status_on(ui, ui.painter(), avatar, activity, unread, fill);
+    paint_status_with_attention(ui, avatar, activity, unread, false, fill);
+}
+
+pub fn paint_status_with_attention(
+    ui: &egui::Ui,
+    avatar: Rect,
+    activity: Activity,
+    unread: bool,
+    question_unread: bool,
+    fill: Color32,
+) {
+    paint_status_on(
+        ui,
+        ui.painter(),
+        avatar,
+        activity,
+        unread,
+        question_unread,
+        fill,
+    );
 }
 
 fn paint_status_on(
@@ -232,12 +252,13 @@ fn paint_status_on(
     avatar: Rect,
     activity: Activity,
     unread: bool,
+    question_unread: bool,
     fill: Color32,
 ) {
     let scale = avatar.width() / chrome::AVATAR;
     let indicator = avatar.right_bottom() - egui::vec2(2.0, 2.0) * scale;
     let surface = fill;
-    if activity == Activity::Working {
+    if activity == Activity::Working && !question_unread {
         painter.circle_filled(indicator, 5.5 * scale, surface);
         let time = ui.input(|i| i.time as f32);
         let points = (0..13)
@@ -251,14 +272,14 @@ fn paint_status_on(
             Stroke::new(1.75 * scale, chrome::WORKING),
         ));
         ui.ctx().request_repaint_after(Duration::from_millis(80));
-    } else if activity == Activity::Waiting || unread {
+    } else if activity == Activity::Waiting || question_unread || unread {
         painter.circle_filled(indicator, 5.5 * scale, surface);
         painter.circle_filled(
             indicator,
             3.5 * scale,
-            if activity == Activity::Failed {
+            if activity == Activity::Failed && unread {
                 chrome::FAILED
-            } else if activity == Activity::Waiting {
+            } else if activity == Activity::Waiting || question_unread {
                 chrome::WAITING
             } else {
                 chrome::COMPLETED
@@ -344,7 +365,15 @@ fn paint_card(
         Vec2::splat(chrome::AVATAR),
     );
     icons.paint(painter, avatar, entry.agent);
-    paint_status_on(ui, painter, avatar, entry.activity, entry.unread, fill);
+    paint_status_on(
+        ui,
+        painter,
+        avatar,
+        entry.activity,
+        entry.unread,
+        entry.question_unread,
+        fill,
+    );
     if collapsed && let Some(mark) = style.group {
         paint_group_mark(painter, avatar, &mark.group.name, 1.0);
     }

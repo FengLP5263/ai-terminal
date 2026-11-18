@@ -262,12 +262,38 @@ pub fn assign_group(groups: &mut Vec<SessionGroup>, session: &str, target: Optio
     true
 }
 
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ProjectPanel {
+    #[default]
+    Closed,
+    Files,
+    Git,
+}
+impl ProjectPanel {
+    pub fn from_settings(ui: UiSettings) -> Self {
+        if ui.project_files_open {
+            Self::Files
+        } else if ui.git_panel_open {
+            Self::Git
+        } else {
+            Self::Closed
+        }
+    }
+    pub fn apply(self, ui: &mut UiSettings) {
+        ui.project_files_open = self == Self::Files;
+        ui.git_panel_open = self == Self::Git;
+    }
+}
+
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Workspace {
     #[serde(default)]
     pub sessions: Vec<SessionSpec>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub groups: Vec<SessionGroup>,
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub session_panels: std::collections::BTreeMap<String, ProjectPanel>,
     pub active: Option<String>,
     #[serde(default)]
     pub last_directory: Option<PathBuf>,
@@ -300,6 +326,17 @@ pub fn load(path: &Path) -> Result<Workspace, String> {
         });
         !group.members.is_empty()
     });
+    workspace
+        .session_panels
+        .retain(|id, _| workspace.sessions.iter().any(|s| &s.id == id));
+    if let Some(id) = &workspace.active
+        && workspace.sessions.iter().any(|s| &s.id == id)
+    {
+        workspace
+            .session_panels
+            .entry(id.clone())
+            .or_insert_with(|| ProjectPanel::from_settings(workspace.ui));
+    }
     Ok(workspace)
 }
 pub fn save(path: &Path, workspace: &Workspace) -> Result<(), String> {

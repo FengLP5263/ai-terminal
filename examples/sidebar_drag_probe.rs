@@ -151,6 +151,7 @@ impl eframe::App for Probe {
                     activity,
                     color: Some(color),
                     unread: unread && id == "shell",
+                    question_unread: false,
                     directory: std::path::Path::new("C:/Projects/demo"),
                     hint: "Synthetic fixture".into(),
                 }
@@ -179,6 +180,7 @@ impl eframe::App for Probe {
                     color: e.color,
                     activity: e.activity,
                     unread: e.unread,
+                    question_unread: e.question_unread,
                 })
                 .collect(),
             active: Some("codex".into()),

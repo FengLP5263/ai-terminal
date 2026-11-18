@@ -10,6 +10,7 @@
 
 Python 3.11+。build 要求 Windows/Rust/C++ SDK；从仓库定位路径，verify 不执行包内程序。"""
 import argparse
+import importlib.util
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -24,6 +25,9 @@ import uuid
 import zipfile
 
 ROOT=Path(__file__).resolve().parent.parent
+_skill_spec=importlib.util.spec_from_file_location('ai_terminal_skill_bundle',ROOT/'scripts/skill_bundle.py')
+skill_bundle=importlib.util.module_from_spec(_skill_spec)
+_skill_spec.loader.exec_module(skill_bundle)
 NATIVE_REQUIRED={'conpty.dll','OpenConsole.exe','Microsoft-ConPTY-LICENSE.txt','Microsoft-ConPTY-SOURCE.json'}
 CHANGELOGS=('CHANGELOG.md','CHANGELOG.en.md')
 
@@ -91,6 +95,9 @@ def verify_archive(path):
             raise ValueError('program/helper/license incomplete')
         if manifest.get('format_version',1)>=2 and not NATIVE_REQUIRED.issubset(expected):raise ValueError('native console runtime/license incomplete')
         if 'management_cli' in manifest and not {'ai-terminal-cli.exe','skills/ai-terminal/SKILL.md','docs/cli.md','docs/skills.md'}.issubset(expected):raise ValueError('management CLI/skill incomplete')
+        if 'skill_version' in manifest.get('management_cli',{}):
+            skill = skill_bundle.metadata(archive.read('skills/ai-terminal/version.json'))
+            if skill['version'] != manifest['management_cli']['skill_version'] or skill['minimum_cli_version'] != manifest['management_cli'].get('minimum_cli_version'):raise ValueError('management skill version mismatch')
         if 'fonts' in manifest and not {'Cascadia-LICENSE.txt','FONT-SOURCE.json'}.issubset(expected):raise ValueError('font license/provenance incomplete')
         if any(name not in expected for name in manifest.get('fonts',{}).get('licenses',[])):raise ValueError('declared font license missing')
         if 'syntaxes' in manifest and not {'Syntax-LICENSES.json','SYNTAX-SOURCE.json'}.issubset(expected):raise ValueError('syntax license/provenance incomplete')
@@ -242,7 +249,9 @@ def build(allow_dirty=False):
     head=command(['git','rev-parse','--verify','HEAD'],check=False)
     manifest={'format_version':2,'version':version,'platform':'windows-x64','git_commit':head.stdout.strip() if head.returncode==0 else None,'dirty':dirty,'rustc':command(['rustc','-V']).stdout.strip(),'source_sha256':source_identity(),'source_scope':'Cargo manifests/lock, build.rs, production Rust, local egui_glow sources/shaders, winit build sources/assets, alacritty_terminal/vte manifests/sources, font/icon/branding/native-console assets','native_console':native,'build':'cargo build --locked --release','published':False,'files':{}}
     manifest['source_scope']+=', bilingual changelog, public management skill and CLI documentation'
-    manifest['management_cli']={'schema_version':1,'executable':'ai-terminal-cli.exe','skill':'skills/ai-terminal/SKILL.md'}
+    skill = skill_bundle.metadata((ROOT/'skills/ai-terminal/version.json').read_bytes())
+    manifest['management_cli']={'schema_version':1,'executable':'ai-terminal-cli.exe','skill':'skills/ai-terminal/SKILL.md',
+                                'skill_version':skill['version'],'minimum_cli_version':skill['minimum_cli_version']}
     manifest['source_scope']+=', syntax license/provenance assets'
     manifest['syntaxes']=syntaxes
     manifest['fonts']=fonts

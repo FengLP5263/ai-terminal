@@ -175,6 +175,7 @@ impl eframe::App for Probe {
             color: None,
             activity: Activity::Idle,
             unread: false,
+            question_unread: false,
             hint: String::new(),
         }];
         let groups = [

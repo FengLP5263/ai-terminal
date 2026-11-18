@@ -44,3 +44,5 @@ Keep Tabler originals under .gitattributes -text rules: SVGs and LICENSE.txt mus
 
 
 0.14.0 preview adds ai-terminal-cli.exe, skills/ai-terminal and bilingual CLI/Skill guides under docs; manifest.management_cli requires these members. Source identity includes public skills/guides; do not copy only the new executable. skill-package creates a standalone Skill ZIP and verify-skills checks member safety and per-file identity. Older software archives remain verifiable.
+
+Unreleased: standalone Skill ZIPs read Skill versions from skills/ai-terminal/version.json; software version only records the build context. Schema 2 manifests must match the installed Skill/minimum CLI metadata. Software ZIP management_cli declares and verifies these versions too. Preserve verification of published legacy formats without overwriting old artifacts.

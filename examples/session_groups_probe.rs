@@ -325,6 +325,7 @@ mod native {
                                     color: None,
                                     activity: Activity::Idle,
                                     unread: false,
+                                    question_unread: false,
                                 });
                             }
                         }
@@ -394,6 +395,7 @@ mod native {
                     color: item.color,
                     activity: item.activity,
                     unread: item.unread,
+                    question_unread: item.question_unread,
                     hint: String::new(),
                 })
                 .collect();
@@ -489,6 +491,7 @@ mod native {
                             },
                             activity,
                             unread: activity == Activity::Completed,
+                            question_unread: false,
                         })
                         .collect(),
                         groups: vec![

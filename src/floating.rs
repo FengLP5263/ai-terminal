@@ -29,6 +29,7 @@ pub struct Item {
     pub color: Option<SessionColor>,
     pub activity: Activity,
     pub unread: bool,
+    pub question_unread: bool,
 }
 #[derive(Clone, Default, PartialEq)]
 pub struct Snapshot {
@@ -418,13 +419,17 @@ impl HoverState {
 }
 
 fn attention(items: &[Item]) -> Option<&Item> {
-    items.iter().max_by_key(|i| match (i.activity, i.unread) {
-        (Activity::Failed, true) => 5,
-        (Activity::Waiting, _) => 4,
-        (Activity::Working, _) => 3,
-        (_, true) => 2,
-        _ => 0,
-    })
+    items
+        .iter()
+        .max_by_key(|i| match (i.activity, i.unread, i.question_unread) {
+            (Activity::Failed, true, _) => 7,
+            (Activity::Waiting, _, _) => 6,
+            (_, _, true) => 5,
+            (Activity::Completed, true, _) => 4,
+            (Activity::Working, _, _) => 3,
+            (_, true, _) => 2,
+            _ => 0,
+        })
 }
 fn body_with_hint(
     ui: &mut egui::Ui,
@@ -553,11 +558,12 @@ fn body_with_hint(
                                             .as_ref()
                                             .and_then(|g| attention(&g.items))
                                             .unwrap_or(item);
-                                        sidebar::paint_status(
+                                        sidebar::paint_status_with_attention(
                                             ui,
                                             avatar,
                                             state.activity,
                                             state.unread,
+                                            state.question_unread,
                                             Color32::from_gray(8),
                                         );
                                         if let Some(group) = &group {
@@ -576,10 +582,17 @@ fn body_with_hint(
                                             i18n::activity(snapshot.locale, item.activity)
                                         };
                                         let hint_text = format!(
-                                            "{} · {} · {}",
+                                            "{} · {} · {}{}",
                                             item.name,
                                             item.agent.label(),
-                                            status
+                                            status,
+                                            if item.question_unread {
+                                                snapshot
+                                                    .locale
+                                                    .text(" · 有未查看的提问", " · Unread question")
+                                            } else {
+                                                ""
+                                            }
                                         );
                                         if response.hovered()
                                             && !response.dragged()
@@ -878,6 +891,7 @@ mod hint_tests {
                     color: None,
                     activity: Activity::Idle,
                     unread: false,
+                    question_unread: false,
                 })
                 .collect(),
             groups: vec![SessionGroup {
@@ -917,12 +931,42 @@ mod hint_tests {
                 .id,
             "c"
         );
+        snapshot.items[2].activity = Activity::Working;
+        snapshot.items[2].question_unread = true;
+        let group = snapshot.hover_group(&snapshot.groups[0]);
+        let highlighted = attention(&group.items).unwrap();
+        assert_eq!(highlighted.id, "c");
+        assert!(highlighted.question_unread);
+        assert_eq!(highlighted.activity, Activity::Working);
         crate::model::reorder(&mut snapshot.items, 2, 0, false);
         assert_eq!(snapshot.representatives()[0].0.id, "c");
         snapshot.items.remove(0);
         assert_eq!(snapshot.representatives()[0].0.id, "a");
         snapshot.groups.clear();
         assert_eq!(snapshot.entry_count(), 2);
+    }
+
+    #[test]
+    fn group_status_prioritizes_attention_then_unread_completion_then_work() {
+        let mut items = grouped().items;
+        items[0].activity = Activity::Waiting;
+        items[1].activity = Activity::Completed;
+        items[1].unread = true;
+        items[2].activity = Activity::Working;
+        assert_eq!(attention(&items).unwrap().id, items[0].id);
+        items[0].activity = Activity::Idle;
+        assert_eq!(attention(&items).unwrap().id, items[1].id);
+        items[1].unread = false;
+        assert_eq!(attention(&items).unwrap().id, items[2].id);
+        items[0].activity = Activity::Working;
+        items[0].question_unread = true;
+        items[1].unread = true;
+        assert_eq!(attention(&items).unwrap().id, items[0].id);
+        items[0].question_unread = false;
+        assert_eq!(attention(&items).unwrap().id, items[1].id);
+        items[0].activity = Activity::Failed;
+        items[0].unread = true;
+        assert_eq!(attention(&items).unwrap().id, items[0].id);
     }
     #[test]
     fn group_hover_crosses_window_gap_and_closes_once_after_both_surfaces_are_left() {
@@ -972,6 +1016,7 @@ mod hint_tests {
                     color: None,
                     activity: Activity::Working,
                     unread: false,
+                    question_unread: false,
                 }],
                 locale: Locale::ZhCn,
                 ..Default::default()

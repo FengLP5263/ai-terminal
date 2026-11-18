@@ -170,6 +170,101 @@ fn cli_parses_unicode_and_rejects_extra_or_conflicting_options() {
 }
 
 #[test]
+fn resume_keeps_manager_and_agent_ids_distinct_and_rejects_injection() {
+    let conversation = "a1234567-1234-4234-8234-123456789abc";
+    let parsed = control::cli::parse(
+        [
+            "session",
+            "resume",
+            "current",
+            "--agent",
+            "codex",
+            "--conversation-id",
+            conversation,
+            "--activate",
+        ]
+        .into_iter()
+        .map(Into::into)
+        .collect(),
+    )
+    .unwrap();
+    assert!(
+        matches!(parsed.command, Command::Resume { id, agent: Agent::Codex, conversation_id, activate: true }
+        if id == "current" && conversation_id == conversation)
+    );
+    assert_eq!(
+        control::resume_arguments(Agent::Codex, conversation).unwrap(),
+        ["resume", conversation]
+    );
+    for agent in [Agent::Claude, Agent::Qoder, Agent::QoderCn] {
+        assert_eq!(
+            control::resume_arguments(agent, conversation).unwrap(),
+            ["--resume", conversation]
+        );
+    }
+    for id in [
+        "",
+        "--last",
+        "name with spaces",
+        "id;command",
+        "id\ncommand",
+        "id\0",
+        "not-a-uuid",
+    ] {
+        assert!(control::resume_arguments(Agent::Codex, id).is_err());
+    }
+    assert!(control::resume_arguments(Agent::Claude, &"a".repeat(257)).is_err());
+    assert!(control::resume_arguments(Agent::Kimi, conversation).is_err());
+    assert!(control::resume_arguments(Agent::ZCode, conversation).is_err());
+    assert!(
+        control::cli::parse(
+            ["session", "resume", "current", "--agent", "codex"]
+                .into_iter()
+                .map(Into::into)
+                .collect()
+        )
+        .is_err()
+    );
+    let wire = serde_json::to_value(Request {
+        schema_version: 1,
+        request_id: uuid::Uuid::new_v4().to_string(),
+        caller_session: None,
+        action: Command::Resume {
+            id: "manager-id".into(),
+            agent: Agent::Codex,
+            conversation_id: conversation.into(),
+            activate: false,
+        },
+    })
+    .unwrap();
+    assert_eq!(wire["command"], "resume");
+    assert_eq!(wire["id"], "manager-id");
+    assert_eq!(wire["conversation_id"], conversation);
+}
+
+#[test]
+fn legacy_panel_preference_only_migrates_to_the_active_session() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut w = workspace(dir.path());
+    let mut second = w.sessions[0].clone();
+    second.id = "second".into();
+    w.sessions.push(second);
+    w.ui.git_panel_open = true;
+    let path = dir.path().join("sessions.json");
+    ai_terminal::model::save(&path, &w).unwrap();
+    let loaded = ai_terminal::model::load(&path).unwrap();
+    assert_eq!(
+        loaded.session_panels["leader"],
+        ai_terminal::model::ProjectPanel::Git
+    );
+    assert!(!loaded.session_panels.contains_key("second"));
+    assert_eq!(
+        loaded.sessions[0].agent_session_id,
+        w.sessions[0].agent_session_id
+    );
+}
+
+#[test]
 fn authenticated_transport_round_trip_wakes_without_gui_and_cleans_descriptor() {
     let dir = tempfile::tempdir().unwrap();
     let (wake_tx, wake_rx) = std::sync::mpsc::channel();

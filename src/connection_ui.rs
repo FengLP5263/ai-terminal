@@ -35,6 +35,7 @@ pub fn show(ui: &mut egui::Ui, agent: Agent, status: &Status) -> egui::Response 
             } else {
                 ui.label(match locale {crate::i18n::Locale::ZhCn=>format!("已识别 {}，尚未收到任务通知。",agent.label()),crate::i18n::Locale::En=>format!("Recognized {}. No task event received yet.",agent.label())});
                 if agent==Agent::Codex {
+                    ui.label(crate::i18n::tr(ui.ctx(),"收到 Codex 的 OSC9 提问通知后，侧栏和浮窗会显示黄色未读标记，任务可继续运行。自动通知方式可能仅响铃；提问提醒需要在 Codex 中选择 OSC9 通知。","Received Codex OSC9 questions show a yellow unread marker in the sidebar and floating bar while work can continue. Automatic notifications may only ring a bell; question reminders require OSC9 notifications in Codex."));
                     ui.label(crate::i18n::tr(ui.ctx(),"Codex 原生状态支持共享 agents 总览，无需额外状态 hook。已在 Codex 0.166.0 验证。","Codex native lifecycle supports the shared agents overview without additional status hooks. Verified with Codex 0.166.0."));
                     ui.label(crate::i18n::tr(ui.ctx(),"旧版没有原生通知时，可退出后运行 codex --no-daemon 使用兼容模式，再用 /hooks 审查状态钩子。此模式没有共享 agents 入口。","For older CLIs without native events, exit and run codex --no-daemon for compatibility, then review status hooks in /hooks. This mode has no shared agents entry."));
                 } else if matches!(agent, Agent::QoderCn | Agent::Qoder) {

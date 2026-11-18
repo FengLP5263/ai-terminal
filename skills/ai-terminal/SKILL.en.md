@@ -9,6 +9,8 @@ description: "Control a running AI Terminal with ai-terminal-cli: sessions, team
 
 Operate through the manager so its UI and saved data stay synchronized. Requires a CLI-enabled Windows version; 0.13.0 and earlier do not expose this API. Commands emit UTF-8 JSON by default and accept --json.
 
+See [version.json](version.json) for this Skill's independent version, minimum CLI version and source. Inspect instance capabilities; updating the Skill does not add interfaces to a running older manager.
+
 ## Select the executable and instance
 
 Inside a managed session run `ai-terminal-cli instance info --json`. If PATH is unavailable, PowerShell can use `& $env:AI_TERMINAL_CLI instance info --json`. Outside the manager use the full executable path and, when necessary, --data-dir to select the manager's data directory, not the project directory. Check the returned version, instance, data directory and caller_session first.
@@ -17,7 +19,7 @@ current identifies the calling managed session, never the GUI selection. Externa
 
 ## Read for the task
 
-- Query, create, rename, color, start, activate or close: [Session commands](references/sessions.en.md).
+- Query, create, rename, color, start, resume a conversation, activate or close: [Session commands](references/sessions.en.md).
 - Create, assign, rename, dissolve or order groups: [Group commands](references/groups.en.md).
 - Build a team around the caller, preview plans and launch members: [Team orchestration](references/teams.en.md).
 - Language/font/zoom, windows, sidebar and floating bar: [Native settings](references/settings.en.md).
@@ -30,6 +32,7 @@ current identifies the calling managed session, never the GUI selection. Externa
 1. Inspect existing metadata and resolve target UUIDs. Keep changes within the user's requested scope.
 2. Use workspace apply for multiple metadata changes. Preview with dry-run and optionally commit with if_revision. Validation errors change nothing. Preview UUIDs are provisional; use actual commit results.
 3. New sessions are unstarted. Use session run separately when Agent startup is requested, or session start for a Shell. run requires a session without a running terminal, preventing commands from being injected into an interactive CLI.
+   To continue existing work, first resolve its Agent conversation ID and follow the session reference. An empty Agent or process_started receipt does not establish that the original conversation was restored.
 4. Check both exit status and JSON ok/error. A launch receipt means the process was created, not that login, hooks, the model or a task are ready. Runtime status still comes from native lifecycle events.
 5. Read back the session/workspace and report actual sessions, groups, ordering and launch results.
 

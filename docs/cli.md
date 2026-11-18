@@ -24,6 +24,8 @@ ai-terminal-cli session run $r.result.results[0].id --agent codex --json
 
 普通创建不启动进程；session start 启动 Shell，session run 在没有运行终端的会话中启动指定 Agent。管理器重启后不会自动再次启动 Agent。登录、信任和模型任务沿用 CLI 自己的交互；管理器不自动提交提示词或确认授权。
 
+继续原任务需要恢复 Agent 自己的历史对话，不能把“Agent 已启动”等同于“原对话已恢复”。未发布增量提供 `session resume <会话UUID> --agent codex --conversation-id <Codex对话UUID>`；先查询 agent_resume 能力，0.14.0 正式版不支持该命令。已有 Shell 的安全恢复步骤、不同 ID 和验收要求见[会话参考](../skills/ai-terminal/references/sessions.md#启动与恢复历史对话)。
+
 外部调用用完整程序路径，必要时加 --data-dir 指定管理器的元数据目录。该路径不是项目目录。不写用户级 PATH；受管子进程临时获得命令路径和 AI_TERMINAL_CLI。current 始终是调用者会话，而非界面选中项；外部调用先查询完整 UUID。
 
 ## 命令与团队编排
@@ -52,6 +54,12 @@ ai-terminal-cli file open --path README.md
 - [终端交互](../skills/ai-terminal/references/terminal.md)：显式视口读取、文字／按键／本地滚动、停止／重启和未读确认。
 
 这些接口使用现有原生实现；设置先校验再保存，立即生效。文件／Git／媒体异步排队，用 loading／error 和实际结果核实。CLI 不接管系统文件选择器、安装卸载、其他应用或用户的剪贴板，也不提供界面本就没有的 Git 写操作。命令完整列表见 `--help`。
+
+未发布增量将右侧文件／Git 面板状态按会话 UUID 保存：切换时恢复各自的文件页签、Git 页签或收起状态；新会话默认收起。CLI 的 panel open／close 只影响当前选中的会话。
+
+未发布增量还把提问提醒与生命周期分开：收到 Codex OSC9 `Question:` 通知后，在侧栏／浮窗显示黄色未读提问标记，Agent 可同时保持“进行中”。session list／show 的 question_unread 表示未查看提醒，查看／acknowledge 后清除，不代表已回答。问题正文不保存。
+
+Codex 0.167 的 Auto 通知对未识别的终端可能只响铃；铃声没有可分类的提问信息。要启用这条提醒路径，由用户在 Codex 选择 `tui.notification_method = "osc9"`；需要在终端仍有焦点时也发出通知，可选择 `tui.notification_condition = "always"`，使用通知白名单时加入 async-question。管理器不改写用户配置，也不为此注入会让 Codex 退出共享后台的 -c 选项。来源：[异步提问通知](https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/tui/src/chatwidget/notifications.rs)、[通知后端](https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/tui/src/notifications/mod.rs)。
 
 ## 从源码验证
 
