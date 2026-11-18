@@ -139,3 +139,8 @@ Seti 按官方 VS Code 文件图标的 150% 尺寸规范校准图标族的显示
 0.12.0 README 图：readme_capture 的第四参数支持 files／history／diff／markdown／image，第二参数为独立 output 目录，第三参数为 zh／en。新增 Markdown 与图片模式只在自身目录创建固定双语文档及透明 PNG，使用正式只读组件，主界面仍显示固定示例路径；不读用户项目或调用模型。公开图保持原始 PNG 字节，并在 assets/readme/SOURCE.json 逐文件记录版本、语言、尺寸与摘要。
 
 0.13.0：国际版 Qoder 在会话元数据中使用新增可选枚举值 Qoder；旧枚举及配置保持兼容，运行身份仍不持久化。国际版复用既有 qoder.png，不新增图片／字体或改动来源字节。音视频仅保存本次查看的已验证本地路径和短暂播放器状态，不保存进度、媒体副本或正文，不整份读取大媒体。windows 0.62.2 启用 Media Foundation／WIC 投影并直接引用既有 windows-core 0.62.2；无解码器包或浏览器依赖。
+
+
+0.14.0 预览：不新增会话持久化字段。新增 runtime/control.json（实例定位、版本、PID 与 DPAPI 加密凭据）和无凭据 control.lock；正常退出移除定位文件，不保存 CLI 请求或回执。运行时回执只含有界确认信息和请求指纹，不含终端输入／读取正文。Windows ZIP 新增 ai-terminal-cli.exe、skills/ai-terminal 和双语 CLI／技能说明，清单声明 management_cli，源码身份覆盖公开技能与说明；独立技能 ZIP 有逐文件 SHA-256 清单，不含运行数据。旧 ZIP 校验保持兼容。
+
+0.14.0-preview.2：src/control/actions.rs 与 cli/native.rs 定义原生控制命令，src/app/control/native.rs 在 App::logic 执行设置、窗口／浮窗、面板、文件／Git 只读查看、媒体及显式终端 I/O。设置完整校验并原子保存后应用，不重启 PTY。文件／Git 复用有界后台读取，返回 loading、error 与分页；媒体复用当前文档拥有的原生引擎。终端读取仅当前 viewport；输入最多 64 KiB，只有显式请求才传递，不作为状态推断来源。回执保存 SHA-256 请求指纹与无正文确认，读取响应不缓存。截图只捕获本实例主窗口，PNG 编码在后台执行，不覆盖已有文件；输出是显式请求的制品而非自动日志。能力由 instance capabilities 发现；旧管理器通过 Info 预检明确拒绝新命令。

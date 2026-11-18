@@ -154,3 +154,8 @@ Git 规模原生核查（Windows）：`cargo build --offline --locked --release 
 Qoder 国际版启动：构建 `cargo build --offline --locked --release --bins --example qoder_cn_probe`，运行 `target/release/examples/qoder_cn_probe.exe output/<unique-qoder> qoder <isolated-directory>`。只启动已安装的 qodercli，不发送提示、不登录或确认信任；核对共享头像，真实 hook 连接另行记录。tests/qoder.rs、App 状态归约及 PowerShell／CMD／Git Bash 伪 CLI 覆盖独立身份、恢复、只报告状态的 hook 及显式设置保留。
 
 原生媒体核查：构建 `cargo build --offline --locked --release --example media_probe`；在唯一 output 目录用本地样例生成器（如已安装 ffmpeg）生成六秒 WAV 和四秒 H.264 MP4，分别命名 `音频 😀.wav` 和 `视频 #1.mp4`；运行 `target/release/examples/media_probe.exe output/<unique-media>`。复用正式播放器，静音核对初始暂停、播放推进、暂停、跳转、播放结束、释放及不支持内容；核对 result.json 和三张原生 PNG。仅生成样例，不读用户媒体、不联网、不启动 Agent 或请求模型。tests/media_playback.rs 另覆盖不读正文的大文件分派及本地路径转义。
+
+
+管理 CLI：cargo test --offline --locked --test control 与 --bin ai-terminal app::control::tests 覆盖认证、本机限定、整批校验、保存失败、回执去重和实际 PTY 身份保留。先 build --bins，再运行 App 原生测试。cli_probe 的完整命令见 scripts/README.md，使用真实外部 CLI、正式 App、隔离数据及本地 Agent 替身，核对最小化后台管理、调用者身份、两张截图和自身进程回收；不能称为真实模型回合。skill-package／verify-skills 同时在 Windows/POSIX 入口可用，独立 ZIP 回读验证。
+
+CLI 原生操作回归由 cli_probe 扩展覆盖：通过真实外部 CLI 核对最小化设置、浮窗 50% 透明度、原 PTY PID、文件分页／Markdown／图片、合成本地静音 WAV 播放／暂停／跳转、只读 Git、显式样例输入和停止／重启。新增原生命令必须走 App::logic，读取内容不写回执，不能在 ctx.input 内再次获取 Context 锁。

@@ -4,6 +4,11 @@
 
 Start here for current guidance. Versioned documents are historical records of the behavior and checks at the time.
 
+## CLI and Skills
+
+- [Native management CLI](cli.en.md) · [Agent Skill package and installation](skills.en.md)
+- [Skill entry](../skills/ai-terminal/SKILL.en.md) · [Team orchestration](../skills/ai-terminal/references/teams.en.md)
+
 ## Getting started and contributing
 
 - [Project overview and usage](../README.en.md) · [Contribution guide](../CONTRIBUTING.en.md) · [Collaboration rules](../AGENTS.en.md)

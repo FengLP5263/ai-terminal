@@ -20,6 +20,8 @@ use std::{
 };
 
 const BG: Color32 = ai_terminal::appearance::TERMINAL_BG;
+#[path = "app/control.rs"]
+mod control;
 const MUTED: Color32 = ai_terminal::chrome::SECONDARY;
 const YELLOW: Color32 = Color32::from_rgb(235, 184, 82);
 
@@ -300,6 +302,11 @@ pub struct App {
     terminal_rect: Option<egui::Rect>,
     sidebar_right: f32,
     bridge: Option<Bridge>,
+    control: Option<ai_terminal::control::ControlServer>,
+    control_receipts: VecDeque<(String, Vec<u8>, ai_terminal::control::Response)>,
+    control_closers: Vec<crate::shutdown::ShutdownTask>,
+    control_capture: control::native::CaptureState,
+    control_floating_position: Option<[f32; 2]>,
     pty_sender: Sender<(u64, PtyEvent)>,
     pty_receiver: Receiver<(u64, PtyEvent)>,
     directory: PathBuf,
@@ -405,6 +412,24 @@ impl App {
         };
         let (pty_sender, pty_receiver) = mpsc::channel();
         let load_failed = error.is_some();
+        let context = cc.egui_ctx.clone();
+        let control = match ai_terminal::control::ControlServer::start(
+            &directory,
+            Arc::new(move || context.request_repaint_of(egui::ViewportId::ROOT)),
+        ) {
+            Ok(server) => Some(server),
+            Err(e) => {
+                error = Some(format!(
+                    "{}: {e}",
+                    tr(
+                        &cc.egui_ctx,
+                        "会话管理 CLI 无法启动",
+                        "Unable to start session management CLI"
+                    )
+                ));
+                None
+            }
+        };
         Self {
             renderer: egui_term::TextRendererSession::new(&cc.egui_ctx),
             helper: std::env::current_exe()
@@ -422,6 +447,11 @@ impl App {
             terminal_rect: None,
             sidebar_right: 0.0,
             bridge,
+            control,
+            control_receipts: VecDeque::new(),
+            control_closers: Vec::new(),
+            control_capture: Default::default(),
+            control_floating_position: None,
             pty_sender,
             pty_receiver,
             directory,
@@ -489,6 +519,14 @@ impl App {
         }
     }
     fn start_session(&mut self, index: usize, ctx: &egui::Context) {
+        self.start_session_with_agent(index, ctx, None);
+    }
+    fn start_session_with_agent(
+        &mut self,
+        index: usize,
+        ctx: &egui::Context,
+        agent: Option<Agent>,
+    ) {
         let Some(bridge) = self.bridge.as_ref() else {
             return;
         };
@@ -510,12 +548,50 @@ impl App {
                     )
                     .into());
                 }
-                let launch = launch::build(
-                    &session.spec,
-                    bridge,
-                    &self.directory.join("runtime"),
-                    helper,
-                )?;
+                let mut launch = if let Some(agent) = agent {
+                    ai_terminal::shell::build_agent(
+                        &session.spec,
+                        agent,
+                        bridge,
+                        &self.directory.join("runtime"),
+                        helper,
+                    )?
+                } else {
+                    launch::build(
+                        &session.spec,
+                        bridge,
+                        &self.directory.join("runtime"),
+                        helper,
+                    )?
+                };
+                if let Some(control) = &self.control {
+                    launch.environment.extend(control.environment());
+                }
+                if let Ok(exe) = std::env::current_exe()
+                    && let Some(parent) = exe.parent()
+                {
+                    let cli = parent.join("ai-terminal-cli.exe");
+                    if cli.is_file() {
+                        launch
+                            .environment
+                            .insert("AI_TERMINAL_CLI".into(), cli.to_string_lossy().into_owned());
+                        let mut paths: Vec<_> = launch
+                            .environment
+                            .get("PATH")
+                            .map(|path| std::env::split_paths(path).collect())
+                            .unwrap_or_default();
+                        // Keep the prepared session shim directory first. The
+                        // management CLI must not bypass Agent lifecycle shims.
+                        paths.insert(usize::from(!paths.is_empty()), parent.to_owned());
+                        launch.environment.insert(
+                            "PATH".into(),
+                            std::env::join_paths(paths)
+                                .map_err(|e| e.to_string())?
+                                .to_string_lossy()
+                                .into_owned(),
+                        );
+                    }
+                }
                 let backend = TerminalBackend::new(
                     session.terminal_id,
                     ctx.clone(),
@@ -706,6 +782,7 @@ impl App {
             }
         }
         self.receive_events(ctx);
+        self.poll_control(ctx);
         let active_directory = self
             .sessions
             .iter()
@@ -833,6 +910,12 @@ impl App {
         self.floating_zoom = self.preferences.floating_enabled.then_some(zoom);
         if !self.preferences.floating_enabled {
             self.floating.dismiss();
+        }
+        if self.preferences.floating_enabled
+            && let Some(position) = self.control_floating_position.take()
+        {
+            self.preferences.floating_position_pixels = Some(position);
+            self.floating.reposition(ctx, position);
         }
     }
     fn floating_action(&mut self, action: ai_terminal::floating::Action, ctx: &egui::Context) {

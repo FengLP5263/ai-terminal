@@ -74,7 +74,7 @@ class ArchiveVerification(unittest.TestCase):
     def test_source_identity_covers_window_backend_build_sources_and_glow_shaders(self):
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder)
-            names=['CHANGELOG.md','CHANGELOG.en.md','build.rs','Cargo.toml','Cargo.lock','vendor/egui_term/Cargo.toml','vendor/alacritty_terminal/Cargo.toml','vendor/vte/Cargo.toml','vendor/egui-winit/Cargo.toml','vendor/winit/Cargo.toml','vendor/winit/build.rs','vendor/winit/src/platform_impl/windows/event_loop.rs','vendor/egui_glow/Cargo.toml','vendor/egui_glow/src/painter.rs','vendor/egui_glow/src/shader/fragment.glsl','vendor/alacritty_terminal/src/term/mod.rs','vendor/vte/src/ansi.rs','assets/file-icons/brand-python.svg']
+            names=['docs/cli.md','docs/cli.en.md','docs/skills.md','docs/skills.en.md','CHANGELOG.md','CHANGELOG.en.md','build.rs','Cargo.toml','Cargo.lock','vendor/egui_term/Cargo.toml','vendor/alacritty_terminal/Cargo.toml','vendor/vte/Cargo.toml','vendor/egui-winit/Cargo.toml','vendor/winit/Cargo.toml','vendor/winit/build.rs','vendor/winit/src/platform_impl/windows/event_loop.rs','vendor/egui_glow/Cargo.toml','vendor/egui_glow/src/painter.rs','vendor/egui_glow/src/shader/fragment.glsl','vendor/alacritty_terminal/src/term/mod.rs','vendor/vte/src/ansi.rs','assets/file-icons/brand-python.svg']
             for name in names:
                 path=root/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(b'original')
             for name in ['src','vendor/egui_term/src','vendor/egui-winit/src','assets/fonts','assets/icons','assets/branding']:(root/name).mkdir(parents=True,exist_ok=True)
@@ -155,7 +155,7 @@ class ArchiveVerification(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder)/'repo';out=Path(folder)/'package';out.mkdir()
             for name in ['src','vendor/egui_term/src','vendor/egui-winit/src','assets/fonts','assets/icons','assets/branding','assets/windows/conpty/x64']:(root/name).mkdir(parents=True,exist_ok=True)
-            for name in ['CHANGELOG.md','CHANGELOG.en.md','build.rs','Cargo.toml','Cargo.lock','vendor/egui_term/Cargo.toml','vendor/alacritty_terminal/Cargo.toml','vendor/vte/Cargo.toml','vendor/egui-winit/Cargo.toml','vendor/egui_glow/Cargo.toml','vendor/winit/Cargo.toml','vendor/winit/build.rs']:
+            for name in ['docs/cli.md','docs/cli.en.md','docs/skills.md','docs/skills.en.md','CHANGELOG.md','CHANGELOG.en.md','build.rs','Cargo.toml','Cargo.lock','vendor/egui_term/Cargo.toml','vendor/alacritty_terminal/Cargo.toml','vendor/vte/Cargo.toml','vendor/egui-winit/Cargo.toml','vendor/egui_glow/Cargo.toml','vendor/winit/Cargo.toml','vendor/winit/build.rs']:
                 p=root/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(b'fixture')
             native=root/'assets/windows/conpty';files={}
             for name in ['x64/conpty.dll','x64/OpenConsole.exe','LICENSE.txt']:

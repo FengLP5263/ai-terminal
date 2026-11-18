@@ -146,7 +146,19 @@ pub struct FileView {
     preview: crate::project_preview::View,
 }
 impl FileView {
+    pub fn preview_mut(&mut self) -> &mut crate::project_preview::View {
+        &mut self.preview
+    }
+    pub fn collapse(&mut self, path: &Path, client: &mut FileClient) {
+        self.expanded.retain(|p| !p.starts_with(path));
+        client.collapse(path);
+        self.revision = None;
+    }
     pub fn expand(&mut self, path: &Path, client: &mut FileClient) {
+        if self.root != client.root {
+            self.root = client.root.clone();
+            self.expanded.clear();
+        }
         self.expanded.insert(path.into());
         client.ensure_directory(path);
         self.revision = None;

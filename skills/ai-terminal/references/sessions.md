@@ -1,0 +1,39 @@
+# 会话命令
+
+简体中文 | [English](sessions.en.md)
+
+以下命令均可追加 --json；在管理器外调用时在命令前加 --data-dir <数据目录>。所有 ID 使用完整 UUID，或在受管会话中用 current。
+
+| 命令 | 参数与行为 |
+| --- | --- |
+| instance info | 返回管理器版本、PID、实例 ID、数据目录、调用者会话及工作区 revision；不返回凭据 |
+| session list | --offset N --limit N；默认 100、最大 200；按 next_offset 翻页，total 为总数 |
+| session show ID | 查看名称、目录、Shell、颜色、组、顺序、活动项、运行状态、Agent、生命周期、未读和启动错误 |
+| session create | 必需 --name NAME --directory PATH；可选 --shell powershell/cmd/bash、--color COLOR、--group UUID、--before UUID 或 --after UUID |
+| session rename ID | --name NAME |
+| session color ID | --color none/red/green/amber/blue/pink/purple；yellow 是 amber 的命令行别名 |
+| session group ID | --group UUID；none 表示移出组 |
+| session move ID | 恰好指定 --before UUID 或 --after UUID；移动整个会话，不重建进程 |
+| session start ID [--activate] | 后台启动其 Shell，已运行时保留现有程序 |
+| session activate ID | 切换并恢复主窗口；未运行时启动 Shell，已运行时保留；清除该会话未读 |
+| session run ID | --agent NAME，可选 --activate；仅未启动／已退出的会话可运行 Agent |
+| session close ID | 未启动会话直接关闭；运行中必须 --force，结束自身受管进程树 |
+
+示例（PowerShell）：
+
+```powershell
+$new = ai-terminal-cli session create --name '前端 ✨' --directory $PWD.Path --color blue --json | ConvertFrom-Json
+if (-not $new.ok) { throw $new.error.message }
+$id = $new.result.results[0].id
+ai-terminal-cli session run $id --agent codex --json
+ai-terminal-cli session rename $id --name '前端实现' --json
+ai-terminal-cli session activate $id --json
+```
+
+run 支持 codex、claude、qoder（国际版，公开 qodercli 入口）、qodercn、kimi、zcode、trae。qodercli、qoderclicn、traecli 也可作名称别名。通过既有会话 shim 启动真实 CLI，不保存自动启动配置；管理器重启后仍恢复为普通 Shell，避免意外自动运行 Agent。
+
+新建默认 PowerShell，目录是已有目录，不创建项目或修改项目文件。创建只建立导航元数据，不自动启动。名称为 1–128 个非控制字符，去除首尾空白。普通 create 的相对目录按调用者工作目录解析。已有运行会话不提供直接改目录；要切换其目录，应由用户在 Shell 中操作。
+
+关闭的会话从导航中移除，Agent 自己的历史保留；最后一个组成员关闭时删除空组。进程清理在后台进行，回执中的 process_cleanup=scheduled 不等于所有子进程已经退出。不要把关闭当前调用者作为流程的前置步骤，否则它会在读取回执前结束。
+
+session list 的分页索引对应当前全局顺序。连续翻页时核对 revision；变化后重新查询，避免并发排序造成遗漏。超过 1 MiB 的完整工作区应改用分页会话列表。

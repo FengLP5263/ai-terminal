@@ -4,6 +4,11 @@
 
 从这里查找当前规范；带版本号的文档是历史记录，只代表记录时的行为和测试结果。
 
+## CLI 与技能
+
+- [原生管理 CLI](cli.md) · [Agent 技能包与安装](skills.md)
+- [技能入口](../skills/ai-terminal/SKILL.md) · [团队编排](../skills/ai-terminal/references/teams.md)
+
 ## 开始与协作
 
 - [项目介绍与使用](../README.md) · [贡献指南](../CONTRIBUTING.md) · [项目协作规则](../AGENTS.md)

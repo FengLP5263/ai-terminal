@@ -12,7 +12,7 @@ Use Codex, Claude Code, Qoder / Qoder CN, Kimi Code, ZCode and TRAE CLI in a fam
 [![Platform](https://img.shields.io/badge/platform-Windows%20x64-0078D4)](#platform-support)
 [![License](https://img.shields.io/badge/license-MIT-5c8a66)](LICENSE)
 
-[Get started](#quick-start) · [Features](#built-for-multiple-sessions) · [Git workspace](#inspect-git-changes-and-history) · [Supported Agents](#supported-agents) · [Changelog](CHANGELOG.en.md) · [FAQ](#frequently-asked-questions) · [Contribute](CONTRIBUTING.en.md)
+[Get started](#quick-start) · [Features](#built-for-multiple-sessions) · [Git workspace](#inspect-git-changes-and-history) · [Supported Agents](#supported-agents) · [CLI and Skill](#cli-and-agent-skill) · [Changelog](CHANGELOG.en.md) · [FAQ](#frequently-asked-questions) · [Contribute](CONTRIBUTING.en.md)
 
 [简体中文](README.md) | English
 
@@ -139,7 +139,7 @@ ZCode was tested with the community distribution [zcode-app-cli](https://github.
 
 ### 1. Download and run
 
-Download the Windows x64 ZIP from [GitHub Releases](https://github.com/FengLP5263/ai-terminal/releases/latest), **extract the entire archive**, and run `ai-terminal.exe`. Starting with 0.4.3, keep `ai-terminal.exe`, `ai-terminal-hook.exe`, `conpty.dll`, and `OpenConsole.exe` together. Rust, Python, and Electron are not required to run the release package.
+Download the Windows x64 ZIP from [GitHub Releases](https://github.com/FengLP5263/ai-terminal/releases/latest), **extract the entire archive**, and run `ai-terminal.exe`. Starting with 0.4.3, keep `ai-terminal.exe`, `ai-terminal-hook.exe`, `ai-terminal-cli.exe`, `conpty.dll`, and `OpenConsole.exe` together. Rust, Python, and Electron are not required to run the release package.
 
 ### 2. Open a terminal and start an Agent
 
@@ -190,6 +190,20 @@ When launched for the first time with the default data directory, the app tries 
 ### Are conversations or API keys saved?
 
 The default data directory is `%LOCALAPPDATA%/ai-terminal`. It stores session metadata, interface preferences, and temporary hook configuration, not prompts, conversation text, or API keys. Each CLI manages its own data and configuration.
+
+## CLI and Agent Skill
+
+0.14.0 provides a native management CLI for session creation, names, colors, grouping, ordering and explicit member-Agent startup, plus native settings, floating/window controls, file/Git viewing, media playback and explicit terminal interaction. Batch plans support validation, dry runs and atomic persistence while preserving existing terminals. [CLI documentation](docs/cli.en.md) · [Agent Skill package](docs/skills.en.md). Managers through 0.13.0 do not expose this API.
+
+
+Run these commands inside a terminal created by this version:
+
+```powershell
+ai-terminal-cli instance capabilities --json
+ai-terminal-cli floating set --enabled true --transparency 0
+```
+
+The full Windows package includes the CLI. Download the standalone Skill ZIP from the release page, extract it, and place the ai-terminal folder in your Agent's skill directory. User PATH is unchanged; owned sessions inherit this instance's CLI automatically. See the linked guides for external terminal use and installation details.
 
 ## Develop from source
 

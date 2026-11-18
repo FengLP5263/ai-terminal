@@ -4,6 +4,37 @@
 
 Record user-visible additions, improvements, fixes, and compatibility changes for each release; omit categories that do not apply. Review both languages together, use the same version entry in GitHub Releases, and ship both files in the ZIP. Historical summaries follow existing GitHub release notes and UTC publication dates; development versions without a separate release do not receive invented release dates.
 
+## [0.14.0] - 2026-11-18
+
+### Added
+
+- Bundle the standalone ai-terminal-cli for creating, naming, coloring, grouping, ordering, activating and closing sessions, atomically configuring teams and explicitly launching installed Agents.
+- CLI controls for language, font, UI zoom, sidebar, floating enable/transparency/border/position, window state, panels and main-window captures.
+- CLI access to lazy file trees, paginated text, Markdown source/rendered modes, image zoom, read-only Git queries/diffs and media playback controls.
+- Explicit terminal viewport reads, text input, keys and local history scrolling, plus session stop/restart and unread acknowledgement. Bodies never enter manager logs or receipts.
+- A bilingual Agent Skill, task-specific command references, team examples and a standalone Skill ZIP, with CLI/Skill installation documented together.
+
+### Compatibility and validation
+
+- Preserve existing session formats and terminal processes. The local authenticated API provides capability discovery, bounded queues, request fingerprints, receipts and revision checks; older managers reject unsupported commands explicitly.
+- User acceptance covered session names/colors/order, groups, floating transparency, 100% UI zoom and both side panels. Offline tests and isolated native integration are verified separately, without automatically submitting real model tasks or accepting trust/permissions.
+
+## [0.14.0-preview.2] - 2026-11-18
+
+### Added
+
+- CLI controls for language, font, zoom, sidebar and floating settings, windows and panels, project files, Markdown, images, read-only Git queries and media playback.
+- Explicit terminal viewport reads, text input, keys and scrolling, plus stop, restart and unread acknowledgement. Content is transient; receipts retain only request fingerprints.
+- Capability discovery and main-window captures, with bilingual command/Skill references and isolated native regression coverage.
+
+## [0.14.0-preview.1] - 2026-11-18
+
+### Added
+
+- Add the standalone ai-terminal-cli for session discovery, creation, startup, activation, closure, naming, colors, grouping and ordering, with validated atomic team plans.
+- Explicitly launch installed Agents in unstarted sessions through existing session-scoped integration, without submitting prompts or accepting trust dialogs.
+- Ship a distributable ai-terminal Skill, command reference, team examples and standalone skill ZIP, with CLI and Skills documentation sections.
+
 ## [0.13.0] - 2026-11-17
 
 ### Added

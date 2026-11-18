@@ -2,6 +2,7 @@ pub mod appearance;
 pub mod bridge;
 pub mod chrome;
 pub mod connection_ui;
+pub mod control;
 pub mod dialogs;
 pub mod discovery;
 pub mod font_choice;

@@ -98,3 +98,10 @@ preview.6：git/worktree.rs 按需读取 HEAD 与当前文件的净差异，与�
 0.11.0 会话分组由 model 管理 UUID 导航元数据，sidebar 提供右键管理及组名。floating 将同组投影为会话顺序中的第一位，简化工牌和优先级最高的真实成员状态避免隐藏待处理信息；不产生“整组完成”事件。floating_group 是归属浮窗的可交互、非激活原生 viewport，仅共享成员元数据和有界激活消息；不共享终端正文或新增终端实例。
 
 0.13.0：Qoder 国际版作为独立 Agent::Qoder，复用 Qoder CN 的头像及显式 hook 状态归约。src/media_player.rs 使用 Windows Media Foundation Media Engine 播放项目内音视频，视频通过有界 WIC 帧拷贝绘制为现有 egui 纹理。只在打开媒体时动态载入系统媒体库；缺少组件不影响终端启动。播放器由当前只读文档独占，切换或关闭即销毁；没有浏览器运行时、额外视频窗口、后台媒体会话或模型代理。
+
+
+## 原生管理 CLI（0.14.0 预览）
+
+src/bin/ai-terminal-cli.rs 是独立控制台入口，不初始化 GUI／字体／GPU。src/control 定义版本化协议、计划归约、实例发现及独立认证通道；src/app/control.rs 在 App::logic 执行管理请求。元数据计划先在副本完整校验、原子保存，再按 UUID 移动原 Session，保留 ConPTY／Job 和历史。session run 复用 shell::build_agent 的现有 Agent shim，只操作无运行终端的会话；不输入终端命令或保存自动启动配置。公开技能位于 skills/ai-terminal，与源码开发技能分开；CLI／技能目录见 docs/cli.md、docs/skills.md。
+
+0.14.0-preview.2：src/control/actions.rs 与 cli/native.rs 定义原生控制命令，src/app/control/native.rs 在 App::logic 执行设置、窗口／浮窗、面板、文件／Git 只读查看、媒体及显式终端 I/O。设置完整校验并原子保存后应用，不重启 PTY。文件／Git 复用有界后台读取，返回 loading、error 与分页；媒体复用当前文档拥有的原生引擎。终端读取仅当前 viewport；输入最多 64 KiB，只有显式请求才传递，不作为状态推断来源。回执保存 SHA-256 请求指纹与无正文确认，读取响应不缓存。截图只捕获本实例主窗口，PNG 编码在后台执行，不覆盖已有文件；输出是显式请求的制品而非自动日志。能力由 instance capabilities 发现；旧管理器通过 Info 预检明确拒绝新命令。

@@ -13,6 +13,7 @@ ai-terminal 本地开发、验证与打包的 Windows 权威入口。
 .EXAMPLE
 # 本地制品与校验
     .\scripts\windows\project.ps1 smoke -Release                                   # 检查已构建的原生优化版
+    .\scripts\windows\project.ps1 skill-package                                     # 构建独立 Agent Skill ZIP
     .\scripts\windows\project.ps1 package                                          # 构建并校验本地 ZIP
     .\scripts\windows\project.ps1 installer -AllowDirty                            # 构建 ZIP 与当前用户安装版
     .\scripts\windows\project.ps1 installer -Acceptance -AllowDirty                # 独立注册表／快捷方式的安装验收包
@@ -24,7 +25,7 @@ ai-terminal 本地开发、验证与打包的 Windows 权威入口。
     .\scripts\windows\project.ps1 verify-claude -AllowModelRequest                 # 明确授权一次可能计费的真实模型核查
 
 .PARAMETER Action
-governance（默认）、format-check、check、test、ci、build、run、release、smoke、measure-idle、package、verify-package、installer、verify-installer、installer-smoke、verify-claude。
+governance（默认）、format-check、check、test、ci、build、run、release、smoke、measure-idle、package、verify-package、skill-package、verify-skills、installer、verify-installer、installer-smoke、verify-claude。
 
 .PARAMETER Release
 smoke 和 measure-idle 使用 release 目录；否则使用 debug。
@@ -58,7 +59,7 @@ installer-smoke 的旧版本验收 JSON，必须与当前包有相同验收身�
 命令失败返回非零；真实模型调用、远端发布和清理用户数据不包含在默认检查内。
 #>
 param(
-    [ValidateSet('governance','format-check','check','test','ci','build','run','release','smoke','measure-idle','package','verify-package','installer','verify-installer','installer-smoke','verify-claude')][string]$Action='governance',
+    [ValidateSet('governance','format-check','check','test','ci','build','run','release','smoke','measure-idle','package','verify-package','skill-package','verify-skills','installer','verify-installer','installer-smoke','verify-claude')][string]$Action='governance',
     [switch]$Release,[string]$Path,[switch]$AllowDirty,[switch]$AllowModelRequest,
     [switch]$Acceptance,[string]$AcceptanceId,[string]$Previous,
     [ValidateSet('debug','release')][string]$Profile='release',[ValidatePattern('^[A-Za-z0-9-]+$')][string]$Label='native'
@@ -93,6 +94,8 @@ try {
         'smoke' {& (Join-Path $taskRoot 'scripts\smoke.ps1') -Release:$Release}
         'measure-idle' {& (Join-Path $taskRoot 'scripts\measure-idle.ps1') -Release:$Release -Label $Label}
         'package' {$taskArguments=@('scripts/package.py','build');if($AllowDirty){$taskArguments+='--allow-dirty'};Invoke-ProjectPython -Parameters $taskArguments}
+        'skill-package' {Invoke-ProjectPython -Parameters @('scripts/skill_bundle.py','build')}
+        'verify-skills' {if(-not $Path){throw '-Path is required.'};Invoke-ProjectPython -Parameters @('scripts/skill_bundle.py','verify','--path',$Path)}
         'verify-package' {if(-not $Path){throw '-Path is required.'};Invoke-ProjectPython -Parameters @('scripts/package.py','verify',$Path)}
         'installer' {$taskArguments=@('scripts/installer.py','build');if($Path){$taskArguments+=@('--path',$Path)};if($AllowDirty){$taskArguments+='--allow-dirty'};if($Acceptance){$taskArguments+='--acceptance'};if($AcceptanceId){$taskArguments+=@('--acceptance-id',$AcceptanceId)};Invoke-ProjectPython -Parameters $taskArguments}
         'verify-installer' {if(-not $Path){throw '-Path is required.'};Invoke-ProjectPython -Parameters @('scripts/installer.py','verify',$Path)}
