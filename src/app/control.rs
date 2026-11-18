@@ -6,10 +6,24 @@ use std::collections::BTreeMap;
 pub(super) mod native;
 
 impl App {
+    pub(super) fn session_panel_states(&self) -> BTreeMap<String, model::ProjectPanel> {
+        self.sessions
+            .iter()
+            .map(|s| {
+                let panel = if Some(&s.spec.id) == self.active.as_ref() {
+                    model::ProjectPanel::from_settings(self.preferences)
+                } else {
+                    s.project_panel
+                };
+                (s.spec.id.clone(), panel)
+            })
+            .collect()
+    }
     fn control_workspace(&self) -> Workspace {
         Workspace {
             sessions: self.sessions.iter().map(|s| s.spec.clone()).collect(),
             groups: self.groups.clone(),
+            session_panels: self.session_panel_states(),
             active: self.active.clone(),
             last_directory: self.last_directory.clone(),
             ui: self.preferences,
@@ -22,10 +36,14 @@ impl App {
             "shell": match session.spec.agent { Agent::Shell => "powershell", Agent::Cmd => "cmd", Agent::Bash => "bash", _ => "powershell" },
             "color": session.spec.color, "group_id": model::session_group(&self.groups, &session.spec.id).map(|g| &g.id),
             "index": index, "active": self.active.as_deref() == Some(&session.spec.id),
+            "project_panel": if self.active.as_deref() == Some(&session.spec.id) {
+                model::ProjectPanel::from_settings(self.preferences)
+            } else { session.project_panel },
             "running": session.backend.is_some(), "agent": session.display_agent().label(),
             "process_id": session.backend.as_ref().map(|b| b.pty_id()),
             "activity": match session.status.activity { Activity::Unknown => "unknown", Activity::Idle => "idle", Activity::Completed => "completed", Activity::Working => "working", Activity::Failed => "failed", Activity::Waiting => "waiting", Activity::Exited => "exited" },
             "unread": session.status.unread, "error": session.error,
+            "question_unread": session.status.question_unread,
         })
     }
     fn control_groups(&self) -> Vec<Value> {
@@ -61,7 +79,7 @@ impl App {
                     .ok_or_else(|| ApiError::new("unavailable", "CLI is disabled"))?
                     .descriptor;
                 Ok(
-                    json!({"instance_id": d.instance_id, "pid": d.pid, "version": d.version, "data_directory": d.data_directory, "caller_session": caller, "revision": revision, "schema_version": control::SCHEMA_VERSION, "capabilities": {"native_controls":true, "settings":true,"window":true,"floating":true,"panels":true,"files":true,"git_readonly":true,"media":true,"terminal_io":true,"session_lifecycle":true,"capture":true}}),
+                    json!({"instance_id": d.instance_id, "pid": d.pid, "version": d.version, "data_directory": d.data_directory, "caller_session": caller, "revision": revision, "schema_version": control::SCHEMA_VERSION, "capabilities": {"agent_resume":true,"native_controls":true, "settings":true,"window":true,"floating":true,"panels":true,"files":true,"git_readonly":true,"media":true,"terminal_io":true,"session_lifecycle":true,"capture":true}}),
                 )
             }
             Command::Receipt { id } => self
@@ -120,6 +138,12 @@ impl App {
                         .into_iter()
                         .map(|spec| {
                             if let Some(mut live) = existing.remove(&spec.id) {
+                                live.project_panel = prepared
+                                    .workspace
+                                    .session_panels
+                                    .get(&spec.id)
+                                    .copied()
+                                    .unwrap_or_default();
                                 live.spec = spec;
                                 live
                             } else {
@@ -141,10 +165,21 @@ impl App {
                     json!({"dry_run": dry_run, "revision_before": revision, "revision": after, "results": prepared.results}),
                 )
             }
-            Command::Start { id, activate } | Command::Run { id, activate, .. } => {
+            Command::Start { id, activate }
+            | Command::Run { id, activate, .. }
+            | Command::Resume { id, activate, .. } => {
                 let i = self.control_index(id, caller)?;
                 let id = self.sessions[i].spec.id.clone();
-                if let Command::Run { agent, .. } = request.action {
+                let launch_agent = match &request.action {
+                    Command::Run { agent, .. } => Some((*agent, Vec::new())),
+                    Command::Resume {
+                        agent,
+                        conversation_id,
+                        ..
+                    } => Some((*agent, control::resume_arguments(*agent, conversation_id)?)),
+                    _ => None,
+                };
+                if let Some((agent, arguments)) = launch_agent {
                     if agent.is_shell() {
                         return Err(ApiError::new(
                             "invalid_argument",
@@ -157,7 +192,7 @@ impl App {
                             "Agent launch requires an unstarted session; do not send a command into a live terminal",
                         ));
                     }
-                    self.start_session_with_agent(i, ctx, Some(agent));
+                    self.start_session_with_agent_arguments(i, ctx, Some(agent), arguments);
                 } else {
                     self.start_session(i, ctx);
                 }
@@ -174,9 +209,17 @@ impl App {
                     self.activate(id, ctx);
                     ai_terminal::floating::restore_main(ctx);
                 }
-                Ok(
-                    json!({"session": self.control_session(i), "launched": true, "readiness": "process_started"}),
-                )
+                let mut result = json!({"session": self.control_session(i), "launched": true, "readiness": "process_started"});
+                if let Command::Resume {
+                    agent,
+                    conversation_id,
+                    ..
+                } = &request.action
+                {
+                    result["resume_requested"] =
+                        json!({"agent": agent, "conversation_id": conversation_id});
+                }
+                Ok(result)
             }
             Command::Close { id, force } => {
                 if self.control_closers.len() >= 32 {
@@ -192,6 +235,7 @@ impl App {
                 let id = self.sessions[i].spec.id.clone();
                 let mut next = workspace;
                 next.sessions.retain(|s| s.id != id);
+                next.session_panels.remove(&id);
                 model::assign_group(&mut next.groups, &id, None);
                 if next.active.as_deref() == Some(&id) {
                     next.active = next.sessions.first().map(|s| s.id.clone());
@@ -212,14 +256,18 @@ impl App {
                 }
                 self.sessions.remove(i);
                 self.groups = next.groups;
-                self.active = next.active;
+                // Keep the previous active ID until activate restores the next
+                // session's panel rather than caching the closed one's panel.
                 self.rename = self.rename.take().filter(|v| *v != id);
                 self.close_session = self.close_session.take().filter(|v| *v != id);
                 self.dirty = false;
                 if was_active {
                     self.project_view.release_document(ctx);
-                    if let Some(next) = self.active.clone() {
+                    if let Some(next) = next.active {
                         self.activate(next, ctx);
+                    } else {
+                        self.active = None;
+                        model::ProjectPanel::Closed.apply(&mut self.preferences);
                     }
                 }
                 self.sync_visibility();
@@ -288,6 +336,7 @@ impl App {
                     Command::Apply { dry_run: false, .. }
                         | Command::Start { .. }
                         | Command::Run { .. }
+                        | Command::Resume { .. }
                         | Command::Close { .. }
                 ) || matches!(&request.action, Command::Native { action } if action.cache_receipt())
                 {
@@ -319,6 +368,76 @@ mod tests {
     use super::*;
     use control::actions::{Action, SettingsPatch};
     use control::{Operation, Shell};
+
+    #[test]
+    fn project_panels_follow_sessions_and_survive_save_and_reload() {
+        use control::actions::Panel;
+        let (dir, ctx, mut app) = app();
+        app.bridge = None; // Navigation only; this test creates no PTY.
+        let mut ids = Vec::new();
+        for _ in 0..3 {
+            let result = app
+                .control_command(&request(create(dir.path())), &ctx)
+                .unwrap();
+            ids.push(result["results"][0]["id"].as_str().unwrap().to_owned());
+        }
+        app.activate(ids[0].clone(), &ctx);
+        app.control_native(
+            &Action::Panel {
+                panel: Panel::Files,
+                open: true,
+            },
+            None,
+            &ctx,
+        )
+        .unwrap();
+        app.activate(ids[1].clone(), &ctx);
+        assert!(!app.preferences.project_files_open && !app.preferences.git_panel_open);
+        app.control_native(
+            &Action::Panel {
+                panel: Panel::Git,
+                open: true,
+            },
+            None,
+            &ctx,
+        )
+        .unwrap();
+        app.activate(ids[2].clone(), &ctx);
+        assert!(!app.preferences.project_files_open && !app.preferences.git_panel_open);
+        app.activate(ids[0].clone(), &ctx);
+        assert!(app.preferences.project_files_open && !app.preferences.git_panel_open);
+        app.activate(ids[1].clone(), &ctx);
+        assert!(!app.preferences.project_files_open && app.preferences.git_panel_open);
+        // Metadata changes must not replace live per-session navigation state.
+        app.control_command(
+            &request(Command::Apply {
+                operations: vec![Operation::Rename {
+                    id: ids[0].clone(),
+                    name: "renamed".into(),
+                }],
+                dry_run: false,
+                if_revision: None,
+            }),
+            &ctx,
+        )
+        .unwrap();
+        app.activate(ids[0].clone(), &ctx);
+        assert!(app.preferences.project_files_open);
+        app.dirty = true;
+        app.persist();
+        let saved = model::load(&dir.path().join("sessions.json")).unwrap();
+        assert_eq!(saved.session_panels[&ids[0]], model::ProjectPanel::Files);
+        assert_eq!(saved.session_panels[&ids[1]], model::ProjectPanel::Git);
+        assert_eq!(saved.session_panels[&ids[2]], model::ProjectPanel::Closed);
+        assert!(app.sessions.iter().all(|s| s.backend.is_none()));
+        drop(app);
+        let creation = eframe::CreationContext::_new_kittest(ctx.clone());
+        let mut restored = App::new(&creation, dir.path().into(), false, false);
+        restored.bridge = None;
+        assert!(restored.preferences.project_files_open);
+        restored.activate(ids[1].clone(), &ctx);
+        assert!(restored.preferences.git_panel_open && !restored.preferences.project_files_open);
+    }
 
     #[test]
     fn native_settings_are_atomic_and_receipts_do_not_retain_terminal_input() {
@@ -599,6 +718,22 @@ mod tests {
             .code,
             "session_running"
         );
+        assert_eq!(
+            app.control_command(
+                &request(Command::Resume {
+                    id: id.clone(),
+                    agent: Agent::Codex,
+                    conversation_id: "a1234567-1234-4234-8234-123456789abc".into(),
+                    activate: false,
+                }),
+                &ctx,
+            )
+            .err()
+            .unwrap()
+            .code,
+            "session_running"
+        );
+        assert_eq!(app.sessions[1].backend.as_ref().unwrap().pty_id(), pid);
         assert_eq!(
             app.control_command(&request(Command::Close { id, force: false }), &ctx)
                 .err()

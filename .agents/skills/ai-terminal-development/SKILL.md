@@ -36,3 +36,5 @@ Git Bash 加载系统／用户登录配置后再追加会话集成，保留提�
 管理 CLI 在 src/control，App 接入位于 src/app/control.rs；控制台入口 src/bin/ai-terminal-cli.rs 不初始化 GUI。改动要同步 docs/cli、docs/skills 与面向用户的 skills/ai-terminal 双语参考，不能把开发技能当作产品使用技能。build/release 同时生成三个 EXE；用户会话只临时继承本机实例能力。
 
 CLI 原生操作回归由 cli_probe 扩展覆盖：通过真实外部 CLI 核对最小化设置、浮窗 50% 透明度、原 PTY PID、文件分页／Markdown／图片、合成本地静音 WAV 播放／暂停／跳转、只读 Git、显式样例输入和停止／重启。新增原生命令必须走 App::logic，读取内容不写回执，不能在 ctx.input 内再次获取 Context 锁。
+
+session resume 的参数必须经过 control::resume_arguments 校验，经原有 shim 传递；旧管理器通过 agent_resume 能力预检明确拒绝。公开 Skill 的 version.json 与软件 Cargo 版本独立，版本变更需同步包校验和双语指南。右侧文件／Git 状态保存于 Workspace.session_panels，UiSettings 布尔值仅为活动会话投影，不在切换时新增磁盘写入。

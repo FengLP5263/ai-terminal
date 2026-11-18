@@ -144,3 +144,9 @@ Seti 按官方 VS Code 文件图标的 150% 尺寸规范校准图标族的显示
 0.14.0 预览：不新增会话持久化字段。新增 runtime/control.json（实例定位、版本、PID 与 DPAPI 加密凭据）和无凭据 control.lock；正常退出移除定位文件，不保存 CLI 请求或回执。运行时回执只含有界确认信息和请求指纹，不含终端输入／读取正文。Windows ZIP 新增 ai-terminal-cli.exe、skills/ai-terminal 和双语 CLI／技能说明，清单声明 management_cli，源码身份覆盖公开技能与说明；独立技能 ZIP 有逐文件 SHA-256 清单，不含运行数据。旧 ZIP 校验保持兼容。
 
 0.14.0-preview.2：src/control/actions.rs 与 cli/native.rs 定义原生控制命令，src/app/control/native.rs 在 App::logic 执行设置、窗口／浮窗、面板、文件／Git 只读查看、媒体及显式终端 I/O。设置完整校验并原子保存后应用，不重启 PTY。文件／Git 复用有界后台读取，返回 loading、error 与分页；媒体复用当前文档拥有的原生引擎。终端读取仅当前 viewport；输入最多 64 KiB，只有显式请求才传递，不作为状态推断来源。回执保存 SHA-256 请求指纹与无正文确认，读取响应不缓存。截图只捕获本实例主窗口，PNG 编码在后台执行，不覆盖已有文件；输出是显式请求的制品而非自动日志。能力由 instance capabilities 发现；旧管理器通过 Info 预检明确拒绝新命令。
+
+0.15.0：Workspace 新增默认空的 session_panels 映射，以会话 UUID 保存右侧面板的 closed／files／git 枚举，不保存终端正文。旧全局偏好仅迁移到原活动会话，其他旧／新会话默认收起；加载移除孤立项，删除会话同时删除映射。正常保存、CLI 原子操作和退出快照共用同一投影。
+
+公开技能新增 version.json，技能版本独立于软件版本，记录最低 CLI 版本、协议和源码仓库。独立技能包使用 schema 2 manifest 核对内外版本与逐文件 SHA-256，保持旧 schema 1 已发布包的校验兼容；软件包同时声明 skill_version。预览标识不代表正式发布。
+
+question_unread 仅为当前进程内的未查看提问提醒布尔值，传入侧栏／浮窗元数据快照及 CLI 查询，不保存到 sessions.json，不存问题标题／正文。与完成未读 unread 分开；查看只清除通知，不表示已回答。

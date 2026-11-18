@@ -205,7 +205,14 @@ fn body(
                             Vec2::splat(32.0 * ratio),
                         );
                         icons.paint(ui.painter(), avatar, item.agent);
-                        sidebar::paint_status(ui, avatar, item.activity, item.unread, fill);
+                        sidebar::paint_status_with_attention(
+                            ui,
+                            avatar,
+                            item.activity,
+                            item.unread,
+                            item.question_unread,
+                            fill,
+                        );
                         let left = row.left() + 46.0 * ratio;
                         crate::ui_text::paint(
                             ui,
@@ -221,7 +228,7 @@ fn body(
                             ui.painter(),
                             Pos2::new(left, row.top() + 27.0 * ratio),
                             &format!(
-                                "{} · {}",
+                                "{} · {}{}",
                                 item.agent.label(),
                                 if item.agent.is_shell()
                                     && item.activity == crate::status::Activity::Unknown
@@ -229,6 +236,11 @@ fn body(
                                     group.locale.text("未启动", "Not started")
                                 } else {
                                     crate::i18n::activity(group.locale, item.activity)
+                                },
+                                if item.question_unread {
+                                    group.locale.text(" · 有未查看的提问", " · Unread question")
+                                } else {
+                                    ""
                                 }
                             ),
                             11.0 * ratio,
@@ -292,6 +304,7 @@ mod tests {
                     color,
                     activity: Activity::Completed,
                     unread: true,
+                    question_unread: false,
                 })
                 .collect(),
             active: Some("0".into()),

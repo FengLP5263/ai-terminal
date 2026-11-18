@@ -12,6 +12,7 @@ fn main() -> eframe::Result {
         project_media::{MediaKind, Playable},
     };
     use std::{
+        collections::VecDeque,
         path::PathBuf,
         time::{Duration, Instant},
     };
@@ -27,14 +28,43 @@ fn main() -> eframe::Result {
         position: f64,
         checks: Vec<serde_json::Value>,
         done: bool,
+        input: VecDeque<Vec<egui::Event>>,
     }
     impl Probe {
+        fn click(&mut self, ctx: &egui::Context, id: &str) {
+            let pos = ctx
+                .read_response(egui::Id::new(id))
+                .expect("native media control")
+                .rect
+                .center();
+            self.input.push_back(vec![
+                egui::Event::PointerMoved(pos),
+                egui::Event::PointerButton {
+                    pos,
+                    button: egui::PointerButton::Primary,
+                    pressed: true,
+                    modifiers: egui::Modifiers::NONE,
+                },
+            ]);
+            self.input.push_back(vec![egui::Event::PointerButton {
+                pos,
+                button: egui::PointerButton::Primary,
+                pressed: false,
+                modifiers: egui::Modifiers::NONE,
+            }]);
+        }
         fn check(&mut self, name: &str, ok: bool) {
             self.checks
                 .push(serde_json::json!({"case":self.case,"check":name,"ok":ok}));
         }
     }
     impl eframe::App for Probe {
+        fn raw_input_hook(&mut self, _: &egui::Context, input: &mut egui::RawInput) {
+            if let Some(events) = self.input.pop_front() {
+                input.focused = true;
+                input.events.extend(events);
+            }
+        }
         fn ui(&mut self, ui: &mut egui::Ui, _: &mut eframe::Frame) {
             let ctx = ui.ctx().clone();
             for event in ctx.input(|i| i.events.clone()) {
@@ -64,6 +94,7 @@ fn main() -> eframe::Result {
             } else {
                 "Unsupported media fixture"
             });
+            let was_done = self.done;
             if !self.done {
                 if self.stage == 0 {
                     let (file, kind) = match self.case {
@@ -117,15 +148,21 @@ fn main() -> eframe::Result {
                             self.check("does-not-autoplay", player.paused());
                             let player = self.player.as_ref().unwrap();
                             player.volume(0.0).unwrap(); // Tests remain silent.
-                            player.play().unwrap();
+                            self.click(&ctx, "media-play-toggle");
                             self.stage = 2;
                             self.changed = Instant::now();
                         }
                         2 if elapsed > Duration::from_millis(900) => {
-                            self.position = player.position();
-                            let moving = self.position > 0.2;
-                            player.pause().unwrap();
+                            let moving = player.position() > 0.2 && !player.paused();
                             self.check("position-advances", moving);
+                            self.click(&ctx, "media-play-toggle");
+                            self.stage = 10;
+                            self.changed = Instant::now();
+                        }
+                        10 if elapsed > Duration::from_millis(250) => {
+                            let paused = player.paused();
+                            self.position = player.position();
+                            self.check("ui-pause-button", paused);
                             self.stage = 3;
                             self.changed = Instant::now();
                         }
@@ -149,6 +186,39 @@ fn main() -> eframe::Result {
                                     self.player.as_ref().unwrap().has_frame(),
                                 );
                             }
+                            self.stage = 11;
+                            self.changed = Instant::now();
+                        }
+                        11 if self.shots > self.case * 2 => {
+                            ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(egui::vec2(
+                                460.0, 620.0,
+                            )));
+                            self.stage = 7;
+                            self.changed = Instant::now();
+                        }
+                        7 if elapsed > Duration::from_millis(350) => {
+                            ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(
+                                egui::UserData::new(format!("case-{}-narrow.png", self.case)),
+                            ));
+                            self.player.as_ref().unwrap().volume(0.4).unwrap();
+                            self.click(&ctx, "media-mute-toggle");
+                            self.stage = 8;
+                            self.changed = Instant::now();
+                        }
+                        8 if elapsed > Duration::from_millis(250) => {
+                            let muted = player.current_volume() == 0.0;
+                            self.check("ui-mute-button", muted);
+                            self.click(&ctx, "media-mute-toggle");
+                            self.stage = 9;
+                            self.changed = Instant::now();
+                        }
+                        9 if elapsed > Duration::from_millis(250) => {
+                            let restored = (player.current_volume() - 0.4).abs() < 0.001;
+                            player.volume(0.0).unwrap();
+                            self.check("ui-unmute-restores-volume", restored);
+                            ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(egui::vec2(
+                                1050.0, 720.0,
+                            )));
                             self.stage = 5;
                             self.changed = Instant::now();
                         }
@@ -160,6 +230,14 @@ fn main() -> eframe::Result {
                         }
                         6 if elapsed > Duration::from_millis(1100) => {
                             self.check("end-of-file-pauses", player.paused());
+                            self.click(&ctx, "media-play-toggle");
+                            self.stage = 12;
+                            self.changed = Instant::now();
+                        }
+                        12 if elapsed > Duration::from_millis(450) => {
+                            let replayed = !player.paused() && player.position() < 1.0;
+                            player.pause().unwrap();
+                            self.check("ui-replay-after-end", replayed);
                             self.player = None;
                             let file = self.output.join(if self.case == 0 {
                                 self.audio
@@ -179,13 +257,13 @@ fn main() -> eframe::Result {
                     }
                 }
             }
-            if self.done
-                && self.shots < 3
+            if was_done
+                && self.shots < 5
                 && let Some(player) = &mut self.player
             {
                 player.show(ui);
             }
-            if self.done && (self.shots >= 3 || self.checks.iter().any(|c| c["ok"] == false)) {
+            if self.done && (self.shots >= 5 || self.checks.iter().any(|c| c["ok"] == false)) {
                 self.player = None;
                 let ok = self.checks.iter().all(|c| c["ok"] == true) && self.case == 2;
                 std::fs::write(self.output.join("result.json"), serde_json::to_vec_pretty(&serde_json::json!({"ok":ok,"checks":self.checks,"synthetic_media":true,"network":false,"model_requests":false})).unwrap()).unwrap();
@@ -227,6 +305,7 @@ fn main() -> eframe::Result {
                 position: 0.0,
                 checks: vec![],
                 done: false,
+                input: VecDeque::new(),
             }))
         }),
     )

@@ -9,12 +9,23 @@ import argparse
 from datetime import datetime, timezone
 import hashlib
 import json
+import re
 from pathlib import Path, PurePosixPath
 import tomllib
 import uuid
 import zipfile
 
 ROOT = Path(__file__).resolve().parent.parent
+
+
+def metadata(data):
+    record = json.loads(data)
+    for key in ('version', 'minimum_cli_version'):
+        if not isinstance(record.get(key), str) or not re.fullmatch(r'(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?', record[key]):
+            raise ValueError('Invalid skill ' + key)
+    if record.get('schema_version') != 1 or record.get('name') != 'ai-terminal' or record.get('control_schema') != 1:
+        raise ValueError('Unsupported skill version metadata')
+    return record
 
 
 def digest(data):
@@ -26,13 +37,14 @@ def members(root=ROOT):
     files = {f'ai-terminal/{p.relative_to(source).as_posix()}': p.read_bytes()
              for p in sorted(source.rglob('*')) if p.is_file() and not p.is_symlink()}
     required = {'ai-terminal/SKILL.md', 'ai-terminal/SKILL.en.md',
-                'ai-terminal/agents/openai.yaml'}
+                'ai-terminal/agents/openai.yaml', 'ai-terminal/version.json'}
     if not required.issubset(files):
         raise ValueError('Skill entry/metadata missing')
     for name in files:
         if not name.endswith(('.md', '.yaml', '.json')):
             raise ValueError('Unexpected skill resource: ' + name)
     files['LICENSE.txt'] = (root / 'LICENSE').read_bytes()
+    metadata(files['ai-terminal/version.json'])
     return files
 
 
@@ -58,14 +70,23 @@ def verify(path):
             data = archive.read(name)
             if len(data) != record['bytes'] or digest(data) != record['sha256']:
                 raise ValueError('Skill checksum mismatch: ' + name)
+        if manifest.get('schema_version', 1) == 2:
+            record = metadata(archive.read('ai-terminal/version.json'))
+            if record['version'] != manifest['version'] or record['minimum_cli_version'] != manifest['minimum_cli_version']:
+                raise ValueError('Skill version metadata differs from manifest')
+        elif manifest.get('schema_version', 1) != 1:
+            raise ValueError('Unsupported skill bundle schema')
     return {'ok': True, 'archive': Path(path).name, 'version': manifest['version'],
             'sha256': digest(Path(path).read_bytes()), 'files': len(names)}
 
 
 def build(output=None, root=ROOT):
-    version = tomllib.loads((root / 'Cargo.toml').read_text(encoding='utf-8'))['package']['version']
+    software_version = tomllib.loads((root / 'Cargo.toml').read_text(encoding='utf-8'))['package']['version']
     files = members(root)
-    manifest = {'schema_version': 1, 'version': version, 'control_schema': 1,
+    record = metadata(files['ai-terminal/version.json'])
+    version = record['version']
+    manifest = {'schema_version': 2, 'version': version, 'minimum_cli_version': record['minimum_cli_version'],
+                'software_version': software_version, 'source_repository': record['source_repository'], 'control_schema': 1,
                 'files': {n: {'bytes': len(b), 'sha256': digest(b)} for n, b in files.items()}}
     files['bundle-manifest.json'] = (json.dumps(manifest, ensure_ascii=False, indent=2) + '\n').encode('utf-8')
     folder = Path(output) if output else root / 'output/skills'

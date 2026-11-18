@@ -8,6 +8,14 @@ The user-facing [skills/ai-terminal](../skills/ai-terminal/SKILL.en.md) is separ
 
 Copy the entire ai-terminal folder into your Agent's skill directory, retaining references and agents. Agents supporting project-local .agents/skills can use `<project>/.agents/skills/ai-terminal/`; other Agents use their documented directory. Do not copy only the entry file or put it in AI Terminal's data directory. No user hooks, authentication or model configuration changes are needed.
 
+## Versions and upgrades
+
+Skills use independent semantic versions; software/CLI and Skill versions may differ, allowing guidance fixes without a software release. The installed [version.json](../skills/ai-terminal/version.json) records Skill version, minimum CLI version, protocol and source repository. Read it back after installation or upgrade, then check the running manager through instance info/capabilities. Treat older Skills with no version metadata as unknown legacy packages, never as the latest.
+
+The standalone manifest records Skill version, minimum CLI version and build-time software version, with SHA-256 identities for its contents. Verification rejects inconsistent internal/manifest versions and continues to accept previously released archive formats. Preview versions identify unreleased content; finalize a new version and artifact for publication without overwriting published versions.
+
+For existing teams, the Skill distinguishes manager session IDs from Agent conversation IDs and restores the verified name/project directly, avoiding an initial blank Agent. See the [session reference](../skills/ai-terminal/references/sessions.en.md#starting-versus-resuming-a-conversation).
+
 The source distribution includes skills/ai-terminal. Build a standalone ZIP locally:
 
 ```powershell
@@ -24,3 +32,5 @@ It includes ai-terminal/, LICENSE.txt and a verifiable SHA-256 manifest. Full Wi
 The Agent checks instance/caller identity, previews and commits metadata through the team reference, launches members separately, and reads back results. Ordinary changes use existing user authorization; closing a running session terminates its owned process tree. References also cover settings, viewing and terminal interaction. Content reads/task submission must fit user authorization; automatic trust approval is never authorized by this Skill.
 
 See [CLI documentation](cli.en.md) and the [Skill entry](../skills/ai-terminal/SKILL.en.md).
+
+The minimum CLI version covers base commands and compatibility flows; new commands still require client Help and manager capability checks. `session resume` is available in CLI 0.15.0; older clients use explicit Shell restoration from the session reference. Updating a Skill does not add commands to an older client.

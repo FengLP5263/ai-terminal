@@ -212,3 +212,11 @@ target/release/examples/cli_probe.exe output/<fresh-directory>
 ```
 
 Matching POSIX skill-package/verify-skills actions are portable; the native CLI/GUI still require Windows. cli_probe stages only its own binaries and calls the production App through real CLI subprocesses. It covers team preview/commit, duplicate receipts, revision conflicts, minimized updates, Agent shim startup/caller identity, running-close protection and owned-process cleanup, producing three native PNGs and result.json. The Agent is a local stand-in: no model request, user profile or system input. Full Windows ZIPs include the CLI, public Skill and bilingual usage documentation, while verification remains compatible with older archives. Extended checks cover native settings/floating transparency, file pagination/Markdown/images, synthetic muted WAV playback, read-only Git, explicit fixture input, stop and restart.
+
+0.15.0 cli_probe checks also verify exact resume arguments/conversation IDs, independent Files/Git panels across sessions and preserved PTY identity, adding session-back-git.png and session-leader-files.png. Standalone Skills carry independent version.json metadata and schema 2 manifests, recording minimum CLI and build-time software versions separately. Previously published Skill archives remain verifiable.
+
+The cli_probe Agent stand-in also sends explicit working → blocked/question events to check waiting and the yellow screenshot indicator; this is not acceptance of a real Codex model question.
+
+The async-question phase adds async-question-unread.png: an explicit background OSC9 Question sets an independent unread flag while activity stays working. Viewing clears the notice without stopping work, followed by a blocking-wait check. Codex's user-selected OSC9 backend is a separate integration prerequisite.
+
+The media_probe also verifies real control clicks, mute restoration and replay after EOF, producing four wide/narrow audio/video layout captures and an unsupported-file capture. Synthetic input targets only its own egui window and playback stays silent. project_ui checks centering/zoom using the actual image texture.

@@ -163,6 +163,11 @@ impl App {
         }
         let mut workspace = self.control_workspace();
         workspace.ui = p;
+        if let Some(id) = &self.active {
+            workspace
+                .session_panels
+                .insert(id.clone(), model::ProjectPanel::from_settings(p));
+        }
         self.control_save(&workspace)?;
         if p.terminal_font != self.preferences.terminal_font {
             let actual = ai_terminal::appearance::set_terminal_font(ctx, p.terminal_font);

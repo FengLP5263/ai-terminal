@@ -86,6 +86,7 @@ impl eframe::App for Probe {
                 agent: Agent::Cmd,
                 activity: Activity::Idle,
                 unread: false,
+                question_unread: false,
                 directory: std::path::Path::new("C:/Projects/demo"),
                 hint: "Local fixture".into(),
             })

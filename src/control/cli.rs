@@ -31,6 +31,7 @@ Usage: ai-terminal-cli [--data-dir PATH] [--json] COMMAND
   session start ID [--activate]            Start its Shell, optionally switching
   session activate ID                      Open and switch to its Shell
   session run ID --agent codex|claude|qoder|qodercn|kimi|zcode|trae [--activate]
+  session resume ID --agent NAME --conversation-id AGENT_ID [--activate]
   session close ID [--force]               Running sessions require --force
   group list
   group create --name NAME --members ID,ID,...
@@ -44,6 +45,8 @@ Commands emit UTF-8 JSON by default (--json is accepted for Agent compatibility)
 No running manager: fail without editing sessions.json or starting another manager.
 Run starts an Agent only in a session with no running terminal. It sends no prompt,
 accepts no trust dialog, and leaves authentication/permissions to the installed CLI.
+Resume selects an explicit Agent-owned conversation; the manager ID and conversation
+ID are different. Resume also requires no running terminal and never uses --last.
 See docs/cli.md and docs/skills.md for the protocol, limits and team examples.
 "#;
 
@@ -315,6 +318,18 @@ pub fn parse(arguments: Vec<OsString>) -> ApiResult<Parsed> {
                 activate: args.yes("activate"),
             });
         }
+        ("session", "resume") => {
+            count = 3;
+            let agent = agent(&args.required("agent")?)?;
+            let conversation_id = args.required("conversation-id")?;
+            super::resume_arguments(agent, &conversation_id)?;
+            command = Some(Command::Resume {
+                id: args.id()?,
+                agent,
+                conversation_id,
+                activate: args.yes("activate"),
+            });
+        }
         ("session", "close") => {
             count = 3;
             command = Some(Command::Close {
@@ -406,7 +421,10 @@ pub fn run(arguments: Vec<OsString>) -> i32 {
         request_id = parsed.request_id.clone();
         let (descriptor, caller_session) = target(parsed.directory.as_deref())?;
         instance_id = descriptor.instance_id.clone();
-        if matches!(parsed.command, Command::Native { .. }) {
+        if matches!(
+            parsed.command,
+            Command::Native { .. } | Command::Resume { .. }
+        ) {
             let check = super::call(
                 &descriptor,
                 Request {
@@ -416,15 +434,22 @@ pub fn run(arguments: Vec<OsString>) -> i32 {
                     action: Command::Info,
                 },
             )?;
+            let capability = if matches!(parsed.command, Command::Resume { .. }) {
+                "agent_resume"
+            } else {
+                "native_controls"
+            };
             if check
                 .result
                 .as_ref()
-                .and_then(|v| v["capabilities"]["native_controls"].as_bool())
+                .and_then(|v| v["capabilities"][capability].as_bool())
                 != Some(true)
             {
                 return Err(ApiError::new(
                     "unsupported_command",
-                    "This manager predates native controls. Open the newer preview; existing sessions are left running.",
+                    format!(
+                        "This manager does not support {capability}. Open a matching newer manager; existing sessions are left running."
+                    ),
                 ));
             }
         }

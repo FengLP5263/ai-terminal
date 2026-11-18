@@ -90,6 +90,7 @@ fn floating_geometry_and_scaled_clicks_are_independent_of_main_zoom() {
             color: None,
             activity: Activity::Idle,
             unread: false,
+            question_unread: false,
         }],
         active: Some("scaled".into()),
         locale: Locale::En,
@@ -172,6 +173,7 @@ fn floating_icons_are_rasterized_at_their_final_physical_size() {
                         color: None,
                         activity: Activity::Idle,
                         unread: false,
+                        question_unread: false,
                     })
                     .collect(),
                 active: None,
@@ -442,6 +444,7 @@ fn island_clicks_identify_sessions_and_keep_failure_question_and_completion_dist
             color: None,
             activity,
             unread: true,
+            question_unread: false,
         })
         .collect(),
         active: Some("0".into()),
@@ -513,6 +516,7 @@ fn a_single_session_stays_clickable_after_a_long_hover() {
             color: None,
             activity: Activity::Waiting,
             unread: true,
+            question_unread: false,
         }],
         ..Default::default()
     };
@@ -628,6 +632,7 @@ fn many_sessions_stay_still_and_only_drag_scrolls_without_opening_a_session() {
                 color: None,
                 activity: Activity::Idle,
                 unread: false,
+                question_unread: false,
             })
             .collect(),
         ..Default::default()
@@ -752,6 +757,7 @@ fn floating_result_dot_disappears_when_the_session_is_read() {
                 color: None,
                 activity,
                 unread: true,
+                question_unread: false,
             }],
             active: None,
             locale: Locale::En,
@@ -842,6 +848,7 @@ fn live_floating_opacity_updates_background_preserves_avatars_and_click_targets(
                 color: None,
                 activity: Activity::Idle,
                 unread: false,
+                question_unread: false,
             }],
             ..Default::default()
         },

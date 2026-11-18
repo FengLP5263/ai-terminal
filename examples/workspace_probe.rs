@@ -130,6 +130,7 @@ impl eframe::App for Probe {
                     },
                     activity,
                     unread,
+                    question_unread: false,
                     hint: "本地样例，状态为合成事件".into(),
                 }
             })

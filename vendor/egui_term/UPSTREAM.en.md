@@ -74,3 +74,5 @@ Font comparison can select a system CJK family, still Microsoft YaHei UI by defa
 0.4.9-preview.4: TerminalView suppresses ConPTY resize during sizing/invisible/already discarded passes and when raw screen geometry is unknown or invalid. Input processing remains independent, and visible real-window resizing stays enabled. No history copy, polling or idle repaint is added.
 
 0.7.0 preview: snapshots add O(1) history size and the backend provides clamped absolute local ScrollTo. A fixed-gutter viewport scrollbar consumes drag/track gestures locally, including release outside, without PTY mouse reports. Empty history/alternate screens hide it; 5,000-line retention, viewport-only copying and event-driven repaint remain.
+
+Unreleased: recognize Codex 0.167 explicit OSC9 `Question:` asynchronous-question notifications alongside `Plan mode prompt:` through the existing bounded, invocation-scoped, coalesced-wakeup channel. Only the question kind is retained, never titles or question contents. Ordinary output, OSC2 titles and bells never imply a question. The host presents lifecycle and unread-question attention independently.

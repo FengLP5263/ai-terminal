@@ -270,3 +270,17 @@ Windows 原生程序支持 `ai-terminal.exe --settings`，直接显示同一个�
 控制请求 256 KiB、响应 1 MiB、32 项待处理队列、16 项连接队列、4 个连接线程，读取／排队有截止时间；后台 ROOT 唤醒而非空闲轮询。元数据修改与启动／关闭分开；运行会话关闭需要 force，后台只回收该 Session 所有的资源。修改回执有界保留 64 项／4 MiB，不跨重启；超时先查回执与现状。详情见 docs/cli.md。
 
 0.14.0-preview.2：src/control/actions.rs 与 cli/native.rs 定义原生控制命令，src/app/control/native.rs 在 App::logic 执行设置、窗口／浮窗、面板、文件／Git 只读查看、媒体及显式终端 I/O。设置完整校验并原子保存后应用，不重启 PTY。文件／Git 复用有界后台读取，返回 loading、error 与分页；媒体复用当前文档拥有的原生引擎。终端读取仅当前 viewport；输入最多 64 KiB，只有显式请求才传递，不作为状态推断来源。回执保存 SHA-256 请求指纹与无正文确认，读取响应不缓存。截图只捕获本实例主窗口，PNG 编码在后台执行，不覆盖已有文件；输出是显式请求的制品而非自动日志。能力由 instance capabilities 发现；旧管理器通过 Info 预检明确拒绝新命令。
+
+## 0.15.0：显式恢复与会话面板
+
+管理 CLI 的 session resume 需要 agent_resume 能力、明确的 Agent 对话 ID 和未运行的目标终端，经过独立校验后将 resume／--resume 参数直接交给原会话 shim。回执只表示进程建立及请求的恢复目标，不表示历史已载入；不自动查找 --last、不接受信任、不替换运行程序。旧管理器由新 CLI 的能力预检拒绝。
+
+右侧文件／Git 面板按会话 UUID 保存 closed／files／git。UiSettings 的两个旧布尔值只投影当前活动会话；切换前保存旧会话的内存状态，再恢复新会话状态，不因切换新增磁盘写入或重启 PTY。CLI 面板修改沿用原子保存；重命名、分组和排序保留会话状态。
+
+Codex 0.167 的异步问题在任务继续运行时仍上报 working，停止工作且存在未答问题时才上报 blocked/question。原生 blocked/question 仍归约为 Waiting；合成回归覆盖迟到 hook 不得覆盖此状态。源码核对与真实现场复现分开记录，不用普通提问文本推断等待。依据：[Codex 0.167 原生状态](https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/tui/src/bottom_pane/mod.rs#L1743-L1763)。
+
+0.15.0 异步提问提醒：Codex 0.167 通过 OSC9 `Question:` 单独通知新问题，宿主将 question_unread 与 Activity 分开保存于内存。原生 Working 不被改写为 Waiting；非当前／不可见终端收到问题后，侧栏和浮窗在原有右下角状态位优先显示黄色标记，不另设角标；运行转圈暂时让位，实际查看或显式 acknowledge 清除标记后恢复，不代表问题已回答。分组汇总依次优先未读失败、阻塞等待、未读提问、未读完成、运行；已查看完成不覆盖运行状态。提示正文不保存，不从铃声、普通输出或窗口标题推断问题。
+
+Codex Auto 通知对 ai-terminal 默认选择铃声而非 OSC9。用户需要自行选择 OSC9（按需允许 async-question 与 always 条件），本机／用户配置不由管理器改写；也不在原生模式注入 -c 通知选项，因为 Codex 0.167 的共享后台排除这些覆盖参数。来源：[通知后端](https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/tui/src/notifications/mod.rs)、[共享后台条件](https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/tui/src/daemon_startup.rs)。
+
+0.15.0 多媒体预览布局：project_preview 的图片在可滚动画布内水平、垂直居中，适应窗口保留内边距，原尺寸／放大仍可滚动。media_player/controls.rs 只绘制传输控件并返回明确操作；Player 将音频控制条或视频画面与下方控件整体居中。控件按可用宽度换行，使用已有 Codicons、圆形滑块、当前／总时长和静音；上次非零音量只存在 Player 内存中。拖动期间仅预览位置，松开再向引擎提交定位。继续使用原生异步解码、默认暂停、播放时按需刷新及关闭后释放，不新增后台轮询或持久化字段。

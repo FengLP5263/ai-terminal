@@ -159,3 +159,11 @@ Qoder 国际版启动：构建 `cargo build --offline --locked --release --bins 
 管理 CLI：cargo test --offline --locked --test control 与 --bin ai-terminal app::control::tests 覆盖认证、本机限定、整批校验、保存失败、回执去重和实际 PTY 身份保留。先 build --bins，再运行 App 原生测试。cli_probe 的完整命令见 scripts/README.md，使用真实外部 CLI、正式 App、隔离数据及本地 Agent 替身，核对最小化后台管理、调用者身份、两张截图和自身进程回收；不能称为真实模型回合。skill-package／verify-skills 同时在 Windows/POSIX 入口可用，独立 ZIP 回读验证。
 
 CLI 原生操作回归由 cli_probe 扩展覆盖：通过真实外部 CLI 核对最小化设置、浮窗 50% 透明度、原 PTY PID、文件分页／Markdown／图片、合成本地静音 WAV 播放／暂停／跳转、只读 Git、显式样例输入和停止／重启。新增原生命令必须走 App::logic，读取内容不写回执，不能在 ctx.input 内再次获取 Context 锁。
+
+显式恢复回归另覆盖：管理器／Agent ID 区分、参数注入拒绝、运行会话保持原 PTY；cli_probe 的替身检查实际收到 resume 和准确对话 ID，不把替身认定为真实历史恢复。会话面板回归覆盖三会话分别为文件／Git／收起、元数据修改、保存重载、旧全局偏好迁移；原生探针截图验证切换后的实际布局。技能包测试覆盖内外版本不一致、内容篡改和旧包兼容。
+
+cli_probe 的本地替身显式发送 working → blocked/question，核对正式 App 返回 waiting，并从 agent-fixture.png 检查黄色等待标记。它验证接收链路，不能证明真实 Codex 在异步问题尚不阻塞时也会发出该通知。
+
+异步提问补充：cli_probe 先在后台替身发送 Working + OSC9 Question，验证 activity 仍为 working、question_unread 为 true 并截图 async-question-unread.png，再切换查看，验证标记清除且工作未停止，最后发送阻塞通知检查 Waiting。分组优先级回归覆盖需要处理 → 未读完成 → 运行，以及查看后的优先级恢复；普通铃声不参与识别。
+
+多媒体布局回归：media_player::controls 的 UI 用例覆盖 180／320／560 点按钮命中、未就绪禁用与拖动进度松开提交；project_ui 用实际图片纹理检查不同视口／缩放下的水平、垂直居中。media_probe 对自身窗口注入原生 egui 输入，实际点击播放、暂停、静音、取消静音及结束后重播；暂停时检查音量恢复，播放测试保持静音。宽／窄音视频各生成截图，加上不支持文件共五张；仍不读取用户媒体、不发送系统输入或模型请求。

@@ -14,6 +14,7 @@ struct Harness {
     color: Option<SessionColor>,
     activity: Activity,
     unread: bool,
+    question_unread: bool,
     extra: Vec<String>,
     width: f32,
     height: f32,
@@ -39,6 +40,7 @@ fn session_tooltips_keep_multiline_unicode_and_use_native_color_emoji() {
                 color: None,
                 activity: Activity::Idle,
                 unread: false,
+                question_unread: false,
                 hint: "就绪 · 最近事件 OSC701".into(),
             }];
             let groups = [ai_terminal::model::SessionGroup {
@@ -154,6 +156,51 @@ fn session_tooltips_keep_multiline_unicode_and_use_native_color_emoji() {
         }
     }
 }
+
+#[test]
+fn unread_question_uses_the_existing_status_slot_without_changing_working() {
+    fn yellow_dots(shape: &egui::Shape) -> Vec<Pos2> {
+        match shape {
+            egui::Shape::Circle(c) if c.fill == ai_terminal::chrome::WAITING => vec![c.center],
+            egui::Shape::Vec(shapes) => shapes.iter().flat_map(yellow_dots).collect(),
+            _ => vec![],
+        }
+    }
+    for scale in [1.0, 1.5, 2.0] {
+        let ctx = egui::Context::default();
+        let avatar = Rect::from_min_size(
+            Pos2::new(40.0, 40.0),
+            egui::Vec2::splat(ai_terminal::chrome::AVATAR * scale),
+        );
+        let activity = Activity::Working;
+        for question_unread in [true, false] {
+            let output = ctx.run_ui(egui::RawInput::default(), |ui| {
+                sidebar::paint_status_with_attention(
+                    ui,
+                    avatar,
+                    activity,
+                    false,
+                    question_unread,
+                    egui::Color32::BLACK,
+                );
+            });
+            let dots: Vec<_> = output
+                .shapes
+                .iter()
+                .flat_map(|s| yellow_dots(&s.shape))
+                .collect();
+            assert_eq!(
+                dots,
+                if question_unread {
+                    vec![avatar.right_bottom() - egui::vec2(2.0, 2.0) * scale]
+                } else {
+                    vec![]
+                }
+            );
+            assert_eq!(activity, Activity::Working);
+        }
+    }
+}
 impl Harness {
     fn new() -> Self {
         let ctx = egui::Context::default();
@@ -167,6 +214,7 @@ impl Harness {
             color: None,
             activity: Activity::Idle,
             unread: false,
+            question_unread: false,
             extra: Vec::new(),
             width: 238.0,
             height: 600.0,
@@ -203,6 +251,7 @@ impl Harness {
                 Activity::Idle
             },
             unread: id == "a" && self.unread,
+            question_unread: id == "a" && self.question_unread,
             hint: String::new(),
         })
         .collect();
@@ -214,6 +263,7 @@ impl Harness {
             color: None,
             activity: Activity::Idle,
             unread: false,
+            question_unread: false,
             hint: String::new(),
         }));
         let mut actions = Actions::default();
