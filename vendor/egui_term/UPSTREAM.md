@@ -106,3 +106,12 @@ Unreleased: recognize Codex 0.167 explicit OSC9 `Question:` asynchronous-questio
 
 
 未发布：识别 Codex 0.167 的显式 OSC9 `Question:` 异步提问通知，与旧 `Plan mode prompt:` 共用有界、按调用代次隔离且合并唤醒的提醒通道。仅保留 question 类型，不保存标题或问题正文；普通输出、OSC2 标题和铃声不推断为提问。生命周期与未查看提问提醒由宿主分别呈现。
+
+Unreleased terminal resize fix: on column changes, normal-buffer rows with a solid padded background receive a transient paint hint, including TUIs reserving the final column. One colored blank remains as an anchor; the remaining presentation padding becomes ordinary empty cells so narrowing does not wrap it into extra blank rows. egui_term extends only that background to the current terminal edge. Text, hard breaks, soft-wrap semantics, cursor coordinates and PTY identity remain intact. Inline highlights, mixed backgrounds, underlines and alternate screens do not expand; explicitly erasing or overwriting the leading cell clears the hint. No persistent settings, history copies, polling or input injection are added; the existing 5,000-line bound and resize events remain.
+
+
+未发布的终端缩放修复：普通缓冲区在列数变化时为原本铺满整行的统一背景保留临时绘制标记，包括保留最后一列的 TUI。尾部纯填充只保留一个有色空格作绘制锚点，其余成为普通空白，避免缩窄时把背景填充折成额外空行。egui_term 仅把该背景延伸到当前终端右边缘；文字、硬换行、软换行语义、光标坐标与 PTY 身份保持。行内高亮、混合背景、下划线和备用屏幕不按整行扩展；显式擦除或改写首单元格清除标记。不增加持久化配置、历史副本、轮询或输入注入，沿用 5000 行上限及现有尺寸事件。
+
+Unreleased scroll/input fix: generated terminal protocol replies, including standard and private cursor reports, enter the existing PTY I/O queue directly after parsing. The writer is initialized before the reader starts and bypasses ordinary state/title forwarding. Protocol bytes are neither rewritten nor deduplicated; user input is not scanned or filtered. Hidden terminals also respond. Windows ConPTY pipes re-arm readiness after each event batch. Buffered output posts another notification; an empty pipe atomically checks readiness and registers its waker, preventing a read-budget yield from losing the next output wake. Waker registration holds no lock acquired by its callback. Existing parse budgets, bounded pipes, 5,000-line history and hidden output draining remain; there is no idle polling or synthetic key input.
+
+未发布的滚动／输入修复：终端协议应答（含普通和私有光标位置报告）在解析后直接进入原有 PTY I/O 队列，初始化在读取线程启动之前完成，不再等待普通状态／标题事件转发线程。协议字节不改写、不去重，不扫描或过滤用户输入；隐藏终端同样响应。 Windows 的 ConPTY 管道在每次事件处理后重新注册读写就绪；读缓冲未空时重新投递通知，空缓冲使用管道的原子检查／唤醒注册，避免达到单批解析预算后丢失后续输出唤醒。注册唤醒时不持有其回调会获取的锁。保留原有解析预算、有界管道、5000 行历史和后台排空；没有空闲轮询或模拟按键。

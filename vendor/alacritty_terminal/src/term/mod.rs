@@ -674,6 +674,9 @@ impl<T> Term<T> {
         self.vi_mode_cursor.point.line += delta;
 
         let is_alt = self.mode.contains(TermMode::ALT_SCREEN);
+        if !is_alt && num_cols != old_cols {
+            self.mark_full_width_backgrounds();
+        }
         self.grid.resize(!is_alt, num_lines, num_cols);
         self.inactive_grid.resize(is_alt, num_lines, num_cols);
 
@@ -702,6 +705,52 @@ impl<T> Term<T> {
 
         // Resize damage information.
         self.damage.resize(num_cols, num_lines);
+    }
+
+    /// Remember solid, padded row backgrounds before resizing the normal grid.
+    /// New columns remain ordinary empty cells: this hint only extends their paint,
+    /// so copying, hard newlines, cursor coordinates and reflow are unchanged.
+    fn mark_full_width_backgrounds(&mut self) {
+        let columns = self.grid.columns();
+        if columns < 4 {
+            return;
+        }
+        for line in self.grid.topmost_line().0..=self.grid.bottommost_line().0 {
+            let row = &mut self.grid[Line(line)];
+            let bg = row[Column(0)].bg;
+            if bg == Color::Named(NamedColor::Background)
+                || row[Column(0)].flags.contains(Flags::FULL_WIDTH_BACKGROUND)
+            {
+                continue;
+            }
+            // Some TUIs reserve the final column to avoid triggering autowrap.
+            let end = if row[Column(columns - 1)] == Cell::default() {
+                columns - 1
+            } else {
+                columns
+            };
+            let tail = &row[Column(end - 1)];
+            if tail.c == ' '
+                && tail.extra.is_none()
+                && row[..Column(end)].iter().all(|cell| {
+                    cell.bg == bg
+                        && !cell.flags.intersects(
+                            Flags::INVERSE | Flags::WRAPLINE | Flags::ALL_UNDERLINES | Flags::STRIKEOUT,
+                        )
+                })
+            {
+                // Keep one colored blank as the paint anchor. The rest is
+                // presentation padding, not text to wrap into extra blank rows.
+                let keep = row[..Column(end)]
+                    .iter()
+                    .rposition(|cell| cell.c != ' ' || cell.extra.is_some())
+                    .map_or(1, |index| (index + 2).min(end));
+                for cell in &mut row[Column(keep)..Column(end)] {
+                    *cell = Cell::default();
+                }
+                row[Column(0)].flags.insert(Flags::FULL_WIDTH_BACKGROUND);
+            }
+        }
     }
 
     /// Active terminal modes.

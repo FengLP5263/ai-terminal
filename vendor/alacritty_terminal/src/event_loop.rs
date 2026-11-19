@@ -306,9 +306,12 @@ where
                     }
                 }
 
-                // Register write interest if necessary.
+                // Windows pipes emulate level readiness with completion packets.
+                // Re-arm them after a read budget yields with buffered output,
+                // even when write interest did not change. Otherwise no new edge
+                // is guaranteed and the remaining output waits for user input.
                 let needs_write = state.needs_write();
-                if needs_write != interest.writable {
+                if needs_write != interest.writable || cfg!(windows) {
                     interest.writable = needs_write;
 
                     // Re-register with new interest.

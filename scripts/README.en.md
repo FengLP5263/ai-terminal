@@ -224,3 +224,25 @@ The media_probe also verifies real control clicks, mute restoration and replay a
 Native Markdown verification: build `cargo build --offline --locked --release --bins --example markdown_probe`, then run `target/release/examples/markdown_probe.exe output/<unique-markdown>`. Only public repository READMEs and PNG assets are copied into an isolated directory. Nine images cover centered headers, 96-point branding, 32-point table icons, both languages, two/five-column tables, a narrow window and 133% scaling, plus equal-width short/long code blocks, block spacing, right-aligned copy buttons and color emoji in the CLI guide. Check result.json, normal exit and actual PNGs. project_media/project_ui regressions cover embedded HTML, path boundaries, unchanged source, heading anchors, image sizes and table wrapping. No PTY, Agent, model or user configuration is involved.
 
 The additional settings-context.md capture prepares every resource in the full README before focusing on the Settings section, asserting that settings.png loads. Regressions cover shared URIs for repeated HTML images, the remaining image budget, and all seven icon references plus the later settings screenshot in both READMEs.
+
+Terminal resize background acceptance (Windows): terminal_resize_probe uses production fonts, a real ConPTY and its own no-profile PowerShell fixture. It prints a full-row background and an inline highlight once, then only changes window width and 97%/114%/125% zoom, producing five native PNGs. Inspect each for the old background reaching the new grid's last column while inline highlights stay local; check result.json, normal exit and owned-PTY cleanup. It reads no user sessions and starts no Agent/model; no refresh keys are sent during resizing. terminal_interaction also covers growing/shrinking, CJK and joined emoji, text/cursor/PID preservation, explicit erasure/repaint, alternate screens, long-line soft reflow and hard code line breaks.
+
+```powershell
+cargo build --offline --locked --release --bins --example terminal_resize_probe
+target/release/examples/terminal_resize_probe.exe output/<unique-terminal-resize>
+```
+
+Native Qoder scroll/cancel acceptance: qoder_cn_probe scroll (CN) and qoder-scroll (international) first create 180 fixed long history lines, then start the installed public CLI with unsubmitted input. Four PNGs and result.json cover 146% zoom, wheel scrolling up and back to the bottom, typing after Ctrl+C and cursor-report leakage. Use an already trusted directory; do not approve trust, send Enter/model prompts, modify user configuration or operate existing CLIs. CLI-owned startup behavior and synthetic history are separate evidence. protocol_reply_tests::cursor_replies_do_not_wait_for_the_state_event_forwarder checks standard/private queries without waiting for ordinary event forwarding. The terminal_interaction burst-output regression reaches the final marker in visible and hidden terminals, preserving PID and bottom content through resizing; the old readiness path must fail.
+
+```powershell
+cargo build --offline --locked --release --bins --example qoder_cn_probe
+target/release/examples/qoder_cn_probe.exe output/<unique-cn-scroll> scroll <trusted-directory>
+target/release/examples/qoder_cn_probe.exe output/<unique-qoder-scroll> qoder-scroll <trusted-directory>
+```
+
+Native burst-output/bottom acceptance: terminal_output_probe uses its own no-profile PowerShell to emit 2,048 long lines, exceeding the parse budget and exercising the history bound. After one fixture trigger it sends no keys. Five PNGs check 100%/146%/97%, actual wheel gestures up and back to the bottom, final-composer pixels, cursor/clip bounds and the original PTY. Local fixtures only; no Agent/model or user data.
+
+```powershell
+cargo build --offline --locked --release --bins --example terminal_output_probe
+target/release/examples/terminal_output_probe.exe output/<unique-terminal-output>
+```
