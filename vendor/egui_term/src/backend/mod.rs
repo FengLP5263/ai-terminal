@@ -25,7 +25,7 @@ use std::io::Result;
 use std::ops::{Index, RangeInclusive};
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicU8, Ordering};
 use std::sync::mpsc::Sender;
-use std::sync::{mpsc, Arc};
+use std::sync::{mpsc, Arc, OnceLock};
 
 pub type TerminalMode = TermMode;
 pub type PtyEvent = Event;
@@ -193,9 +193,11 @@ impl TerminalBackend {
         let (event_sender, event_receiver) = mpsc::channel();
         let shutdown = event_sender.clone();
         let wake_pending = Arc::new(AtomicBool::new(false));
+        let protocol_writer = Arc::new(OnceLock::new());
         let event_proxy = EventProxy {
             sender: event_sender,
             wake_pending: wake_pending.clone(),
+            protocol_writer: protocol_writer.clone(),
         };
         let term = Term::new(config, &terminal_size, event_proxy.clone());
         let initial_content = RenderableContent {
@@ -230,6 +232,9 @@ impl TerminalBackend {
         let pty_event_loop = EventLoop::new(term.clone(), event_proxy, pty, false, false)?;
         let notifier = Notifier(pty_event_loop.channel());
         let pty_notifier = Notifier(pty_event_loop.channel());
+        // Protocol replies must reach the same I/O queue immediately, rather
+        // than waiting behind title/status/paint forwarding on another thread.
+        let _ = protocol_writer.set(Notifier(pty_event_loop.channel()));
         let url_regex = RegexSearch::new(r#"(ipfs:|ipns:|magnet:|mailto:|gemini://|gopher://|https://|http://|news:|file://|git://|ssh:|ftp://)[^\u{0000}-\u{001F}\u{007F}-\u{009F}<>"\s{-}\^⟨⟩`]+"#).unwrap();
         let _pty_event_loop_thread = pty_event_loop.spawn();
         let visible = Arc::new(AtomicBool::new(true));
@@ -806,15 +811,98 @@ impl Drop for TerminalBackend {
 pub struct EventProxy {
     sender: mpsc::Sender<Event>,
     wake_pending: Arc<AtomicBool>,
+    protocol_writer: Arc<OnceLock<Notifier>>,
 }
 
 impl EventListener for EventProxy {
     fn send_event(&self, event: Event) {
+        if let Event::PtyWrite(bytes) = event {
+            if let Some(writer) = self.protocol_writer.get() {
+                writer.notify(bytes.into_bytes());
+            } else {
+                let _ = self.sender.send(Event::PtyWrite(bytes));
+            }
+            return;
+        }
         if matches!(event, Event::Wakeup) && self.wake_pending.swap(true, Ordering::AcqRel) {
             return;
         }
         if self.sender.send(event).is_err() {
             self.wake_pending.store(false, Ordering::Release);
+        }
+    }
+}
+
+#[cfg(all(test, windows))]
+mod protocol_reply_tests {
+    use super::*;
+    use std::time::{Duration, Instant};
+
+    #[test]
+    fn cursor_replies_do_not_wait_for_the_state_event_forwarder() {
+        for private in [false, true] {
+            let ctx = egui::Context::default();
+            let (tx, _rx) = mpsc::channel();
+            let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../tests/fixtures/vt_cursor_probe.py");
+            let mut backend = TerminalBackend::new(
+                94571,
+                ctx,
+                tx,
+                BackendSettings {
+                    shell: "python.exe".into(),
+                    args: vec![
+                        "-X".into(),
+                        "utf8".into(),
+                        fixture.to_string_lossy().into_owned(),
+                        if private { "private" } else { "standard" }.into(),
+                        "deferred".into(),
+                    ],
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+            backend.set_visible(false);
+            let until = Instant::now() + Duration::from_secs(5);
+            while !backend.plain_text().contains("PROBE_READY") && Instant::now() < until {
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            assert!(backend.plain_text().contains("PROBE_READY"));
+            let (blocked_tx, blocked_rx) = mpsc::channel();
+            let (release_tx, release_rx) = mpsc::channel();
+            let release_rx = std::sync::Mutex::new(release_rx);
+            backend
+                .shutdown
+                .send(Event::ColorRequest(
+                    0,
+                    Arc::new(move |_| {
+                        let _ = blocked_tx.send(());
+                        let _ = release_rx
+                            .lock()
+                            .unwrap()
+                            .recv_timeout(Duration::from_secs(4));
+                        String::new()
+                    }),
+                ))
+                .unwrap();
+            blocked_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+            backend.notifier.notify(b"?".to_vec());
+            let until = Instant::now() + Duration::from_secs(2);
+            let mut text = backend.plain_text();
+            while !text.contains("GOT:") && Instant::now() < until {
+                std::thread::sleep(Duration::from_millis(10));
+                text = backend.plain_text();
+            }
+            let _ = release_tx.send(());
+            let report = text
+                .lines()
+                .find(|line| line.contains("GOT:"))
+                .unwrap_or("");
+            assert_eq!(
+                report.matches("1b 5b").count(),
+                2,
+                "cursor replies arrived after the raw-input reader stopped: {report}"
+            );
         }
     }
 }

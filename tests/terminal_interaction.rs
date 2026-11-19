@@ -90,6 +90,35 @@ fn wait_text(backend: &mut TerminalBackend, needle: &str) -> String {
     panic!("terminal did not emit {needle:?}: {text}");
 }
 
+#[test]
+fn long_console_output_is_drained_to_the_live_composer_without_extra_input() {
+    for visible in [true, false] {
+        let ctx = egui::Context::default();
+        let mut backend = terminal(
+            &ctx,
+            "[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false); $lines = 1..2048 | ForEach-Object { 'LOCAL_SCROLL_FIXTURE_'+$_+(' long output 中英混排 👩🏽‍💻 '+('x'*160)) }; [Console]::Write([string]::Join(\"`r`n\", $lines)); Write-Output 'LIVE_COMPOSER_READY'; Start-Sleep -Seconds 20",
+        );
+        frame(&ctx, &mut backend, vec![], false);
+        backend.set_visible(visible);
+        wait_text(&mut backend, "LIVE_COMPOSER_READY");
+        for (width, height) in [(500.0, 300.0), (1100.0, 800.0), (780.0, 460.0)] {
+            let font = backend.sync().terminal_size;
+            backend.process_command(egui_term::BackendCommand::Resize(
+                egui::vec2(width, height).into(),
+                egui::vec2(font.cell_width, font.cell_height).into(),
+                1.46,
+            ));
+            std::thread::sleep(Duration::from_millis(400));
+            backend.process_command(egui_term::BackendCommand::ScrollTo(0));
+            let text = backend.plain_text();
+            assert!(
+                text.contains("LIVE_COMPOSER_READY"),
+                "bottom missing after resize {width}x{height}: {text}"
+            );
+        }
+    }
+}
+
 fn key(key: Key) -> Event {
     Event::Key {
         key,
@@ -123,6 +152,135 @@ fn unknown_viewport_geometry_does_not_resize_conpty_to_the_default_canvas() {
         (before.num_cols, before.num_lines),
         "real viewport resize remains enabled"
     );
+}
+
+#[test]
+fn widening_preserves_full_row_backgrounds_without_stretching_inline_highlights() {
+    for (padding, alternate, fill) in [
+        (true, false, true),
+        (false, false, false),
+        (true, true, false),
+    ] {
+        let ctx = egui::Context::default();
+        let script = format!(
+            "$e=[char]27; [Console]::Write($e+'[2J'+$e+'[H'+'{}'); [void][Console]::ReadLine(); $n={}; [Console]::Write($e+'[H'+$e+'[48;2;40;65;85m'+'> sample'+(' '*[Math]::Max(1,$n-8))+$e+'[0m'+$e+'[3;1H'+'中文 👩‍💻 | code = 1;'+$e+'[5;1H'+'ROW_READY'); [void][Console]::ReadLine(); [Console]::Write($e+'[H'+$e+'[2K'+$e+'[48;2;40;65;85mSHORT'+$e+'[0m'+$e+'[6;1H'+'REPAINT_READY'); Start-Sleep -Seconds 20",
+            if alternate { "\x1b[?1049h" } else { "" },
+            if padding {
+                "[Console]::WindowWidth-1"
+            } else {
+                "24"
+            },
+        );
+        let mut backend = terminal(&ctx, &script);
+        let pid = backend.pty_id();
+        let draw = |backend: &mut TerminalBackend, width: f32| {
+            ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(width + 20.0, 500.0),
+                    )),
+                    ..Default::default()
+                },
+                |ui| {
+                    let view = TerminalView::new(ui, backend).set_size(egui::vec2(width, 460.0));
+                    ui.add(view);
+                },
+            )
+        };
+        draw(&mut backend, 600.0);
+        backend.process_command(egui_term::BackendCommand::Write(b"\r".to_vec()));
+        wait_text(&mut backend, "ROW_READY");
+        let cursor = backend.sync().cursor_point;
+        let original: Vec<_> = backend
+            .plain_text()
+            .lines()
+            .map(|line| line.trim_end().to_owned())
+            .collect();
+        for width in [1000.0, 480.0, 780.0, 1200.0] {
+            draw(&mut backend, width);
+            std::thread::sleep(Duration::from_millis(120));
+            let output = draw(&mut backend, width);
+            let gray_right = output
+                .shapes
+                .iter()
+                .filter_map(|shape| match &shape.shape {
+                    egui::Shape::Rect(rect) if rect.fill == egui::Color32::from_rgb(40, 65, 85) => {
+                        Some(rect.rect.right())
+                    }
+                    _ => None,
+                })
+                .fold(0.0_f32, f32::max);
+            assert_eq!(
+                gray_right > width - 20.0,
+                fill || (padding && width <= 600.0),
+                "row background at width={width}, padding={padding}, alternate={alternate}: right={gray_right}",
+            );
+            let current: Vec<_> = backend
+                .plain_text()
+                .lines()
+                .map(|line| line.trim_end().to_owned())
+                .collect();
+            assert_eq!(original, current, "painting must not rewrite terminal text");
+            assert_eq!(backend.sync().cursor_point, cursor);
+            assert_eq!(backend.pty_id(), pid);
+        }
+        backend.process_command(egui_term::BackendCommand::Write(b"\r".to_vec()));
+        wait_text(&mut backend, "REPAINT_READY");
+        let output = draw(&mut backend, 1200.0);
+        assert!(
+            output.shapes.iter().all(|shape| {
+                !matches!(&shape.shape, egui::Shape::Rect(rect)
+                if rect.fill == egui::Color32::from_rgb(40, 65, 85) && rect.rect.right() > 150.0)
+            }),
+            "an explicitly erased/repainted row retained its old background extension"
+        );
+    }
+}
+
+#[test]
+fn resize_reflows_long_output_and_preserves_explicit_line_breaks() {
+    let ctx = egui::Context::default();
+    let mut backend = terminal(
+        &ctx,
+        "[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false); [void][Console]::ReadLine(); [Console]::WriteLine('SOFT_'+('x'*160)+'_END'); [Console]::WriteLine('HARD_ONE  code = 1;'); [Console]::WriteLine('HARD_TWO  中文'); [Console]::Write('REFLOW_READY'); Start-Sleep -Seconds 20",
+    );
+    let draw = |backend: &mut TerminalBackend, width: f32| {
+        ctx.run_ui(
+            egui::RawInput {
+                screen_rect: Some(egui::Rect::from_min_size(
+                    egui::Pos2::ZERO,
+                    egui::vec2(width + 20.0, 500.0),
+                )),
+                ..Default::default()
+            },
+            |ui| {
+                let view = TerminalView::new(ui, backend).set_size(egui::vec2(width, 460.0));
+                ui.add(view);
+            },
+        )
+    };
+    draw(&mut backend, 600.0);
+    backend.process_command(egui_term::BackendCommand::Write(b"\r".to_vec()));
+    wait_text(&mut backend, "REFLOW_READY");
+    for width in [1200.0, 480.0, 1000.0, 600.0] {
+        draw(&mut backend, width);
+        std::thread::sleep(Duration::from_millis(120));
+        draw(&mut backend, width);
+        let text = backend.plain_text();
+        let lines: Vec<_> = text.lines().map(str::trim_end).collect();
+        assert!(lines.contains(&"HARD_ONE  code = 1;"), "{text}");
+        assert!(lines.contains(&"HARD_TWO  中文"), "{text}");
+        assert!(
+            lines
+                .concat()
+                .contains(&format!("SOFT_{}_END", "x".repeat(160))),
+            "soft-wrap content was lost or padded during resize: {text}",
+        );
+        let soft = lines.iter().find(|line| line.starts_with("SOFT_")).unwrap();
+        let size: egui_term::WindowSize = backend.sync().terminal_size.into();
+        assert_eq!(soft.len(), usize::from(size.num_cols));
+    }
 }
 
 #[test]

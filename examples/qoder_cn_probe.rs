@@ -30,6 +30,9 @@ struct Probe {
     synthetic: bool,
     agent: Agent,
     input_probe: bool,
+    scroll_probe: bool,
+    scroll_input_step: usize,
+    terminal_rect: Option<egui::Rect>,
     typed: bool,
     input_checks: Vec<serde_json::Value>,
     stable_marker_frames: usize,
@@ -159,17 +162,39 @@ impl eframe::App for Probe {
             self.status.apply_qoder(&event, false);
             self.changed = Instant::now();
         }
-        if self.began.elapsed() > Duration::from_secs(if self.trace { 60 } else { 35 }) {
+        if self.began.elapsed()
+            > Duration::from_secs(if self.trace || self.scroll_probe {
+                75
+            } else {
+                35
+            })
+        {
             self.finish(ctx);
         }
         ctx.request_repaint_after(Duration::from_millis(80));
     }
-    fn raw_input_hook(&mut self, _: &egui::Context, input: &mut egui::RawInput) {
+    fn raw_input_hook(&mut self, ctx: &egui::Context, input: &mut egui::RawInput) {
         input.focused = true;
         input
             .events
             .retain(|event| matches!(event, egui::Event::Screenshot { .. }));
         input.events.push(egui::Event::PointerGone);
+        if self.scroll_probe && self.stage > 0 {
+            let rect = self.terminal_rect.unwrap_or_else(|| ctx.content_rect());
+            if self.scroll_input_step == 0 {
+                input.events.push(egui::Event::PointerMoved(rect.center()));
+                input.events.push(egui::Event::MouseWheel {
+                    unit: egui::MouseWheelUnit::Line,
+                    delta: egui::vec2(0.0, if self.stage == 2 { -10000.0 } else { 80.0 }),
+                    modifiers: egui::Modifiers::NONE,
+                    phase: egui::TouchPhase::Move,
+                });
+                if self.stage == 3 {
+                    input.events.push(egui::Event::Copy);
+                }
+                self.scroll_input_step += 1;
+            }
+        }
     }
     fn ui(&mut self, ui: &mut egui::Ui, _: &mut eframe::Frame) {
         if self.finished {
@@ -205,6 +230,8 @@ impl eframe::App for Probe {
                 ui.horizontal(|ui| {
                     ui.label(if self.synthetic {
                         "Synthetic Qoder CN lifecycle — no Agent/model"
+                    } else if self.scroll_probe {
+                        "Qoder long history / 146% zoom / scroll / cancel — no Enter"
                     } else if self.input_probe {
                         "Qoder CN unsent input / zoom / cancel — no Enter"
                     } else {
@@ -238,11 +265,13 @@ impl eframe::App for Probe {
                 ui.add_space(8.0);
                 let size = ui.available_size();
                 let view = TerminalView::new(ui, &mut self.terminal)
+                    .set_focus(self.input_probe)
+                    .request_focus(self.input_probe && self.frames == 0)
                     .set_font(appearance::terminal_font(14.0))
                     .set_native_image_paste(true)
                     .set_drag_selection(true)
                     .set_size(size);
-                ui.add(view);
+                self.terminal_rect = Some(ui.add(view).rect);
             });
         self.frames += 1;
         if self.trace {
@@ -270,6 +299,7 @@ impl eframe::App for Probe {
         }) && self.requested
         {
             if self.input_probe
+                && !(self.scroll_probe && self.stage == 1)
                 && !self.terminal.plain_text().contains(if self.stage == 3 {
                     "INPUT_AFTER_CANCEL"
                 } else {
@@ -303,6 +333,13 @@ impl eframe::App for Probe {
                     "trace-narrower",
                     "trace-restored",
                 ][self.stage]
+            } else if self.scroll_probe {
+                [
+                    "scroll-live",
+                    "scroll-history",
+                    "scroll-return",
+                    "scroll-cancel",
+                ][self.stage]
             } else if self.input_probe {
                 ["input-100", "input-103", "input-110", "input-after-cancel"][self.stage]
             } else {
@@ -335,7 +372,10 @@ impl eframe::App for Probe {
                 } else {
                     "INPUT_PROBE"
                 };
-                assert!(text.contains(marker), "unsent input remains visible");
+                assert!(
+                    self.scroll_probe && self.stage == 1 || text.contains(marker),
+                    "unsent input remains visible"
+                );
                 assert!(
                     !matches!(
                         self.status.activity,
@@ -344,11 +384,30 @@ impl eframe::App for Probe {
                     ),
                     "Qoder remains open after a single cancel"
                 );
-                assert!(
-                    !text.contains("[42;4R"),
-                    "cursor response leaked into composer"
-                );
-                self.input_checks.push(serde_json::json!({"stage":self.stage,"marker_visible":true,"zoom":ctx.zoom_factor(),"unsubmitted":true}));
+                let leaked = text.as_bytes().iter().enumerate().any(|(index, byte)| {
+                    if *byte != b'[' {
+                        return false;
+                    }
+                    let tail = &text.as_bytes()[index + 1..];
+                    let row = tail.iter().take_while(|b| b.is_ascii_digit()).count();
+                    if row == 0 || tail.get(row) != Some(&b';') {
+                        return false;
+                    }
+                    let col = tail[row + 1..]
+                        .iter()
+                        .take_while(|b| b.is_ascii_digit())
+                        .count();
+                    col > 0 && tail.get(row + 1 + col) == Some(&b'R')
+                });
+                assert!(!leaked, "cursor response leaked into composer");
+                let content = self.terminal.sync();
+                if self.scroll_probe && self.stage == 2 {
+                    assert_eq!(
+                        content.display_offset, 0,
+                        "scrolling down reaches the composer"
+                    );
+                }
+                self.input_checks.push(serde_json::json!({"stage":self.stage,"marker_visible":text.contains(marker),"zoom":ctx.zoom_factor(),"unsubmitted":true,"display_offset":content.display_offset,"history_size":content.history_size,"mode":format!("{:?}",content.terminal_mode)}));
             }
             if (!self.synthetic && !self.input_probe && !self.trace)
                 || (self.synthetic && self.stage == 10)
@@ -362,10 +421,16 @@ impl eframe::App for Probe {
                     self.synthetic_status();
                 }
                 if self.input_probe {
-                    ctx.set_zoom_factor([1.0, 1.03, 1.1, 1.1][self.stage]);
+                    if self.scroll_probe {
+                        ctx.set_zoom_factor([1.0, 1.46, 1.46, 0.97][self.stage]);
+                    } else {
+                        ctx.set_zoom_factor([1.0, 1.03, 1.1, 1.1][self.stage]);
+                    }
                     if self.stage == 3 {
-                        self.terminal
-                            .process_command(BackendCommand::Write(vec![3]));
+                        if !self.scroll_probe {
+                            self.terminal
+                                .process_command(BackendCommand::Write(vec![3]));
+                        }
                         self.typed = false;
                     }
                 }
@@ -376,6 +441,7 @@ impl eframe::App for Probe {
                     )));
                 }
                 self.frames = 0;
+                self.scroll_input_step = 0;
                 self.stable_marker_frames = 0;
                 self.changed = Instant::now();
             }
@@ -425,7 +491,9 @@ impl eframe::App for Probe {
             && self.changed.elapsed() > delay
             && self.frames >= 4
             && !text.trim().is_empty()
-            && (!self.input_probe || (self.typed && self.stable_marker_frames >= 3))
+            && (!self.input_probe
+                || (self.typed
+                    && (self.stable_marker_frames >= 3 || self.scroll_probe && self.stage == 1)))
         {
             self.requested = true;
             ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::default()));
@@ -438,25 +506,29 @@ fn main() -> eframe::Result {
     let output = PathBuf::from(
         std::env::args()
             .nth(1)
-            .expect("qoder_cn_probe output-directory [fixture|input|trace] [isolated-directory]"),
+            .expect("qoder_cn_probe output-directory [fixture|input|qoder-input|scroll|qoder-scroll|trace|qoder] [working-directory]"),
     );
-    let agent = if std::env::args().nth(2).as_deref() == Some("qoder") {
+    let mode = std::env::args().nth(2).unwrap_or_default();
+    let agent = if mode == "qoder" || mode.starts_with("qoder-") {
         Agent::Qoder
     } else {
         Agent::QoderCn
     };
     let synthetic = std::env::args().nth(2).as_deref() == Some("fixture");
-    let input_probe = std::env::args().nth(2).as_deref() == Some("input");
+    let scroll_probe = matches!(mode.as_str(), "scroll" | "qoder-scroll");
+    let input_probe = scroll_probe || matches!(mode.as_str(), "input" | "qoder-input");
     let trace = std::env::args().nth(2).as_deref() == Some("trace");
-    let directory = if trace || agent == Agent::Qoder {
+    let directory = if trace || agent == Agent::Qoder || scroll_probe {
         std::env::args()
             .nth(3)
             .map(PathBuf::from)
-            .expect("trace requires its own isolated directory")
+            .expect("this mode requires a working directory")
     } else {
         std::env::current_dir().unwrap()
     };
     std::fs::create_dir_all(&output).unwrap();
+    // CLI settings are resolved in the Agent working directory, not this one.
+    let output = output.canonicalize().unwrap();
     eframe::run_native(
         "ai-terminal Qoder CLI probe",
         eframe::NativeOptions {
@@ -493,11 +565,35 @@ fn main() -> eframe::Result {
                 };
                 let plan = launch::build(&spec, &bridge, &output.join("runtime"), &helper)
                     .expect("Qoder CN must already be installed");
-                BackendSettings {
-                    shell: plan.executable,
-                    args: plan.arguments,
-                    env: plan.environment,
-                    working_directory: Some(spec.directory),
+                if scroll_probe {
+                    let quote = |text: &str| format!("'{}'", text.replace('\'', "''"));
+                    let command = format!(
+                        "[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false); 1..180 | ForEach-Object {{ Write-Output ('LOCAL_SCROLL_FIXTURE_'+$_+(' long output 中英混排 👩🏽‍💻 '+('x'*160))) }}; & {} {}; exit $LASTEXITCODE",
+                        quote(&plan.executable),
+                        plan.arguments
+                            .iter()
+                            .map(|arg| quote(arg))
+                            .collect::<Vec<_>>()
+                            .join(" ")
+                    );
+                    BackendSettings {
+                        shell: "powershell.exe".into(),
+                        args: vec![
+                            "-NoLogo".into(),
+                            "-NoProfile".into(),
+                            "-Command".into(),
+                            command,
+                        ],
+                        env: plan.environment,
+                        working_directory: Some(spec.directory),
+                    }
+                } else {
+                    BackendSettings {
+                        shell: plan.executable,
+                        args: plan.arguments,
+                        env: plan.environment,
+                        working_directory: Some(spec.directory),
+                    }
                 }
             };
             let (sender, _) = mpsc::channel();
@@ -515,6 +611,9 @@ fn main() -> eframe::Result {
                 synthetic,
                 agent,
                 input_probe,
+                scroll_probe,
+                scroll_input_step: 0,
+                terminal_rect: None,
                 typed: false,
                 input_checks: Vec::new(),
                 stable_marker_frames: 0,

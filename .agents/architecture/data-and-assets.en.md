@@ -131,3 +131,5 @@ The 0.11.0 preview adds optional root-level groups: each has a UUID id, name and
 The public Skill adds version.json with an independent Skill version, minimum CLI version, protocol and source repository. Standalone schema 2 manifests verify internal/external versions and file SHA-256 identities while retaining verification of published schema 1 archives. Software manifests also declare skill_version. Preview metadata does not constitute publication.
 
 question_unread is an in-memory unseen-question boolean passed to sidebar/floating snapshots and CLI queries. It is not persisted in sessions.json and retains no question title/content. It is independent of completion unread; viewing clears a notice without implying an answer.
+
+Markdown HTML images reuse an internal resource URI by source and declared dimensions, while retaining individual alt text and links. Identical references decode and upload once, preserving the 16-resource and 16-million-pixel limits so repeated icons cannot exhaust the budget for later valid images. No disk cache or user data is added.

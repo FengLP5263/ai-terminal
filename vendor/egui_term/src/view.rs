@@ -443,6 +443,44 @@ impl<'a> TerminalView<'a> {
             CornerRadius::ZERO,
             global_bg,
         ))];
+        // Grow the paint of a previously full-width padded row, without adding
+        // colored spaces to the grid (which would change copying and reflow).
+        if !content.terminal_mode.contains(TermMode::ALT_SCREEN) {
+            for row in content.cells.chunk_by(|a, b| a.point.line == b.point.line) {
+                let Some(first) = row.first().filter(|cell| {
+                    cell.point.column.0 == 0
+                        && cell.cell.flags.contains(cell::Flags::FULL_WIDTH_BACKGROUND)
+                }) else {
+                    continue;
+                };
+                let Some(last) = row.iter().rev().find(|cell| {
+                    cell.cell.c != ' '
+                        || cell.cell.bg != Color::Named(NamedColor::Background)
+                        || cell.cell.extra.is_some()
+                        || cell
+                            .cell
+                            .flags
+                            .intersects(cell::Flags::INVERSE | cell::Flags::ALL_UNDERLINES)
+                }) else {
+                    continue;
+                };
+                if last.cell.bg == first.cell.bg && last.cell.c == ' ' {
+                    let top = origin.y
+                        + cell_height * (first.point.line.0 + content.display_offset as i32) as f32;
+                    let left = origin.x + cell_width * (last.point.column.0 + 1) as f32;
+                    if left < layout.rect.right() {
+                        backgrounds.push(Shape::Rect(RectShape::filled(
+                            Rect::from_min_max(
+                                egui::pos2(left, top),
+                                egui::pos2(layout.rect.right(), top + cell_height),
+                            ),
+                            CornerRadius::ZERO,
+                            color(first.cell.bg),
+                        )));
+                    }
+                }
+            }
+        }
         let mut foregrounds = Vec::new();
         let mut cursor_backgrounds = Vec::new();
         let mut cursors = Vec::new();

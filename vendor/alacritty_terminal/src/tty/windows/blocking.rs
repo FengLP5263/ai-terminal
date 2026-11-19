@@ -42,9 +42,6 @@ pub struct UnblockedReader<R> {
     /// The pipe that we are reading from.
     pipe: Reader,
 
-    /// Is this the first time registering?
-    first_register: bool,
-
     /// We logically own the reader, but we don't actually use it.
     _reader: PhantomData<R>,
 }
@@ -97,17 +94,23 @@ impl<R: Read + Send + 'static> UnblockedReader<R> {
             }
         });
 
-        Self { interest, pipe: reader, first_register: true, _reader: PhantomData }
+        Self { interest, pipe: reader, _reader: PhantomData }
     }
 
     /// Register interest in the reader.
     pub fn register(&mut self, poller: &Arc<Poller>, event: Event, mode: PollMode) {
         let mut interest = self.interest.interest.lock().unwrap();
         *interest = Some(Interest { event, poller: poller.clone(), mode });
+        // Registering a waker may invoke it immediately. Do not hold its lock.
+        drop(interest);
 
-        // Send the event to start off with if we have any data.
-        if (!self.pipe.is_empty() && event.readable) || self.first_register {
-            self.first_register = false;
+        // Check readiness and arm the reader waker atomically with respect to
+        // the pipe. An is_empty check alone loses writes arriving just after it
+        // when the previous read yielded before polling the pipe to Pending.
+        let waker = Waker::from(self.interest.clone());
+        if event.readable
+            && matches!(self.pipe.poll(&mut Context::from_waker(&waker)), Poll::Ready(true))
+        {
             poller.post(CompletionPacket::new(event)).ok();
         }
     }

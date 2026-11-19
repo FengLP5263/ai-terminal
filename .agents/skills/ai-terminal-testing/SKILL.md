@@ -167,3 +167,29 @@ cli_probe 的本地替身显式发送 working → blocked/question，核对正�
 异步提问补充：cli_probe 先在后台替身发送 Working + OSC9 Question，验证 activity 仍为 working、question_unread 为 true 并截图 async-question-unread.png，再切换查看，验证标记清除且工作未停止，最后发送阻塞通知检查 Waiting。分组优先级回归覆盖需要处理 → 未读完成 → 运行，以及查看后的优先级恢复；普通铃声不参与识别。
 
 多媒体布局回归：media_player::controls 的 UI 用例覆盖 180／320／560 点按钮命中、未就绪禁用与拖动进度松开提交；project_ui 用实际图片纹理检查不同视口／缩放下的水平、垂直居中。media_probe 对自身窗口注入原生 egui 输入，实际点击播放、暂停、静音、取消静音及结束后重播；暂停时检查音量恢复，播放测试保持静音。宽／窄音视频各生成截图，加上不支持文件共五张；仍不读取用户媒体、不发送系统输入或模型请求。
+
+Markdown 原生核查：`cargo build --offline --locked --release --bins --example markdown_probe` 后运行 `target/release/examples/markdown_probe.exe output/<unique-markdown>`。只复制仓库内公开的双语 README 与 PNG 资产到隔离目录；九张图覆盖页首居中、96 点标识、32 点表格图标、中英文、两列／五列表格、窄窗口与 133% 缩放，以及 CLI 文档中短／长代码块的统一宽度、块间距、右侧复制按钮和彩色 emoji。检查 result.json、正常退出及实际 PNG。project_media／project_ui 回归覆盖内嵌 HTML、路径边界、源码保持、标题锚点、图标尺寸及表格换行；不启动 PTY、Agent 或模型，不读取用户配置。
+
+补充 settings-context.md 截图先准备完整 README 的所有资源，再聚焦“设置与浮窗”段落；断言 settings.png 成功加载。回归覆盖重复 HTML 图片的共享 URI、后续图片预算，以及中英文 README 的七个图标引用与末尾设置截图。
+
+终端缩放背景核查（Windows）：terminal_resize_probe 使用正式字体、真实 ConPTY 和自己的无 profile PowerShell 样例；先输出一次整行背景和行内高亮，再仅调整窗口宽度与 97%／114%／125% 缩放，生成五张原生 PNG。逐图检查旧背景延伸到新网格最后一列、局部高亮保持局部；检查 result.json、正常退出和自身 PTY 回收。不读取用户会话，不启动 Agent／模型，缩放期间不发送刷新按键。terminal_interaction 回归另覆盖变宽／变窄、中文与组合 emoji、文本与光标／PID 保留、显式擦除后重画、备用屏幕，以及长行软重排与代码硬换行。
+
+```powershell
+cargo build --offline --locked --release --bins --example terminal_resize_probe
+target/release/examples/terminal_resize_probe.exe output/<unique-terminal-resize>
+```
+
+Qoder 滚动／取消原生核查：qoder_cn_probe 的 scroll（CN）和 qoder-scroll（国际版）模式先生成 180 行固定长文本历史，再启动已安装的公开 CLI，填入未提交标记，核对 146% 缩放、滚轮上翻和滚回底部、Ctrl+C 后继续输入及光标应答泄漏，分别生成四张 PNG 与 result.json。必须使用已信任目录；不确认信任、不发送 Enter／模型提示，不修改用户配置或操作已有 CLI。CLI 自有启动行为与合成历史分别记录。protocol_reply_tests::cursor_replies_do_not_wait_for_the_state_event_forwarder 验证普通／私有查询不受普通事件线程阻塞。terminal_interaction 的大输出回归在可见和隐藏终端读到最终标记，保留 PID 并验证缩放后底部内容；旧就绪路径必须失败。
+
+```powershell
+cargo build --offline --locked --release --bins --example qoder_cn_probe
+target/release/examples/qoder_cn_probe.exe output/<unique-cn-scroll> scroll <trusted-directory>
+target/release/examples/qoder_cn_probe.exe output/<unique-qoder-scroll> qoder-scroll <trusted-directory>
+```
+
+大输出与底部原生核查：terminal_output_probe 使用自有无 profile PowerShell，一次输出 2048 条长行，超过单批解析预算并覆盖历史上限；仅一次触发输入，之后不发送按键。五张 PNG 验证 100%／146%／97%、真实滚轮上翻和返回底部、最终输入区文字像素、光标与裁剪边界及原 PTY。只创建本地样例，不调用 Agent／模型或读取用户数据。
+
+```powershell
+cargo build --offline --locked --release --bins --example terminal_output_probe
+target/release/examples/terminal_output_probe.exe output/<unique-terminal-output>
+```
