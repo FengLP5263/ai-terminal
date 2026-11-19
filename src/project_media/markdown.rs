@@ -243,14 +243,30 @@ pub fn prepare_markdown(
     let mut links = BTreeSet::new();
     let mut image_uris = vec![];
     let mut seen_images = BTreeSet::new();
+    let mut event_count = 0;
     for fragment in std::iter::once(&md.text)
         .chain(md.centered.iter())
         .chain(md.tables.iter().flat_map(|t| t.rows.iter().flatten()))
         .chain(md.headings.iter().map(|h| &h.text))
     {
+        let mut rendered_depth = 0usize;
         for event in Parser::new_ext(fragment, options()) {
             if cancelled() {
                 return Err(FileError::Cancelled);
+            }
+            event_count += 1;
+            if event_count > 16_000 {
+                return Ok(None);
+            }
+            match &event {
+                Event::Start(_) => {
+                    rendered_depth += 1;
+                    if rendered_depth > 32 {
+                        return Ok(None);
+                    }
+                }
+                Event::End(_) => rendered_depth = rendered_depth.saturating_sub(1),
+                _ => {}
             }
             match event {
                 Event::Start(Tag::Link { dest_url, .. }) => {

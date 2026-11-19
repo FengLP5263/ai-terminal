@@ -20,6 +20,7 @@ const CASES: &[(&str, f32, f32)] = &[
     ("agents.md", 700.0, 1.33),
     ("cli.md", 1120.0, 1.0),
     ("cli.md", 560.0, 1.0),
+    ("settings-context.md", 900.0, 1.0),
 ];
 struct Probe {
     renderer: egui_term::TextRendererSession,
@@ -130,6 +131,7 @@ fn main() -> eframe::Result {
         std::fs::copy(source.join(name), root.join(name)).unwrap();
     }
     std::fs::copy(source.join("docs/cli.md"), root.join("cli.md")).unwrap();
+    std::fs::copy(source.join("README.md"), root.join("settings-context.md")).unwrap();
     let readme = std::fs::read_to_string(source.join("README.md")).unwrap();
     let section = |heading: &str| {
         readme
@@ -153,7 +155,28 @@ fn main() -> eframe::Result {
     let documents = CASES
         .iter()
         .map(|(name, _, _)| {
-            Arc::new(project_files::read_file(&root, std::path::Path::new(name), || false).unwrap())
+            let mut document =
+                project_files::read_file(&root, std::path::Path::new(name), || false).unwrap();
+            if *name == "settings-context.md" {
+                // Prepare the entire README first, retaining its complete image budget.
+                // Only the native capture layout is restricted to the reported section.
+                let md = document.markdown.as_mut().unwrap();
+                assert!(md.images["assets/readme/settings.png"].is_ok());
+                let index = md
+                    .headings
+                    .iter()
+                    .position(|heading| heading.text == "设置与浮窗")
+                    .unwrap();
+                let start = md
+                    .text
+                    .find(&format!("<{}-heading-{index} />", md.code_marker))
+                    .unwrap();
+                let end = md.text[start + 1..]
+                    .find(&format!("<{}-heading-{} />", md.code_marker, index + 1))
+                    .map_or(md.text.len(), |end| start + 1 + end);
+                md.text = md.text[start..end].to_owned();
+            }
+            Arc::new(document)
         })
         .collect();
     eframe::run_native(

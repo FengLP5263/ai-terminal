@@ -2,6 +2,7 @@
 use super::*;
 use std::ops::Range;
 
+#[derive(PartialEq)]
 pub(super) struct ImageSpec {
     pub source: String,
     width: Option<f32>,
@@ -108,9 +109,8 @@ impl<'a> Normalizer<'a> {
                         cursor = source.len();
                     }
                 }
-                "img" if !token.closing && self.images.len() < 128 => {
+                "img" if !token.closing => {
                     if let Some(src) = token.attrs.get("src").filter(|s| !s.is_empty()) {
-                        let alias = format!("{}-image-{}", self.marker, self.images.len());
                         let dim = |key: &str| {
                             token
                                 .attrs
@@ -119,20 +119,36 @@ impl<'a> Normalizer<'a> {
                                 .filter(|n| (1..=4096).contains(n))
                                 .map(|n| n as f32)
                         };
-                        self.images.insert(
-                            alias.clone(),
-                            ImageSpec {
-                                source: src.clone(),
-                                width: dim("width"),
-                                height: dim("height"),
-                            },
-                        );
+                        let spec = ImageSpec {
+                            source: src.clone(),
+                            width: dim("width"),
+                            height: dim("height"),
+                        };
+                        // Keep a single loader/texture URI for identical references. Counting
+                        // aliases separately would reject valid later images and duplicate VRAM.
+                        let existing = self
+                            .images
+                            .iter()
+                            .find(|(_, other)| **other == spec)
+                            .map(|(uri, _)| uri.clone());
                         let alt = token
                             .attrs
                             .get("alt")
                             .map(String::as_str)
                             .unwrap_or("image");
-                        output.push_str(&format!("![{}](<{alias}>)", escape(alt)));
+                        let alias = existing.or_else(|| {
+                            if self.images.len() >= 128 {
+                                return None;
+                            }
+                            let alias = format!("{}-image-{}", self.marker, self.images.len());
+                            self.images.insert(alias.clone(), spec);
+                            Some(alias)
+                        });
+                        if let Some(alias) = alias {
+                            output.push_str(&format!("![{}](<{alias}>)", escape(alt)));
+                        } else {
+                            output.push_str(&escape(alt));
+                        }
                     }
                 }
                 "a" if !token.closing => {

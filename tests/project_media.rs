@@ -412,16 +412,41 @@ fn repository_readmes_prepare_native_logos_tables_and_section_anchors() {
             .is_ok(),
             "The first content image must not lose its budget to later images: {name}"
         );
+        let settings = if name == "README.en.md" {
+            "assets/readme/settings.en.png"
+        } else {
+            "assets/readme/settings.png"
+        };
+        assert!(
+            md.images[settings].is_ok(),
+            "The later settings screenshot is a valid local image: {name}: {:?}",
+            md.images[settings]
+        );
         assert!(md.headings.len() > 10, "{name}");
         assert_eq!(md.headings[0].text, "AI Terminal");
+        let icon_references: Vec<_> = md
+            .tables
+            .iter()
+            .flat_map(|table| &table.rows)
+            .flatten()
+            .flat_map(|cell| {
+                pulldown_cmark::Parser::new(cell).filter_map(|event| match event {
+                    pulldown_cmark::Event::Start(pulldown_cmark::Tag::Image {
+                        dest_url, ..
+                    }) => Some(dest_url.into_string()),
+                    _ => None,
+                })
+            })
+            .collect();
         assert!(
-            md.images
-                .values()
-                .filter_map(|i| i.as_ref().ok())
-                .filter(|i| i.pixels.source_size == egui::vec2(32.0, 32.0))
+            icon_references
+                .iter()
+                .filter(|uri| md.images.get(*uri).is_some_and(|image| image
+                    .as_ref()
+                    .is_ok_and(|image| image.pixels.source_size == egui::vec2(32.0, 32.0))))
                 .count()
                 >= 7,
-            "All Agent icons must load at their declared size: {name}"
+            "All seven Agent image references must render: {name}"
         );
         assert!(
             md.images
@@ -438,4 +463,50 @@ fn repository_readmes_prepare_native_logos_tables_and_section_anchors() {
         );
         assert_eq!(fs::read_to_string(root.join(name)).unwrap(), source);
     }
+}
+
+#[test]
+fn repeated_html_images_share_a_resource_without_consuming_later_image_slots() {
+    let root = tempfile::tempdir().unwrap();
+    for name in ["icon.png", "later.png"] {
+        image::RgbaImage::from_pixel(24, 24, image::Rgba([10, 90, 180, 255]))
+            .save(root.path().join(name))
+            .unwrap();
+    }
+    let source = format!(
+        "{}\n\n![later](later.png)",
+        "<img src='icon.png' width='32' height='32' alt='badge'>\n\n".repeat(24)
+    );
+    let md = media::prepare_markdown(root.path(), Path::new("README.md"), &source, &|| false)
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        md.images.len(),
+        2,
+        "Repeated display references must reuse the same prepared URI and texture identity"
+    );
+    assert!(md.images.values().all(Result::is_ok));
+    let uris: Vec<_> = pulldown_cmark::Parser::new(&md.text)
+        .filter_map(|event| match event {
+            pulldown_cmark::Event::Start(pulldown_cmark::Tag::Image { dest_url, .. }) => {
+                Some(dest_url.into_string())
+            }
+            _ => None,
+        })
+        .collect();
+    assert_eq!(uris.len(), 25);
+    assert!(uris[..24].iter().all(|uri| uri == &uris[0]));
+    assert_ne!(uris[0], uris[24]);
+}
+
+#[test]
+fn reused_html_resources_do_not_bypass_the_rendering_complexity_limit() {
+    let root = tempfile::tempdir().unwrap();
+    let source = "<img src='same.png' width='32'>".repeat(6000);
+    assert!(source.len() < 256 * 1024);
+    assert!(
+        media::prepare_markdown(root.path(), Path::new("README.md"), &source, &|| false)
+            .unwrap()
+            .is_none()
+    );
 }
