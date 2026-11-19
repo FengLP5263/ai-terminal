@@ -232,3 +232,5 @@ cli_probe 的 Agent 替身还发送明确的 working → blocked/question，校�
 异步提问阶段增加 async-question-unread.png：后台替身以明确 OSC9 Question 通知设置独立未读标记，保持 working；查看后清除标记但不停止工作，再验证阻塞等待。与 Codex 是否选择 OSC9 后端的用户设置分开验证。
 
 多媒体预览的 media_probe 还验证标准控件的实际点击、静音恢复和结束后重播，生成宽／窄音频及视频共四张布局图，以及不支持文件截图；只向自身 egui 窗口注入合成输入，播放保持静音。图片布局回归在 project_ui 中检查实际纹理的居中与缩放。
+
+Markdown 原生核查：`cargo build --offline --locked --release --bins --example markdown_probe` 后运行 `target/release/examples/markdown_probe.exe output/<unique-markdown>`。只复制仓库内公开的双语 README 与 PNG 资产到隔离目录；八张图覆盖页首居中、96 点标识、32 点表格图标、中英文、两列／五列表格、窄窗口与 133% 缩放，以及 CLI 文档中短／长代码块的统一宽度、块间距、右侧复制按钮和彩色 emoji。检查 result.json、正常退出及实际 PNG。project_media／project_ui 回归覆盖内嵌 HTML、路径边界、源码保持、标题锚点、图标尺寸及表格换行；不启动 PTY、Agent 或模型，不读取用户配置。

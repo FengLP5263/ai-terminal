@@ -8,6 +8,7 @@ use crate::{
 };
 use egui::{Color32, TextureHandle};
 use egui_commonmark::{CommonMarkCache, CommonMarkViewer};
+mod markdown;
 use std::{
     collections::BTreeMap,
     path::Path,
@@ -64,6 +65,7 @@ pub struct View {
     uris: Vec<String>,
     note: Option<String>,
     pending_link: Option<std::path::PathBuf>,
+    pending_anchor: Option<String>,
     player: Option<Result<crate::media_player::Player, String>>,
 }
 impl View {
@@ -106,6 +108,7 @@ impl View {
         self.markdown = CommonMarkCache::default();
         self.note = None;
         self.pending_link = None;
+        self.pending_anchor = None;
     }
     fn select(&mut self, ctx: &egui::Context, path: &Path, data: &Arc<Document>) {
         let key = (path.to_path_buf(), Arc::as_ptr(data) as usize);
@@ -126,9 +129,7 @@ impl View {
         }
         if let Some(md) = &data.markdown {
             for link in &md.links {
-                if !link.starts_with('#') {
-                    self.markdown.add_link_hook(link.clone());
-                }
+                self.markdown.add_link_hook(link.clone());
             }
             let locale = i18n::locale(ctx);
             let mut images = self.images.0.lock().unwrap();
@@ -268,10 +269,8 @@ impl View {
                 ));
             }
             self.show_image(ui, image);
-        } else if !self.source
-            && let Some(md) = &data.markdown
-        {
-            self.show_markdown(ui, md, path);
+        } else if !self.source && data.markdown.is_some() {
+            self.show_markdown(ui, path);
         } else {
             if project_media::markdown_path(path) && !self.source {
                 ui.weak(locale.text(
@@ -358,112 +357,143 @@ impl View {
                 );
             });
     }
-    fn show_markdown(&mut self, ui: &mut egui::Ui, md: &Markdown, path: &Path) {
-        let document = self.document.as_ref().unwrap().clone();
-        let render_code = move |ui: &mut egui::Ui, html: &str| {
-            let md = document.markdown.as_ref().unwrap();
-            if let Some(index) = html
-                .trim()
-                .strip_prefix(&format!("<{}-", md.code_marker))
-                .and_then(|s| s.strip_suffix(" />"))
-                .and_then(|s| s.parse::<usize>().ok())
-                && let Some(patch) = md.code.get(index)
-            {
-                code_block(ui, patch);
-            }
-        };
-        // Markdown prose uses the normal UI font; only code uses the monospace family.
+    fn show_markdown(&mut self, ui: &mut egui::Ui, path: &Path) {
         ui.style_mut().override_font_id = None;
-        // Pages are bounded by the worker; use the stable renderer for full Markdown structures.
+        let target = self.pending_anchor.take();
+        let mut links = vec![];
         egui::ScrollArea::vertical()
             .id_salt(("project-markdown", &self.identity))
+            .auto_shrink([false, false])
             .show(ui, |ui| {
-                CommonMarkViewer::new()
-                    .explicit_image_uri_scheme(true)
-                    .enable_scroll_to_heading(true)
-                    .render_html_fn(Some(&render_code))
-                    .show(ui, &mut self.markdown, &md.text);
+                let available = ui.available_width();
+                let width = (available - 40.0).clamp(1.0, 1040.0);
+                let gutter = ((available - width) / 2.0).max(0.0);
+                ui.horizontal(|ui| {
+                    ui.add_space(gutter);
+                    ui.vertical(|ui| {
+                        ui.set_width(width);
+                        ui.add_space(14.0);
+                        links = markdown::show(
+                            ui,
+                            &mut self.markdown,
+                            self.document.as_ref().unwrap().clone(),
+                            target.as_deref(),
+                        );
+                        ui.add_space(24.0);
+                    });
+                });
             });
-        for link in &md.links {
-            if self.markdown.get_link_hook(link) == Some(true) {
-                if project_media::external_link(link) {
-                    ui.ctx().open_url(egui::OpenUrl::new_tab(link));
-                } else if let Ok(target) = project_media::local_target(path, link) {
-                    self.pending_link = Some(target);
-                } else {
-                    self.note = Some(
-                        i18n::tr(ui.ctx(), "不支持此链接。", "This link is not supported.").into(),
-                    );
-                }
+        for link in links {
+            if let Some(anchor) = link.strip_prefix('#') {
+                self.pending_anchor = Some(anchor.to_owned());
+                ui.ctx().request_repaint();
+            } else if project_media::external_link(&link) {
+                ui.ctx().open_url(egui::OpenUrl::new_tab(link));
+            } else if let Ok(target) = project_media::local_target(path, &link) {
+                self.pending_link = Some(target);
+            } else {
+                self.note = Some(
+                    i18n::tr(ui.ctx(), "不支持此链接。", "This link is not supported.").into(),
+                );
             }
         }
     }
 }
-fn code_block(ui: &mut egui::Ui, patch: &FilePatch) {
-    egui::Frame::new()
-        .fill(Color32::from_gray(30))
-        .inner_margin(10.0)
-        .corner_radius(4.0)
-        .show(ui, |ui| {
-            ui.with_layout(egui::Layout::top_down(egui::Align::Min), |ui| {
+fn code_block(ui: &mut egui::Ui, patch: &FilePatch, source: &str, id: egui::Id) {
+    let width = ui.available_width();
+    ui.vertical(|ui| {
+        ui.set_width(width);
+        ui.add_space(12.0);
+        egui::Frame::new()
+            .fill(Color32::from_gray(30))
+            .inner_margin(12.0)
+            .corner_radius(6.0)
+            .show(ui, |ui| {
+                ui.set_width((width - 24.0).max(1.0));
                 ui.horizontal(|ui| {
-                    ui.weak(patch.path.strip_prefix("code.").unwrap_or(&patch.path));
-                    if ui
-                        .small_button(i18n::tr(ui.ctx(), "复制", "Copy"))
-                        .clicked()
-                    {
-                        ui.ctx().copy_text(
-                            patch
-                                .lines
-                                .iter()
-                                .map(|l| l.text.as_str())
-                                .collect::<Vec<_>>()
-                                .join("\n"),
-                        );
-                    }
-                });
-                for row in &patch.presentation.rows {
-                    let Some(line) = patch.lines.get(row.source) else {
-                        continue;
-                    };
-                    let mut job = egui::text::LayoutJob::default();
-                    let font = egui::TextStyle::Monospace.resolve(ui.style());
-                    let mut start = 0;
-                    for token in &row.tokens {
-                        let end = (token.end as usize).min(line.text.len());
-                        if let Some(text) = line.text.get(start..end) {
-                            job.append(
-                                text,
-                                0.0,
-                                egui::TextFormat {
-                                    font_id: font.clone(),
-                                    color: Color32::from_rgb(
-                                        token.color[0],
-                                        token.color[1],
-                                        token.color[2],
-                                    ),
-                                    ..Default::default()
-                                },
-                            );
-                            start = end;
+                    let language = patch.path.strip_prefix("code.").unwrap_or(&patch.path);
+                    ui.weak(match language {
+                        "ps1" => "PowerShell",
+                        "sh" => "Bash",
+                        "rs" => "Rust",
+                        "py" => "Python",
+                        other => other,
+                    });
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if ui
+                            .small_button(i18n::tr(ui.ctx(), "复制", "Copy"))
+                            .clicked()
+                        {
+                            ui.ctx().copy_text(source.to_owned());
                         }
-                    }
-                    if start < line.text.len() || job.text.is_empty() {
-                        job.append(
-                            &line.text[start..],
-                            0.0,
-                            egui::TextFormat {
-                                font_id: font,
-                                color: chrome::TEXT,
-                                ..Default::default()
-                            },
-                        );
-                    }
-                    ui.add(egui::Label::new(job).selectable(true).wrap());
-                }
+                    });
+                });
+                ui.add_space(8.0);
+                ui.spacing_mut().scroll.floating = false;
+                ui.spacing_mut().scroll.bar_width = 6.0;
+                ui.spacing_mut().scroll.bar_inner_margin = 4.0;
+                ui.spacing_mut().scroll.bar_outer_margin = 0.0;
+                egui::ScrollArea::horizontal()
+                    .id_salt(("markdown-code", id))
+                    .auto_shrink([false, true])
+                    .show(ui, |ui| {
+                        ui.spacing_mut().item_spacing.y = 2.0;
+                        for row in &patch.presentation.rows {
+                            let Some(line) = patch.lines.get(row.source) else {
+                                continue;
+                            };
+                            let mut job = egui::text::LayoutJob::default();
+                            let font = egui::TextStyle::Monospace.resolve(ui.style());
+                            let mut start = 0;
+                            for token in &row.tokens {
+                                let end = (token.end as usize).min(line.text.len());
+                                if let Some(text) = line.text.get(start..end) {
+                                    job.append(
+                                        text,
+                                        0.0,
+                                        egui::TextFormat {
+                                            font_id: font.clone(),
+                                            color: Color32::from_rgb(
+                                                token.color[0],
+                                                token.color[1],
+                                                token.color[2],
+                                            ),
+                                            line_height: Some(font.size * 1.45),
+                                            ..Default::default()
+                                        },
+                                    );
+                                    start = end;
+                                }
+                            }
+                            if start < line.text.len() || job.text.is_empty() {
+                                job.append(
+                                    &line.text[start..],
+                                    0.0,
+                                    egui::TextFormat {
+                                        font_id: font.clone(),
+                                        color: chrome::TEXT,
+                                        line_height: Some(font.size * 1.45),
+                                        ..Default::default()
+                                    },
+                                );
+                            }
+                            let galley = crate::ui_text::layout_job(ui.ctx(), job);
+                            let response =
+                                ui.add(egui::Label::new(galley.clone()).selectable(true));
+                            crate::ui_text::paint_emoji(
+                                ui.painter(),
+                                response.rect.min,
+                                &galley,
+                                font.size,
+                                chrome::TEXT,
+                            );
+                        }
+                    });
             });
-        });
+        ui.add_space(12.0);
+    });
 }
+
 pub fn byte_size(bytes: u64) -> String {
     if bytes >= 1024 * 1024 {
         format!("{:.1} MiB", bytes as f64 / (1024.0 * 1024.0))

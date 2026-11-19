@@ -167,3 +167,5 @@ cli_probe 的本地替身显式发送 working → blocked/question，核对正�
 异步提问补充：cli_probe 先在后台替身发送 Working + OSC9 Question，验证 activity 仍为 working、question_unread 为 true 并截图 async-question-unread.png，再切换查看，验证标记清除且工作未停止，最后发送阻塞通知检查 Waiting。分组优先级回归覆盖需要处理 → 未读完成 → 运行，以及查看后的优先级恢复；普通铃声不参与识别。
 
 多媒体布局回归：media_player::controls 的 UI 用例覆盖 180／320／560 点按钮命中、未就绪禁用与拖动进度松开提交；project_ui 用实际图片纹理检查不同视口／缩放下的水平、垂直居中。media_probe 对自身窗口注入原生 egui 输入，实际点击播放、暂停、静音、取消静音及结束后重播；暂停时检查音量恢复，播放测试保持静音。宽／窄音视频各生成截图，加上不支持文件共五张；仍不读取用户媒体、不发送系统输入或模型请求。
+
+Markdown 原生核查：`cargo build --offline --locked --release --bins --example markdown_probe` 后运行 `target/release/examples/markdown_probe.exe output/<unique-markdown>`。只复制仓库内公开的双语 README 与 PNG 资产到隔离目录；八张图覆盖页首居中、96 点标识、32 点表格图标、中英文、两列／五列表格、窄窗口与 133% 缩放，以及 CLI 文档中短／长代码块的统一宽度、块间距、右侧复制按钮和彩色 emoji。检查 result.json、正常退出及实际 PNG。project_media／project_ui 回归覆盖内嵌 HTML、路径边界、源码保持、标题锚点、图标尺寸及表格换行；不启动 PTY、Agent 或模型，不读取用户配置。

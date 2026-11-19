@@ -284,3 +284,7 @@ Codex 0.167 的异步问题在任务继续运行时仍上报 working，停止工
 Codex Auto 通知对 ai-terminal 默认选择铃声而非 OSC9。用户需要自行选择 OSC9（按需允许 async-question 与 always 条件），本机／用户配置不由管理器改写；也不在原生模式注入 -c 通知选项，因为 Codex 0.167 的共享后台排除这些覆盖参数。来源：[通知后端](https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/tui/src/notifications/mod.rs)、[共享后台条件](https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/tui/src/daemon_startup.rs)。
 
 0.15.0 多媒体预览布局：project_preview 的图片在可滚动画布内水平、垂直居中，适应窗口保留内边距，原尺寸／放大仍可滚动。media_player/controls.rs 只绘制传输控件并返回明确操作；Player 将音频控制条或视频画面与下方控件整体居中。控件按可用宽度换行，使用已有 Codicons、圆形滑块、当前／总时长和静音；上次非零音量只存在 Player 内存中。拖动期间仅预览位置，松开再向引擎提交定位。继续使用原生异步解码、默认暂停、播放时按需刷新及关闭后释放，不新增后台轮询或持久化字段。
+
+Markdown 预览修复：project_media/markdown 在原有文件后台线程将安全 HTML 子集、标题与表格准备为有界原生展示数据；图片尺寸只调整逻辑展示大小，解码像素预算保持。project_preview/markdown 负责居中容器、标题锚点和带独立横向滚动的换行表格，普通正文继续复用 CommonMark。只改变预览，不改源码；不新增浏览器、联网加载、持久化字段或生产轮询。
+
+Markdown 代码块沿用同一正文宽度，头部右对齐复制按钮，长行在块内横向滚动；块前后保留间距。语法 LayoutJob 经过 ui_text 的完整字素和彩色 emoji 路径；复制使用后台保留的代码原文，保留制表符与 Unicode，不复制展示用的缩进展开结果。

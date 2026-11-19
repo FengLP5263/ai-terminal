@@ -259,6 +259,234 @@ fn markdown_renders_code_switches_to_source_and_routes_only_safe_local_links() {
 }
 
 #[test]
+fn markdown_html_header_is_centered_and_tables_wrap_without_raw_tags_or_page_overflow() {
+    let mut f = Fixture::new();
+    f.files_open = false;
+    image::RgbaImage::from_pixel(160, 80, image::Rgba([30, 120, 210, 255]))
+        .save(f.root.path().join("logo.png"))
+        .unwrap();
+    let description = "This table description must wrap within its own column instead of widening the entire document. ".repeat(3);
+    let source = format!(
+        "<div align='center'>\n\n<img src='logo.png' width='96'>\n\n# Doc title\n\n[Header file](src/app.rs)\n\n</div>\n\n| Icon | Description |\n|---|---|\n| <img src='logo.png' width='32' height='32'> | {description} |\n\n[After table](src/app.rs)\n"
+    );
+    std::fs::write(f.root.path().join("README.md"), &source).unwrap();
+    f.client.open_file(Path::new("README.md"));
+    wait(&mut f.client, |c| {
+        c.file.as_ref().is_some_and(|file| !file.loading)
+    });
+    for width in [700.0, 1100.0] {
+        f.frame(vec![], width);
+        let output = f.frame(vec![], width);
+        let heading = text_rect(&output, "Doc title").unwrap();
+        assert!(
+            (heading.center().x - width / 2.0).abs() < 4.0,
+            "Centered heading at width {width}: {heading:?}"
+        );
+        let cell = text_rect(&output, description.trim()).unwrap();
+        assert!(output.shapes.iter().any(|shape| matches!(&shape.shape, egui::Shape::Rect(row) if [egui::Color32::from_rgb(19,22,27), egui::Color32::from_rgb(13,16,20)].contains(&row.fill) && row.rect.shrink(7.0).contains_rect(cell))), "Row borders must remain outside wrapped text: {cell:?}");
+        assert!(
+            cell.height() > 40.0 && cell.right() < width - 15.0,
+            "Table cell must wrap: {cell:?}"
+        );
+        assert!(text_rect(&output, "<img src='logo.png' width='32' height='32'>").is_none());
+        let manager = f.ctx.tex_manager();
+        let manager = manager.read();
+        let image_bounds: Vec<_> = output
+            .shapes
+            .iter()
+            .filter_map(|shape| {
+                if let egui::Shape::Rect(rect) = &shape.shape
+                    && let Some(brush) = &rect.brush
+                    && manager
+                        .meta(brush.fill_texture_id)
+                        .is_some_and(|meta| meta.name.contains("-image-"))
+                {
+                    return Some(rect.rect);
+                }
+                if let egui::Shape::Mesh(mesh) = &shape.shape
+                    && manager
+                        .meta(mesh.texture_id)
+                        .is_some_and(|meta| meta.name.contains("-image-"))
+                {
+                    Some(mesh.calc_bounds())
+                } else {
+                    None
+                }
+            })
+            .collect();
+        assert!(image_bounds.iter().any(|rect| (rect.width() - 96.0).abs() < 1.0 && (rect.height() - 48.0).abs() < 1.0), "Header image dimensions: {image_bounds:?}");
+        assert!(image_bounds.iter().any(|rect| (rect.width() - 32.0).abs() < 1.0 && (rect.height() - 32.0).abs() < 1.0), "Table icon dimensions: {image_bounds:?}");
+    }
+    let output = f.frame(vec![], 1100.0);
+    f.click(text_rect(&output, "Header file").unwrap().center(), 1100.0);
+    assert_eq!(
+        f.client.file.as_ref().unwrap().path,
+        Path::new("src/app.rs")
+    );
+    assert_eq!(
+        std::fs::read_to_string(f.root.path().join("README.md")).unwrap(),
+        source
+    );
+}
+
+#[test]
+fn markdown_centered_navigation_scrolls_to_a_generated_section_anchor() {
+    let mut f = Fixture::new();
+    f.files_open = false;
+    let source = format!(
+        "<div align='center'>\n\n[Jump to end](#end)\n\n</div>\n\n# Start\n\n{}\n\n## End\n\nLast paragraph",
+        "A paragraph with enough room to test scrolling.\n\n".repeat(50)
+    );
+    std::fs::write(f.root.path().join("README.md"), source).unwrap();
+    f.client.open_file(Path::new("README.md"));
+    wait(&mut f.client, |c| {
+        c.file.as_ref().is_some_and(|file| !file.loading)
+    });
+    f.frame(vec![], 900.0);
+    let before = f.frame(vec![], 900.0);
+    assert!(text_rect(&before, "End").is_none_or(|rect| rect.top() > 720.0));
+    f.click(text_rect(&before, "Jump to end").unwrap().center(), 900.0);
+    for _ in 0..8 {
+        f.frame(vec![], 900.0);
+    }
+    let after = f.frame(vec![], 900.0);
+    assert!(
+        text_rect(&after, "End").unwrap().top() < 650.0,
+        "A local section link must scroll the document"
+    );
+    assert!(
+        !after
+            .platform_output
+            .commands
+            .iter()
+            .any(|command| matches!(command, egui::OutputCommand::OpenUrl(_)))
+    );
+}
+
+#[test]
+fn markdown_code_blocks_share_reading_width_keep_gaps_and_copy_raw_emoji_and_tabs() {
+    let mut f = Fixture::new();
+    f.files_open = false;
+    let _renderer = egui_term::TextRendererSession::new(&f.ctx);
+    let short = "ai-terminal-cli instance info --json\nai-terminal-cli session list --json\nai-terminal-cli session rename current --name '主协调' --json";
+    let long = format!(
+        "$r = ai-terminal-cli session create --name '前端 ✨ 👩🏽‍💻' --directory $PWD.Path --json {}\n\tif (-not $r.ok) {{ throw $r.error.message }}\nai-terminal-cli session run $r.result.results[0].id --agent codex",
+        " --argument=value".repeat(25)
+    );
+    let source = format!(
+        "Before code\n\n```powershell\n{short}\n```\n\nBetween blocks\n\n```powershell\n{long}\n```\n\nAfter code\n"
+    );
+    std::fs::write(f.root.path().join("README.md"), &source).unwrap();
+    f.client.open_file(Path::new("README.md"));
+    wait(&mut f.client, |c| {
+        c.file.as_ref().is_some_and(|file| !file.loading)
+    });
+    for (width, zoom) in [(800.0, 1.0), (1400.0, 1.0), (1200.0, 1.33)] {
+        f.ctx.set_zoom_factor(zoom);
+        f.frame(vec![], width);
+        let output = f.frame(vec![], width);
+        let blocks: Vec<_> = output
+            .shapes
+            .iter()
+            .filter_map(|shape| match &shape.shape {
+                egui::Shape::Rect(rect)
+                    if rect.fill == egui::Color32::from_gray(30) && rect.rect.width() > 250.0 =>
+                {
+                    Some(rect.rect)
+                }
+                _ => None,
+            })
+            .collect();
+        assert_eq!(blocks.len(), 2);
+        assert!(
+            (blocks[0].width() - blocks[1].width()).abs() < 1.0
+                && (blocks[0].left() - blocks[1].left()).abs() < 1.0,
+            "Code blocks must use the same reading width: {blocks:?}"
+        );
+        let before = text_rect(&output, "Before code").unwrap();
+        let between = text_rect(&output, "Between blocks").unwrap();
+        let after = text_rect(&output, "After code").unwrap();
+        assert!(blocks[0].top() - before.bottom() >= 10.0);
+        assert!(between.top() - blocks[0].bottom() >= 10.0);
+        assert!(blocks[1].top() - between.bottom() >= 10.0);
+        assert!(after.top() - blocks[1].bottom() >= 10.0);
+        let copies: Vec<_> = output
+            .shapes
+            .iter()
+            .filter_map(|shape| match &shape.shape {
+                egui::Shape::Text(text) if text.galley.job.text == "Copy" => {
+                    Some(text.galley.rect.translate(text.pos.to_vec2()))
+                }
+                _ => None,
+            })
+            .collect();
+        assert_eq!(copies.len(), 2);
+        for (block, button) in blocks.iter().zip(&copies) {
+            assert!(
+                block.right() - button.right() < 30.0 && block.contains_rect(*button),
+                "Copy stays in the right header: {block:?} {button:?}"
+            );
+        }
+        assert!(output.shapes.iter().any(|shape| matches!(&shape.shape, egui::Shape::Mesh(mesh) if mesh.texture_id != egui::TextureId::default())), "Code emoji must use the native bitmap path");
+    }
+    f.ctx.set_zoom_factor(1.0);
+    f.frame(vec![], 1000.0);
+    let output = f.frame(vec![], 1000.0);
+    let copy = output
+        .shapes
+        .iter()
+        .filter_map(|shape| match &shape.shape {
+            egui::Shape::Text(text) if text.galley.job.text == "Copy" => {
+                Some(text.galley.rect.translate(text.pos.to_vec2()).center())
+            }
+            _ => None,
+        })
+        .nth(1)
+        .unwrap();
+    let pointer = |pressed| Event::PointerButton {
+        pos: copy,
+        button: PointerButton::Primary,
+        pressed,
+        modifiers: Modifiers::NONE,
+    };
+    f.frame(vec![Event::PointerMoved(copy), pointer(true)], 1000.0);
+    let copied = f.frame(vec![pointer(false)], 1000.0);
+    assert!(
+        copied.platform_output.commands.iter().any(
+            |command| matches!(command, egui::OutputCommand::CopyText(value) if value == &long)
+        ),
+        "Copy must preserve tabs and the original Unicode text"
+    );
+    let first_line = long.lines().next().unwrap();
+    let initial = text_rect(&copied, first_line).unwrap();
+    let pointer = egui::pos2(initial.left() + 30.0, initial.center().y);
+    f.frame(
+        vec![
+            Event::PointerMoved(pointer),
+            Event::MouseWheel {
+                unit: egui::MouseWheelUnit::Point,
+                phase: egui::TouchPhase::Move,
+                delta: egui::vec2(-400.0, 0.0),
+                modifiers: Modifiers::NONE,
+            },
+        ],
+        1000.0,
+    );
+    for _ in 0..8 {
+        f.frame(vec![], 1000.0);
+    }
+    let scrolled = f.frame(vec![], 1000.0);
+    assert!(
+        text_rect(&scrolled, first_line).unwrap().left() < initial.left() - 30.0,
+        "Long code lines must remain reachable by horizontal scrolling"
+    );
+    assert_eq!(
+        std::fs::read_to_string(f.root.path().join("README.md")).unwrap(),
+        source
+    );
+}
+
+#[test]
 fn image_controls_and_text_page_buttons_remain_inside_the_read_only_view() {
     let mut f = Fixture::new();
     image::RgbaImage::from_pixel(16, 8, image::Rgba([10, 100, 210, 128]))

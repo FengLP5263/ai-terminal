@@ -301,7 +301,7 @@ fn markdown_prepares_highlighted_code_and_only_project_local_images() {
     assert_eq!(md.code[0].lines[0].text, "{\"name\": \"项目\"}");
     assert!(!md.text.contains("```"));
     assert!(md.text.contains(&format!("<{}-0 />", md.code_marker)));
-    assert!(md.text.contains("| 项目 | 状态 |"));
+    assert_eq!(md.tables[0].rows[0], ["项目", "状态"]);
     assert!(!md.code[0].presentation.rows[0].tokens.is_empty());
     assert!(md.images["../%E5%9B%BE%E7%89%87.png"].is_ok());
     assert_eq!(
@@ -333,4 +333,109 @@ fn markdown_prepares_highlighted_code_and_only_project_local_images() {
     assert!(!media::external_link("javascript:alert(1)"));
     assert!(!media::external_link("https://host\n"));
     assert!(media::external_link("https://example.invalid"));
+}
+
+#[test]
+fn markdown_html_images_keep_dimensions_centered_headers_and_table_line_breaks() {
+    let root = tempfile::tempdir().unwrap();
+    image::RgbaImage::from_pixel(160, 80, image::Rgba([40, 110, 200, 255]))
+        .save(root.path().join("a&b.png"))
+        .unwrap();
+    let source = "<div align='center'>\n\n<IMG SRC=\"a&amp;b.png\" WIDTH=96 alt='图标'>\n\n# Team **work**\n\n[File](source.rs)\n\n</div>\n\n| Icon | Description |\n|:---:|---|\n| <img src='a&#38;b.png' width=32 height=32> | first<br>second |\n";
+    let md = media::prepare_markdown(root.path(), Path::new("README.md"), source, &|| false)
+        .unwrap()
+        .unwrap();
+    assert_eq!(md.centered.len(), 1);
+    assert_eq!(md.headings[0].anchor, "team-work");
+    assert_eq!(md.tables[0].rows[0], ["Icon", "Description"]);
+    assert_eq!(md.tables[0].rows[1][1], "first  \nsecond");
+    let sizes: Vec<_> = md
+        .images
+        .values()
+        .map(|i| i.as_ref().unwrap().pixels.source_size)
+        .collect();
+    assert!(sizes.contains(&egui::vec2(96.0, 48.0)) && sizes.contains(&egui::vec2(32.0, 32.0)));
+    assert!(md.links.contains(&"source.rs".into()));
+    assert!(!md.text.contains("<IMG") && !md.tables[0].rows[1][0].contains("<img"));
+    assert!(
+        md.images
+            .values()
+            .all(|i| i.as_ref().unwrap().original == [160, 80])
+    );
+}
+
+#[test]
+fn markdown_html_does_not_execute_or_fetch_and_preserves_code_literals() {
+    let root = tempfile::tempdir().unwrap();
+    let source = "<!-- private decoration -->\n<script>discarded-script</script>\n\n`<img src='literal.png'>`\n\n```html\n<img src='literal.png'>\n```\n\n<img src='https://example.invalid/a.png' onerror='run()'>\n\n<a href='javascript:alert(1)'>blocked</a>\n\n## Same\n\n## Same\n";
+    let md = media::prepare_markdown(root.path(), Path::new("README.md"), source, &|| false)
+        .unwrap()
+        .unwrap();
+    assert!(
+        !md.text.contains("discarded-script")
+            && !md.text.contains("private decoration")
+            && !md.text.contains("onerror")
+    );
+    assert!(md.text.contains("`<img src='literal.png'>`"));
+    assert_eq!(md.code[0].lines[0].text, "<img src='literal.png'>");
+    assert_eq!(md.images.len(), 1);
+    assert_eq!(
+        md.images.values().next().unwrap().as_ref().unwrap_err(),
+        &FileError::OutsideProject
+    );
+    assert!(md.links.contains(&"javascript:alert(1)".into()));
+    assert_eq!(
+        md.headings
+            .iter()
+            .map(|h| h.anchor.as_str())
+            .collect::<Vec<_>>(),
+        ["same", "same-1"]
+    );
+}
+
+#[test]
+fn repository_readmes_prepare_native_logos_tables_and_section_anchors() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    for name in ["README.md", "README.en.md"] {
+        let source = fs::read_to_string(root.join(name)).unwrap();
+        let md = media::prepare_markdown(root, Path::new(name), &source, &|| false)
+            .unwrap()
+            .unwrap();
+        assert_eq!(md.centered.len(), 1, "{name}");
+        assert!(md.tables.len() >= 3, "{name}");
+        assert!(
+            md.images[if name == "README.en.md" {
+                "assets/readme/workspace.en.png"
+            } else {
+                "assets/readme/workspace.png"
+            }]
+            .is_ok(),
+            "The first content image must not lose its budget to later images: {name}"
+        );
+        assert!(md.headings.len() > 10, "{name}");
+        assert_eq!(md.headings[0].text, "AI Terminal");
+        assert!(
+            md.images
+                .values()
+                .filter_map(|i| i.as_ref().ok())
+                .filter(|i| i.pixels.source_size == egui::vec2(32.0, 32.0))
+                .count()
+                >= 7,
+            "All Agent icons must load at their declared size: {name}"
+        );
+        assert!(
+            md.images
+                .values()
+                .filter_map(|i| i.as_ref().ok())
+                .any(|i| i.pixels.source_size.x == 96.0)
+        );
+        assert!(
+            md.tables
+                .iter()
+                .flat_map(|t| &t.rows)
+                .flatten()
+                .all(|cell| !cell.contains("<img"))
+        );
+        assert_eq!(fs::read_to_string(root.join(name)).unwrap(), source);
+    }
 }

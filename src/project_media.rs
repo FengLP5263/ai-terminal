@@ -1,16 +1,18 @@
 //! Bounded image decoding and Markdown preparation, called only by the file worker.
 use crate::{
-    git::{FilePatch, PatchKind, PatchLine, syntax},
-    project_files::{FileError, plain_content, resolve},
+    git::FilePatch,
+    project_files::{FileError, resolve},
 };
-use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag, TagEnd};
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::BTreeMap,
     fs,
     io::{Cursor, Read},
     path::{Component, Path, PathBuf},
     sync::Arc,
 };
+
+mod markdown;
+pub use markdown::{MarkdownHeading, MarkdownTable, prepare_markdown};
 
 pub const MAX_IMAGE_BYTES: u64 = 32 * 1024 * 1024;
 pub const MAX_SOURCE_PIXELS: u64 = 32 * 1024 * 1024;
@@ -50,7 +52,11 @@ pub struct Markdown {
     pub links: Vec<String>,
     pub images: BTreeMap<String, Result<Arc<PreviewImage>, FileError>>,
     pub code: Vec<FilePatch>,
+    pub code_sources: Vec<String>,
     pub code_marker: String,
+    pub tables: Vec<MarkdownTable>,
+    pub centered: Vec<String>,
+    pub headings: Vec<MarkdownHeading>,
 }
 fn extension(path: &Path) -> String {
     path.extension()
@@ -257,145 +263,4 @@ pub fn external_link(uri: &str) -> bool {
     let lower = uri.to_ascii_lowercase();
     (lower.starts_with("https://") || lower.starts_with("http://") || lower.starts_with("mailto:"))
         && !uri.chars().any(char::is_control)
-}
-fn code_path(info: &str) -> String {
-    let language = info.split_whitespace().next().unwrap_or("txt");
-    let ext = match language {
-        "rust" => "rs",
-        "python" => "py",
-        "javascript" => "js",
-        "typescript" => "ts",
-        "powershell" => "ps1",
-        "bash" | "shell" => "sh",
-        "c++" => "cpp",
-        other => other,
-    };
-    format!(
-        "code.{}",
-        ext.chars()
-            .filter(char::is_ascii_alphanumeric)
-            .take(24)
-            .collect::<String>()
-    )
-}
-pub fn prepare_markdown(
-    root: &Path,
-    document: &Path,
-    text: &str,
-    cancelled: &impl Fn() -> bool,
-) -> Result<Option<Markdown>, FileError> {
-    let options = Options::ENABLE_TABLES
-        | Options::ENABLE_STRIKETHROUGH
-        | Options::ENABLE_TASKLISTS
-        | Options::ENABLE_FOOTNOTES
-        | Options::ENABLE_HEADING_ATTRIBUTES;
-    let mut depth = 0usize;
-    let mut links = BTreeSet::new();
-    let mut image_uris = BTreeSet::new();
-    let mut code = vec![];
-    let mut replacements = vec![];
-    let mut block: Option<(usize, String, String)> = None;
-    let marker = format!("ai-terminal-code-{}", uuid::Uuid::new_v4().simple());
-    for (index, (event, span)) in Parser::new_ext(text, options)
-        .into_offset_iter()
-        .enumerate()
-    {
-        if cancelled() {
-            return Err(FileError::Cancelled);
-        }
-        if index > 16_000 {
-            return Ok(None);
-        }
-        match event {
-            Event::Start(tag) => {
-                depth += 1;
-                if depth > 32 {
-                    return Ok(None);
-                }
-                match tag {
-                    Tag::Link { dest_url, .. } => {
-                        links.insert(dest_url.to_string());
-                    }
-                    Tag::Image { dest_url, .. } => {
-                        image_uris.insert(dest_url.to_string());
-                        if image_uris.len() > 128 {
-                            return Ok(None);
-                        }
-                    }
-                    Tag::CodeBlock(kind) => {
-                        let info = match kind {
-                            CodeBlockKind::Fenced(info) => info.to_string(),
-                            CodeBlockKind::Indented => "txt".into(),
-                        };
-                        block = Some((span.start, info, String::new()));
-                    }
-                    _ => {}
-                }
-            }
-            Event::Text(part) if block.is_some() => {
-                block.as_mut().unwrap().2.push_str(&part);
-            }
-            Event::End(end) => {
-                depth = depth.saturating_sub(1);
-                if end == TagEnd::CodeBlock
-                    && let Some((start, info, body)) = block.take()
-                {
-                    let mut patch = plain_content(&code_path(&info));
-                    for (index, line) in body
-                        .strip_suffix('\n')
-                        .unwrap_or(&body)
-                        .split('\n')
-                        .enumerate()
-                    {
-                        patch.lines.push(PatchLine {
-                            kind: PatchKind::Context,
-                            old: None,
-                            new: Some(index as u64 + 1),
-                            text: syntax::display_text(line),
-                        });
-                    }
-                    patch.presentation = syntax::prepare(&patch.path, &patch.lines, cancelled);
-                    replacements
-                        .push((start..span.end, format!("\n<{marker}-{} />\n", code.len())));
-                    code.push(patch);
-                }
-            }
-            _ => {}
-        }
-    }
-    let mut rendered = text.to_owned();
-    for (span, replacement) in replacements.into_iter().rev() {
-        rendered.replace_range(span, &replacement);
-    }
-    let mut images = BTreeMap::new();
-    let mut pixels = 0;
-    for (index, uri) in image_uris.into_iter().enumerate() {
-        if cancelled() {
-            return Err(FileError::Cancelled);
-        }
-        let image = if index >= MAX_INLINE_IMAGES {
-            Err(FileError::ImageLimit)
-        } else {
-            local_target(document, &uri).and_then(|path| read_image(root, &path, true, cancelled))
-        }
-        .and_then(|image| {
-            let count = image.pixels.pixels.len();
-            if pixels + count > MAX_INLINE_PIXELS {
-                return Err(FileError::ImageLimit);
-            }
-            pixels += count;
-            Ok(Arc::new(image))
-        });
-        if matches!(image, Err(FileError::Cancelled)) {
-            return Err(FileError::Cancelled);
-        }
-        images.insert(uri, image);
-    }
-    Ok(Some(Markdown {
-        text: rendered,
-        links: links.into_iter().collect(),
-        images,
-        code,
-        code_marker: marker,
-    }))
 }
