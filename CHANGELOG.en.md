@@ -4,6 +4,15 @@
 
 Record user-visible additions, improvements, fixes, and compatibility changes for each release; omit categories that do not apply. Review both languages together, use the same version entry in GitHub Releases, and ship both files in the ZIP. Historical summaries follow existing GitHub release notes and UTC publication dates; development versions without a separate release do not receive invented release dates.
 
+## [0.15.1] - 2026-11-19
+
+### Fixed
+
+- Improve native Markdown safe HTML, image dimensions, centering, heading anchors, wrapped tables and code-block layout. Repeated images share resources so later illustrations do not incorrectly exhaust the limit.
+- Extend full-row backgrounds in terminal history after zoom/window resizing. Shrinking no longer wraps background padding into extra blank lines; text and explicit line breaks remain intact.
+- Send cursor position and other generated protocol replies directly to the PTY I/O queue, avoiding late replies leaking into CLI input when normal event forwarding is blocked.
+- Fix lost Windows pipe readiness after a large-output read budget, which could leave the bottom of the terminal showing stale output without the composer. Add 146% zoom and hidden-output regressions.
+
 ## [0.15.0] - 2026-11-18
 
 ### Added

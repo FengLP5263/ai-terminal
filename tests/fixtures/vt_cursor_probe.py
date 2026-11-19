@@ -38,6 +38,12 @@ if not k.SetConsoleMode(ctypes.c_void_p(h), ctypes.c_uint32(0x0200)):
 sys.stdout.write("PROBE_READY>")
 sys.stdout.flush()
 
+if "deferred" in sys.argv:
+    trigger = ctypes.create_string_buffer(1)
+    trigger_count = ctypes.c_uint32(0)
+    if not k.ReadFile(ctypes.c_void_p(h), trigger, 1, ctypes.byref(trigger_count), None):
+        raise RuntimeError("deferred query trigger was not received")
+
 captured = bytearray()
 stop = threading.Event()
 
@@ -56,10 +62,10 @@ t.start()
 
 sys.stdout.write("\x1b[?6n" if "private" in sys.argv else "\x1b[6n")
 sys.stdout.flush()
-time.sleep(2)
+time.sleep(0.15 if "deferred" in sys.argv else 2)
 sys.stdout.write("\x1b[?6n" if "private" in sys.argv else "\x1b[6n")
 sys.stdout.flush()
-time.sleep(2)
+time.sleep(0.15 if "deferred" in sys.argv else 2)
 stop.set()
 sys.stdout.write("\nGOT:" + bytes(captured).hex(" ") + "\n")
 sys.stdout.flush()
