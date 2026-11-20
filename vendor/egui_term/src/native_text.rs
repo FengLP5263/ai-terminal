@@ -694,6 +694,30 @@ mod tests {
         assert_ne!(red.vertices[0].color, blue.vertices[0].color);
     }
 
+    #[test]
+    fn non_emoji_media_triangles_preserve_terminal_foreground() {
+        let ctx = Context::default();
+        let font = native();
+        let yellow = Color32::from_rgb(255, 204, 0);
+        let rect = Rect::from_min_size(Pos2::ZERO, egui::vec2(18.0, 36.0));
+        for triangle in ['\u{23f4}', '\u{23f5}', '\u{23f6}', '\u{23f7}'] {
+            let text = triangle.to_string();
+            assert!(
+                !crate::view::emoji_presentation(&text),
+                "{triangle} is a text symbol"
+            );
+            let Some(Shape::Mesh(mesh)) =
+                shape(&ctx, &font, 28.0, &text, rect, 28.0, false, false, yellow)
+            else {
+                panic!("native text triangle was not rendered");
+            };
+            assert!(
+                mesh.vertices.iter().all(|vertex| vertex.color == yellow),
+                "{triangle} discarded its ANSI foreground"
+            );
+        }
+    }
+
     fn full_atlas(ctx: &Context) -> Engine {
         let mut engine = Engine::new(&native()).unwrap();
         for page in 0..MAX_PAGES {

@@ -1,5 +1,7 @@
 # 开发与交付脚本
 
+Claude 输入区对照（Windows）：`cargo build --offline --locked --release --bins --example terminal_probe --example agents_status_probe`。在已有可信目录运行 `terminal_probe.exe claude output/<unique-claude>`，路径指向已构建的 examples 程序；先捕获空输入区 `startup.png` 和 `startup-report.json`，再输入未提交的固定样例并捕获 `terminal.png`。普通模式沿用 CLI 当前权限方式；不发 Enter、不接受信任、不改变用户配置。`agents_status_probe.exe badges output/<unique-badges>` 另用本地样例核对黄色普通三角、灰色占位文字及 100%／146%／200% 缩放，不能代替真实模型回合；分别检查退出码、JSON 与实际 PNG。统一 Windows／POSIX 动作不变。
+
 文件粘贴原生核查（Windows）：`cargo build --offline --locked --release --bins --example file_paste_probe` 后运行 `target/release/examples/file_paste_probe.exe output/<unique-file-paste>`。自身标准 CF_HDROP 内存经正式解析及输入编码写入真实无 profile PowerShell ReadLine 样例；覆盖多文件、空格、中文／emoji 和 UNC 路径。先截图未提交输入，再仅向该样例发回车核对 UTF-8 字节；检查 result.json、PNG、退出码及自身 PTY 回收。不改系统剪贴板、不读用户文件、不启动 Agent／模型；不将此证据冒充各 CLI 附件识别验收。统一 Windows／POSIX 动作不变。
 
 简体中文 | [English](README.en.md)

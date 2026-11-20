@@ -758,7 +758,7 @@ fn glyph_cluster(cells: &[crate::backend::RenderCell], index: usize) -> (String,
             && c.point.column.0 == first.point.column.0 + 1
             && c.cell.c == ' '
     });
-    // A trailing badge in a narrow symbol run must use the same width as its
+    // A trailing emoji badge in a narrow symbol run must use the same width as its
     // neighbours. Otherwise only that last glyph expands into the padding and
     // gets a different raster scale (for example Claude's adjacent play icons).
     let previous_badge = presentation
@@ -790,15 +790,16 @@ fn glyph_cluster(cells: &[crate::backend::RenderCell], index: usize) -> (String,
     (text, end, visual)
 }
 
-/// Text-default emoji (e.g. Claude's pause/play badges) may occupy a narrow
+/// Text-default emoji (e.g. pause/play emoji) may occupy a narrow
 /// emulator cell followed by padding. Shape them as an emoji without consuming
-/// or moving the neighbouring terminal cells. VS15 explicitly requests text.
+/// or moving neighbouring cells. U+23F4..U+23F7 are text symbols (including
+/// Claude's U+23F5 mode badge), not emoji. VS15 explicitly requests text.
 pub(crate) fn emoji_presentation(text: &str) -> bool {
     !text.contains('\u{fe0e}')
         && (text.contains('\u{fe0f}')
             || text.chars().any(|c| {
                 matches!(c as u32,
-                0x23e9..=0x23fa | 0x25b6 | 0x25c0 |
+                0x23e9..=0x23f3 | 0x23f8..=0x23fa | 0x25b6 | 0x25c0 |
                 0x2600..=0x2604 | 0x2614..=0x2615 | 0x2648..=0x2653 |
                 0x26a0..=0x26a1 | 0x26bd..=0x26be | 0x26c4..=0x26c5 |
                 0x26f2..=0x26f3 | 0x26fa | 0x26fd | 0x2705 | 0x2728 |
@@ -1260,8 +1261,8 @@ mod rendering_tests {
             assert_eq!(first.0, second.0);
             assert_eq!(
                 glyph_cluster(&cells[1..], 0).2,
-                2,
-                "an isolated mode badge may use its following blank"
+                if badge == '\u{23f5}' { 1 } else { 2 },
+                "only emoji badges may use their following blank"
             );
         }
     }

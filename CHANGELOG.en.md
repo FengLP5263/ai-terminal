@@ -4,6 +4,12 @@
 
 Record user-visible additions, improvements, fixes, and compatibility changes for each release; omit categories that do not apply. Review both languages together, use the same version entry in GitHub Releases, and ship both files in the ZIP. Historical summaries follow existing GitHub release notes and UTC publication dates; development versions without a separate release do not receive invented release dates.
 
+## [Unreleased]
+
+### Fixed
+
+- Render plain triangles in Claude's mode bar as text rather than emoji, preserving the terminal's yellow foreground and normal text scale.
+
 ## [0.15.1] - 2026-11-19
 
 ### Fixed
