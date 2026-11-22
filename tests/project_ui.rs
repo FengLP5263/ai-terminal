@@ -364,6 +364,125 @@ fn markdown_centered_navigation_scrolls_to_a_generated_section_anchor() {
 }
 
 #[test]
+#[cfg(windows)]
+fn markdown_prose_headings_and_tables_use_native_color_emoji() {
+    let mut f = Fixture::new();
+    f.files_open = false;
+    let _renderer = egui_term::TextRendererSession::new(&f.ctx);
+    let source =
+        "# Heading 🧠\n\nParagraph 📋\n\n| Title |\n| --- |\n| Cell 👩🏽‍💻 |\n\nMath $E=mc^2$.\n";
+    let path = Path::new("README.md");
+    std::fs::write(f.root.path().join(path), source).unwrap();
+    f.client.open_file(path);
+    wait(&mut f.client, |c| {
+        c.file.as_ref().is_some_and(|file| !file.loading)
+    });
+    f.frame(vec![], 900.0);
+    let output = f.frame(vec![], 900.0);
+    let color_glyphs = output
+        .shapes
+        .iter()
+        .filter_map(|entry| match &entry.shape {
+            egui::Shape::Mesh(mesh) if mesh.texture_id != egui::TextureId::default() => {
+                Some(mesh.calc_bounds())
+            }
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    for label in ["Heading 🧠", "Paragraph 📋", "Cell 👩🏽‍💻"] {
+        let rect = text_rect(&output, label).expect(label);
+        assert_eq!(
+            color_glyphs
+                .iter()
+                .filter(|glyph| glyph.intersects(rect))
+                .count(),
+            1,
+            "Expected one native glyph for the full emoji in {label}"
+        );
+    }
+    assert!(text_rect(&output, "Math $E=mc^2$.").is_some());
+    f.view.preview_mut().set_source(true);
+    let source_view = f.frame(vec![], 900.0);
+    assert!(text_rect(&source_view, "# Heading 🧠").is_some());
+    assert_eq!(
+        std::fs::read_to_string(f.root.path().join(path)).unwrap(),
+        source
+    );
+}
+
+#[test]
+fn refreshing_a_markdown_page_keeps_its_reading_position() {
+    let mut f = Fixture::new();
+    f.files_open = false;
+    let path = Path::new("README.md");
+    let source = (0..80)
+        .map(|i| format!("Reading paragraph {i}\n\n"))
+        .collect::<String>();
+    std::fs::write(f.root.path().join(path), &source).unwrap();
+    f.client.open_file(path);
+    let loaded = |c: &FileClient| c.file.as_ref().is_some_and(|file| !file.loading);
+    wait(&mut f.client, loaded);
+    let output = f.frame(vec![], 900.0);
+    let top = text_rect(&output, "Reading paragraph 0").unwrap();
+    f.frame(
+        vec![
+            Event::PointerMoved(egui::pos2(300.0, 350.0)),
+            Event::MouseWheel {
+                unit: egui::MouseWheelUnit::Point,
+                phase: egui::TouchPhase::Move,
+                delta: egui::vec2(0.0, -650.0),
+                modifiers: Modifiers::NONE,
+            },
+        ],
+        900.0,
+    );
+    let mut scrolled = f.frame(vec![], 900.0);
+    for _ in 0..10 {
+        scrolled = f.frame(vec![], 900.0);
+    }
+    let (marker, before) = (1..80)
+        .find_map(|i| {
+            let text = format!("Reading paragraph {i}");
+            let rect = text_rect(&scrolled, &text)?;
+            (rect.center().y > 180.0 && rect.center().y < 490.0).then_some((text, rect))
+        })
+        .expect("scrolled paragraph must be visible");
+    assert!(
+        text_rect(&scrolled, "Reading paragraph 0")
+            .is_none_or(|rect| rect.top() < top.top() - 50.0)
+    );
+    std::fs::write(f.root.path().join(path), source + "\nFresh content\n").unwrap();
+    f.client.refresh_on_focus(false);
+    wait(&mut f.client, loaded);
+    let refreshed = f.frame(vec![], 900.0);
+    let after = text_rect(&refreshed, &marker).expect("reading position survived refresh");
+    assert!(
+        (before.top() - after.top()).abs() < 8.0,
+        "{before:?} -> {after:?}"
+    );
+}
+
+#[test]
+fn markdown_without_a_rendered_preview_shows_source_without_a_preview_button() {
+    let mut f = Fixture::new();
+    f.files_open = false;
+    let path = Path::new("nested.md");
+    let source = format!("# Actual source\n\n{}deep\n", "> ".repeat(40));
+    std::fs::write(f.root.path().join(path), source).unwrap();
+    f.client.open_file(path);
+    wait(&mut f.client, |c| {
+        c.file.as_ref().is_some_and(|file| !file.loading)
+    });
+    let document = f.client.file.as_ref().unwrap().data.as_ref().unwrap();
+    assert!(document.markdown.is_none());
+    let output = f.frame(vec![], 900.0);
+    assert!(text_rect(&output, "Source").is_some());
+    assert!(text_rect(&output, "Preview").is_none());
+    assert!(text_rect(&output, "# Actual source").is_some());
+    assert!(text_rect(&output, "This content exceeds the Markdown preview limits.").is_some());
+}
+
+#[test]
 fn markdown_code_blocks_share_reading_width_keep_gaps_and_copy_raw_emoji_and_tabs() {
     let mut f = Fixture::new();
     f.files_open = false;

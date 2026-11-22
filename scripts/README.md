@@ -235,7 +235,7 @@ cli_probe 的 Agent 替身还发送明确的 working → blocked/question，校�
 
 多媒体预览的 media_probe 还验证标准控件的实际点击、静音恢复和结束后重播，生成宽／窄音频及视频共四张布局图，以及不支持文件截图；只向自身 egui 窗口注入合成输入，播放保持静音。图片布局回归在 project_ui 中检查实际纹理的居中与缩放。
 
-Markdown 原生核查：`cargo build --offline --locked --release --bins --example markdown_probe` 后运行 `target/release/examples/markdown_probe.exe output/<unique-markdown>`。只复制仓库内公开的双语 README 与 PNG 资产到隔离目录；九张图覆盖页首居中、96 点标识、32 点表格图标、中英文、两列／五列表格、窄窗口与 133% 缩放，以及 CLI 文档中短／长代码块的统一宽度、块间距、右侧复制按钮和彩色 emoji。检查 result.json、正常退出及实际 PNG。project_media／project_ui 回归覆盖内嵌 HTML、路径边界、源码保持、标题锚点、图标尺寸及表格换行；不启动 PTY、Agent 或模型，不读取用户配置。
+Markdown 原生核查：`cargo build --offline --locked --release --bins --example markdown_probe` 后运行 `target/release/examples/markdown_probe.exe output/<unique-markdown>`。只复制仓库内公开的双语 README 与 PNG 资产到隔离目录；前九张图覆盖页首居中、96 点标识、32 点表格图标、中英文、两列／五列表格、窄窗口与 133% 缩放，以及 CLI 文档中短／长代码块的统一宽度、块间距、右侧复制按钮和彩色 emoji。检查 result.json、正常退出及实际 PNG。project_media／project_ui 回归覆盖内嵌 HTML、路径边界、源码保持、标题锚点、图标尺寸及表格换行；不启动 PTY、Agent 或模型，不读取用户配置。 第 10 至 12 张使用同一份合成 Markdown 对照预览、源码和 133% 窄窗口，检查正文、引用、标题、链接、表格及行内／独立公式的显示。
 
 补充 settings-context.md 截图先准备完整 README 的所有资源，再聚焦“设置与浮窗”段落；断言 settings.png 成功加载。回归覆盖重复 HTML 图片的共享 URI、后续图片预算，以及中英文 README 的七个图标引用与末尾设置截图。
 

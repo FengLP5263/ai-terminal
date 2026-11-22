@@ -161,7 +161,7 @@ impl App {
                 "The selected font is not installed",
             ));
         }
-        let mut workspace = self.control_workspace();
+        let mut workspace = self.workspace_snapshot();
         workspace.ui = p;
         if let Some(id) = &self.active {
             workspace

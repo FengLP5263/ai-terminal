@@ -658,12 +658,34 @@ impl FileClient {
         self.revision += 1;
     }
     pub fn refresh(&mut self) {
+        self.refresh_directories();
+        self.reload_file();
+    }
+
+    pub fn refresh_on_focus(&mut self, refresh_tree: bool) {
+        if refresh_tree {
+            self.refresh_directories();
+        }
+        let Some(state) = self.file.as_ref().filter(|state| !state.loading) else {
+            return;
+        };
+        if let Some(data) = &state.data {
+            self.request_page(data.page.cursor);
+        } else {
+            self.reload_file();
+        }
+    }
+
+    fn refresh_directories(&mut self) {
         let directories = self.directories.keys().cloned().collect::<Vec<_>>();
-        self.shared.epoch.fetch_add(1, Ordering::Relaxed);
         {
             let mut queue = self.shared.queue.lock().unwrap();
-            queue.requests.clear();
-            queue.responses.clear();
+            queue
+                .requests
+                .retain(|request| matches!(request.kind, Kind::File(..)));
+            queue
+                .responses
+                .retain(|response| matches!(response.data, ResultData::File(..)));
         }
         self.limit_reached = false;
         for path in directories {
@@ -675,19 +697,11 @@ impl FileClient {
             }
             self.request(&path, Kind::Directory(self.next_directory));
         }
-        self.reload_file();
         self.revision += 1;
     }
     pub fn reload_file(&mut self) {
         self.page_history.clear();
-        if let Some(state) = self.file.as_mut() {
-            state.loading = true;
-            state.error = None;
-            let path = state.path.clone();
-            let ticket = self.shared.ticket.fetch_add(1, Ordering::Relaxed) + 1;
-            self.request(&path, Kind::File(ticket, Cursor::default()));
-            self.revision += 1;
-        }
+        self.request_page(Cursor::default());
     }
     pub fn can_previous_page(&self) -> bool {
         !self.page_history.is_empty()

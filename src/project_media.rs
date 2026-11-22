@@ -49,6 +49,7 @@ pub struct PreviewImage {
 #[derive(Debug)]
 pub struct Markdown {
     pub text: String,
+    pub(crate) has_emoji: bool,
     pub links: Vec<String>,
     pub images: BTreeMap<String, Result<Arc<PreviewImage>, FileError>>,
     pub code: Vec<FilePatch>,
