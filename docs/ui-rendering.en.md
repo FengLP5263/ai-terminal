@@ -2,6 +2,26 @@
 
 [简体中文](ui-rendering.md) | English
 
+## Claude text triangles
+
+U+23F4..U+23F7 do not have the Unicode Emoji property. The previous range check included them, scaling Claude's `⏵⏵` with an emoji line box and painting them white. They now use the normal text baseline, size and ANSI foreground. Genuine emoji and explicit VS15/VS16 rules remain unchanged. The native glyph regression first reproduced the old failure, then checked yellow meshes for all four triangles. `agents_status_probe badges` captures yellow badges and a gray input hint at 100%/146%/200%. Real Claude startup captures are separate from these synthetic fixtures. `startup-report.json` records the received hint and triangle colors alongside the emulator's current cursor shape; the renderer does not invent placeholder text or override its cursor based on a screenshot.
+
+Checks on 2026-11-20: governance, fmt/Clippy, relevant terminal/native-text regressions, 31 Python checks, Release smoke and three zoom captures passed. Real Claude startup hints and unsubmitted input were verified separately; the user accepted the preview. Full CI did not pass: Defender events 1116/1117 record `Behavior:Win32/DefenseEvasion.A!ml` quarantining the debug `ai-terminal-hook.exe` and temporary CLI entry copies, preventing Shell tests from starting. The exact trigger and whether this is a false positive remain unconfirmed.
+
+## Same-directory session switching and load comparison
+
+The local fix on 2026-11-22 is based on `69de2a9`. Switching the active session closes file and Git diff previews and cancels pending diff reads. Sessions in the same directory continue sharing the Git repository snapshot. The sidebar click regression and the actual Release CLI check both verified that the target terminal became visible, the previous diff closed, and existing PTYs kept their process IDs. Full CI (366 Rust and 31 Python checks), Release smoke, and native screenshot review passed.
+
+The Release baseline and fixed build each ran with 1, 10, and 30 isolated CMD sessions on the same device. Each operation had 20 samples after warmup at each size. At 30 sessions, the CLI round-trip P95 for activation, scrolling, reading settings, and saving settings was 49.6/80.7/80.1/83.3 ms before and 59.9/81.4/80.2/84.2 ms after. The manager working set was approximately 226 MiB. Timings include CLI startup and transport. Frame latency, individual disk flush times, and sustained output load were not measured. The CLI skips unused workspace snapshots and revision calculations, but round-trip performance did not improve consistently in this comparison. Saving retains atomic replacement and existing completion semantics.
+
+The verified public 0.15.1 Windows ZIP was separately tested with Defender real-time protection enabled on this device. Codex and Qoder entry points launched local command fixtures, reported their identity, and returned to the same CMD process after exit. This check made no model requests. An installer retest on a clean Windows environment remains open.
+
+## Markdown source and preview comparison
+
+When the window regains focus, the viewer reads the current page again and keeps its scroll position. Later pages use the original file size and modification time to validate pagination and offer a reload if the file has changed externally. When Markdown content exceeds the rendering limits, the viewer shows source with an explanation.
+
+Markdown preview paints visible emoji with native Windows color glyphs in the existing text layout, reusing the bounded atlas shared with the source view. Ordinary text, selection ranges, and links retain their existing layout. The final three `markdown_probe` captures compare preview, source, and a narrow zoomed viewport using the same synthetic document. They cover headings, quotes, links, tables, skin tones, ZWJ sequences, and flags. The fixture includes inline `$…$` and display `$$…$$` math. The current preview displays formulas as plain text and has no TeX typesetter.
+
 ## Causes and implementation
 
 - Collapsed-sidebar tiles are fixed at 44×44 logical pixels with centered avatars. The scrollbar uses the adjacent gutter and becomes transparent outside the sidebar. Never derive row height from the scroll area's current available width: showing the scrollbar removes 7 logical pixels, causing an overflow→shorter rows→content fits→hidden scrollbar→taller rows loop near the threshold. Reproduced in preview.1; preview.2 uses a fixed size independent of scrollbar visibility.

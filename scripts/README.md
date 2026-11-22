@@ -1,5 +1,7 @@
 # 开发与交付脚本
 
+Claude 输入区对照（Windows）：`cargo build --offline --locked --release --bins --example terminal_probe --example agents_status_probe`。在已有可信目录运行 `terminal_probe.exe claude output/<unique-claude>`，路径指向已构建的 examples 程序；先捕获空输入区 `startup.png` 和 `startup-report.json`，再输入未提交的固定样例并捕获 `terminal.png`。普通模式沿用 CLI 当前权限方式；不发 Enter、不接受信任、不改变用户配置。`agents_status_probe.exe badges output/<unique-badges>` 另用本地样例核对黄色普通三角、灰色占位文字及 100%／146%／200% 缩放，不能代替真实模型回合；分别检查退出码、JSON 与实际 PNG。统一 Windows／POSIX 动作不变。
+
 文件粘贴原生核查（Windows）：`cargo build --offline --locked --release --bins --example file_paste_probe` 后运行 `target/release/examples/file_paste_probe.exe output/<unique-file-paste>`。自身标准 CF_HDROP 内存经正式解析及输入编码写入真实无 profile PowerShell ReadLine 样例；覆盖多文件、空格、中文／emoji 和 UNC 路径。先截图未提交输入，再仅向该样例发回车核对 UTF-8 字节；检查 result.json、PNG、退出码及自身 PTY 回收。不改系统剪贴板、不读用户文件、不启动 Agent／模型；不将此证据冒充各 CLI 附件识别验收。统一 Windows／POSIX 动作不变。
 
 简体中文 | [English](README.en.md)
@@ -233,7 +235,7 @@ cli_probe 的 Agent 替身还发送明确的 working → blocked/question，校�
 
 多媒体预览的 media_probe 还验证标准控件的实际点击、静音恢复和结束后重播，生成宽／窄音频及视频共四张布局图，以及不支持文件截图；只向自身 egui 窗口注入合成输入，播放保持静音。图片布局回归在 project_ui 中检查实际纹理的居中与缩放。
 
-Markdown 原生核查：`cargo build --offline --locked --release --bins --example markdown_probe` 后运行 `target/release/examples/markdown_probe.exe output/<unique-markdown>`。只复制仓库内公开的双语 README 与 PNG 资产到隔离目录；九张图覆盖页首居中、96 点标识、32 点表格图标、中英文、两列／五列表格、窄窗口与 133% 缩放，以及 CLI 文档中短／长代码块的统一宽度、块间距、右侧复制按钮和彩色 emoji。检查 result.json、正常退出及实际 PNG。project_media／project_ui 回归覆盖内嵌 HTML、路径边界、源码保持、标题锚点、图标尺寸及表格换行；不启动 PTY、Agent 或模型，不读取用户配置。
+Markdown 原生核查：`cargo build --offline --locked --release --bins --example markdown_probe` 后运行 `target/release/examples/markdown_probe.exe output/<unique-markdown>`。只复制仓库内公开的双语 README 与 PNG 资产到隔离目录；前九张图覆盖页首居中、96 点标识、32 点表格图标、中英文、两列／五列表格、窄窗口与 133% 缩放，以及 CLI 文档中短／长代码块的统一宽度、块间距、右侧复制按钮和彩色 emoji。检查 result.json、正常退出及实际 PNG。project_media／project_ui 回归覆盖内嵌 HTML、路径边界、源码保持、标题锚点、图标尺寸及表格换行；不启动 PTY、Agent 或模型，不读取用户配置。 第 10 至 12 张使用同一份合成 Markdown 对照预览、源码和 133% 窄窗口，检查正文、引用、标题、链接、表格及行内／独立公式的显示。
 
 补充 settings-context.md 截图先准备完整 README 的所有资源，再聚焦“设置与浮窗”段落；断言 settings.png 成功加载。回归覆盖重复 HTML 图片的共享 URI、后续图片预算，以及中英文 README 的七个图标引用与末尾设置截图。
 

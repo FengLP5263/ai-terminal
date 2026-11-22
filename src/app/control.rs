@@ -19,15 +19,8 @@ impl App {
             })
             .collect()
     }
-    fn control_workspace(&self) -> Workspace {
-        Workspace {
-            sessions: self.sessions.iter().map(|s| s.spec.clone()).collect(),
-            groups: self.groups.clone(),
-            session_panels: self.session_panel_states(),
-            active: self.active.clone(),
-            last_directory: self.last_directory.clone(),
-            ui: self.preferences,
-        }
+    fn workspace_revision(&self) -> String {
+        control::revision(&self.workspace_snapshot())
     }
     fn control_session(&self, index: usize) -> Value {
         let session = &self.sessions[index];
@@ -68,8 +61,6 @@ impl App {
     }
     fn control_command(&mut self, request: &Request, ctx: &egui::Context) -> ApiResult<Value> {
         let caller = request.caller_session.as_deref();
-        let workspace = self.control_workspace();
-        let revision = control::revision(&workspace);
         match &request.action {
             Command::Native { action } => self.control_native(action, caller, ctx),
             Command::Info => {
@@ -79,7 +70,7 @@ impl App {
                     .ok_or_else(|| ApiError::new("unavailable", "CLI is disabled"))?
                     .descriptor;
                 Ok(
-                    json!({"instance_id": d.instance_id, "pid": d.pid, "version": d.version, "data_directory": d.data_directory, "caller_session": caller, "revision": revision, "schema_version": control::SCHEMA_VERSION, "capabilities": {"agent_resume":true,"native_controls":true, "settings":true,"window":true,"floating":true,"panels":true,"files":true,"git_readonly":true,"media":true,"terminal_io":true,"session_lifecycle":true,"capture":true}}),
+                    json!({"instance_id": d.instance_id, "pid": d.pid, "version": d.version, "data_directory": d.data_directory, "caller_session": caller, "revision": self.workspace_revision(), "schema_version": control::SCHEMA_VERSION, "capabilities": {"agent_resume":true,"native_controls":true, "settings":true,"window":true,"floating":true,"panels":true,"files":true,"git_readonly":true,"media":true,"terminal_io":true,"session_lifecycle":true,"capture":true}}),
                 )
             }
             Command::Receipt { id } => self
@@ -106,23 +97,25 @@ impl App {
                     .collect();
                 let next = offset.saturating_add(sessions.len());
                 Ok(
-                    json!({"sessions": sessions, "total": self.sessions.len(), "offset": offset, "next_offset": (next < self.sessions.len()).then_some(next), "revision": revision}),
+                    json!({"sessions": sessions, "total": self.sessions.len(), "offset": offset, "next_offset": (next < self.sessions.len()).then_some(next), "revision": self.workspace_revision()}),
                 )
             }
             Command::SessionShow { id } => {
                 Ok(self.control_session(self.control_index(id, caller)?))
             }
             Command::GroupList => {
-                Ok(json!({"groups": self.control_groups(), "revision": revision}))
+                Ok(json!({"groups": self.control_groups(), "revision": self.workspace_revision()}))
             }
             Command::WorkspaceShow => Ok(
-                json!({"sessions": (0..self.sessions.len()).map(|i| self.control_session(i)).collect::<Vec<_>>(), "groups": self.control_groups(), "active": self.active, "caller_session": caller, "revision": revision}),
+                json!({"sessions": (0..self.sessions.len()).map(|i| self.control_session(i)).collect::<Vec<_>>(), "groups": self.control_groups(), "active": self.active, "caller_session": caller, "revision": self.workspace_revision()}),
             ),
             Command::Apply {
                 operations,
                 dry_run,
                 if_revision,
             } => {
+                let workspace = self.workspace_snapshot();
+                let revision = control::revision(&workspace);
                 let prepared =
                     control::prepare(&workspace, operations, caller, if_revision.as_deref())?;
                 let after = control::revision(&prepared.workspace);
@@ -233,7 +226,7 @@ impl App {
                     ));
                 }
                 let id = self.sessions[i].spec.id.clone();
-                let mut next = workspace;
+                let mut next = self.workspace_snapshot();
                 next.sessions.retain(|s| s.id != id);
                 next.session_panels.remove(&id);
                 model::assign_group(&mut next.groups, &id, None);
@@ -262,10 +255,10 @@ impl App {
                 self.close_session = self.close_session.take().filter(|v| *v != id);
                 self.dirty = false;
                 if was_active {
-                    self.project_view.release_document(ctx);
                     if let Some(next) = next.active {
                         self.activate(next, ctx);
                     } else {
+                        self.clear_project_preview(ctx);
                         self.active = None;
                         model::ProjectPanel::Closed.apply(&mut self.preferences);
                     }

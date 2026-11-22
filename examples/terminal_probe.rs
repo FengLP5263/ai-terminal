@@ -98,6 +98,9 @@ impl eframe::App for Probe {
             }
             return;
         }
+        if !self.startup_saved {
+            return;
+        }
         let elapsed = self
             .ready_at
             .map(|t| t.elapsed().as_secs_f32())
@@ -111,6 +114,8 @@ impl eframe::App for Probe {
         } else {
             0
         };
+        // A delayed startup capture must not skip the IME preedit/commit stages.
+        let next = next.min(self.input_stage + 1);
         if next > self.input_stage {
             input.events.push(match next {
                 1 => egui::Event::Ime(egui::ImeEvent::Preedit {
@@ -138,8 +143,7 @@ impl eframe::App for Probe {
             .set_font(ai_terminal::appearance::terminal_font(14.0));
         ui.add(view);
         let ctx = ui.ctx();
-        if self.paste_image
-            && !self.startup_requested
+        if !self.startup_requested
             && self
                 .ready_at
                 .is_some_and(|t| t.elapsed() > Duration::from_millis(350))
@@ -164,7 +168,7 @@ impl eframe::App for Probe {
         });
         if let Some(image) = image {
             std::fs::create_dir_all(&self.output).unwrap();
-            let startup = self.paste_image && !self.startup_saved;
+            let startup = !self.startup_saved;
             let file = std::fs::File::create(self.output.join(if startup {
                 "startup.png"
             } else {
@@ -190,6 +194,33 @@ impl eframe::App for Probe {
                 )
                 .unwrap();
             if startup {
+                let text = self.terminal.plain_text();
+                let content = self.terminal.sync();
+                let size: egui_term::WindowSize = content.terminal_size.into();
+                let triangles: Vec<_> = content
+                    .cells
+                    .iter()
+                    .filter(|cell| cell.cell.c == '\u{23f5}')
+                    .map(|cell| {
+                        serde_json::json!({
+                            "line": cell.point.line.0, "column": cell.point.column.0,
+                            "foreground": format!("{:?}", cell.cell.fg),
+                            "flags": format!("{:?}", cell.cell.flags),
+                        })
+                    })
+                    .collect();
+                let report = serde_json::json!({
+                    "placeholder_received": text.contains("Try "),
+                    "cursor_shape": format!("{:?}", content.cursor_shape),
+                    "mode": format!("{:?}", content.terminal_mode),
+                    "columns": size.num_cols, "rows": size.num_lines,
+                    "triangles": triangles, "enter_sent": false, "model_request_sent": false,
+                });
+                std::fs::write(
+                    self.output.join("startup-report.json"),
+                    serde_json::to_vec_pretty(&report).unwrap(),
+                )
+                .unwrap();
                 self.startup_saved = true;
                 return;
             }

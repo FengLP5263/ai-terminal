@@ -10,6 +10,8 @@ Revision: `31bbc7ab8503c9518fcee5717cfa29011e59f451`
 
 License: MIT; original LICENSE preserved.
 
+Unreleased: correct U+23F4..U+23F7 text triangles incorrectly classified as emoji. Claude's U+23F5 mode badges use normal text size and the ANSI foreground. Based on the [Unicode 17 Emoji property](https://www.unicode.org/Public/17.0.0/ucd/emoji/emoji-data.txt), genuine emoji and VS15/VS16 rules remain intact. A regression checks yellow glyph meshes; the native probe covers three zoom levels.
+
 Local changes: viewport-only snapshots; 5,000-line scrollback; no background redraw; coalesced output wakeups; receiver-disconnect termination; per-child environment and Windows argument escaping; IME commits; keyboard focus independent of pointer; bracketed paste; live-grid selection copy; hidden-cursor support.
 
 Color palettes and default key bindings are cached/shared. Rendering avoids per-cell mapping rebuilds, color-string clones and hex parsing. Theme OSC color queries are answered for CLI compatibility; IME candidate positioning is supplied. Terminal row height accounts for the CJK fallback face to avoid overlapping Chinese and Latin lines.

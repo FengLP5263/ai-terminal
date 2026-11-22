@@ -7,6 +7,7 @@ use crate::{
 };
 use pulldown_cmark::{Alignment, CodeBlockKind, Event, Options, Parser, Tag, TagEnd};
 use std::collections::BTreeSet;
+use unicode_segmentation::UnicodeSegmentation;
 
 #[derive(Debug)]
 pub struct MarkdownTable {
@@ -61,6 +62,7 @@ pub fn prepare_markdown(
     let marker = format!("ai-terminal-code-{}", uuid::Uuid::new_v4().simple());
     let mut md = Markdown {
         text: String::new(),
+        has_emoji: text.graphemes(true).any(crate::ui_text::is_emoji),
         links: vec![],
         images: BTreeMap::new(),
         code: vec![],
@@ -85,6 +87,11 @@ pub fn prepare_markdown(
         }
         if index > 16_000 {
             return Ok(None);
+        }
+        if !md.has_emoji
+            && let Event::Text(value) = &event
+        {
+            md.has_emoji = value.graphemes(true).any(crate::ui_text::is_emoji);
         }
         match event {
             Event::Start(tag) => {
