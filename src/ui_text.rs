@@ -3,7 +3,7 @@ use egui::{Color32, FontFamily, FontId, Galley, Painter, Pos2, Rect, Ui, Vec2};
 use std::sync::Arc;
 use unicode_segmentation::UnicodeSegmentation;
 
-fn is_emoji(cluster: &str) -> bool {
+pub(crate) fn is_emoji(cluster: &str) -> bool {
     // An explicit text-presentation selector must keep the source font and color.
     if cluster.contains('\u{fe0e}') {
         return false;

@@ -131,6 +131,7 @@ fn page_navigation_preserves_line_numbers_and_detects_changed_files() {
     .unwrap();
     let mut client = FileClient::new(egui::Context::default());
     client.set_root(Some(root.path()));
+    client.ensure_directory(Path::new(""));
     client.open_file(Path::new("lines.txt"));
     wait(&mut client);
     let first = client.file.as_ref().unwrap().data.clone().unwrap();
@@ -139,6 +140,7 @@ fn page_navigation_preserves_line_numbers_and_detects_changed_files() {
         Some(files::MAX_LINES as u64)
     );
     client.next_page();
+    client.refresh_on_focus(true);
     wait(&mut client);
     let second = client.file.as_ref().unwrap().data.clone().unwrap();
     assert_eq!(
@@ -149,6 +151,11 @@ fn page_navigation_preserves_line_numbers_and_detects_changed_files() {
         second.content.lines.last().unwrap().new,
         Some(files::MAX_LINES as u64 + 3)
     );
+    assert!(client.can_previous_page());
+    client.refresh_on_focus(true);
+    wait(&mut client);
+    let refreshed = client.file.as_ref().unwrap().data.as_ref().unwrap();
+    assert_eq!(refreshed.page.cursor, second.page.cursor);
     assert!(client.can_previous_page());
     client.previous_page();
     wait(&mut client);

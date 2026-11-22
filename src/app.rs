@@ -520,18 +520,21 @@ impl App {
             screenshot_requested: false,
         }
     }
-    fn persist(&mut self) {
-        if !self.dirty || self.load_failed || self.smoke {
-            return;
-        }
-        let workspace = Workspace {
+    fn workspace_snapshot(&self) -> Workspace {
+        Workspace {
             sessions: self.sessions.iter().map(|s| s.spec.clone()).collect(),
             groups: self.groups.clone(),
             session_panels: self.session_panel_states(),
             active: self.active.clone(),
             last_directory: self.last_directory.clone(),
             ui: self.preferences,
-        };
+        }
+    }
+    fn persist(&mut self) {
+        if !self.dirty || self.load_failed || self.smoke {
+            return;
+        }
+        let workspace = self.workspace_snapshot();
         match model::save(&self.directory.join("sessions.json"), &workspace) {
             Ok(()) => {
                 self.dirty = false;
@@ -705,6 +708,13 @@ impl App {
             }
         }
     }
+    fn clear_project_preview(&mut self, ctx: &egui::Context) {
+        self.project_view.release_document(ctx);
+        self.project_files.close_file();
+        if let Some(git) = &mut self.git {
+            git.close_patch();
+        }
+    }
     fn activate(&mut self, id: String, ctx: &egui::Context) {
         if self.active.as_deref() != Some(&id) {
             if let Some(previous) = self
@@ -720,8 +730,8 @@ impl App {
                 .map(|s| s.project_panel)
                 .unwrap_or_default()
                 .apply(&mut self.preferences);
+            self.clear_project_preview(ctx);
         }
-        self.project_view.release_document(ctx);
         self.terminal_focus_pending = true;
         self.active = Some(id.clone());
         if let Some(session) = self.sessions.iter_mut().find(|s| s.spec.id == id) {
@@ -739,14 +749,7 @@ impl App {
         if self.closing.is_some() {
             return;
         }
-        let workspace = Workspace {
-            sessions: self.sessions.iter().map(|s| s.spec.clone()).collect(),
-            groups: self.groups.clone(),
-            session_panels: self.session_panel_states(),
-            active: self.active.clone(),
-            last_directory: self.last_directory.clone(),
-            ui: self.preferences,
-        };
+        let workspace = self.workspace_snapshot();
         let path = self.directory.join("sessions.json");
         let skip_save = self.load_failed || self.smoke;
         let resources: Vec<_> = self
@@ -873,11 +876,8 @@ impl App {
         let root_changed = self.project_files.set_root(project_root.as_deref());
         self.project_files.poll();
         if focused && !self.git_focused && !root_changed {
-            if self.preferences.project_files_open {
-                self.project_files.refresh();
-            } else if self.project_files.file.is_some() {
-                self.project_files.reload_file();
-            }
+            self.project_files
+                .refresh_on_focus(self.preferences.project_files_open);
         }
         if self.preferences.project_files_open {
             self.project_files
@@ -1491,6 +1491,7 @@ impl App {
                     if let Some(next) = self.sessions.first().map(|s| s.spec.id.clone()) {
                         self.activate(next, ctx);
                     } else {
+                        self.clear_project_preview(ctx);
                         self.active = None;
                     }
                 }
@@ -2894,6 +2895,80 @@ Send-State 'state=clear'; Wait-Step 5
         assert_eq!(
             (before.num_cols, before.num_lines),
             (after.num_cols, after.num_lines)
+        );
+    }
+
+    #[test]
+    fn sidebar_switch_closes_diff_even_when_sessions_share_a_directory() {
+        let directory = tempfile::tempdir().unwrap();
+        let ctx = egui::Context::default();
+        let creation = eframe::CreationContext::_new_kittest(ctx.clone());
+        let mut app = App::new(&creation, directory.path().to_owned(), false, false);
+        use_built_helper(&mut app);
+        app.last_directory = Some(directory.path().to_owned());
+        app.new_shell(Agent::Cmd, &ctx);
+        app.new_shell(Agent::Cmd, &ctx);
+        let target = app.sessions[0].spec.id.clone();
+        let pids: Vec<_> = app
+            .sessions
+            .iter()
+            .map(|s| s.backend.as_ref().unwrap().pty_id())
+            .collect();
+        assert_eq!(
+            app.sessions[0].spec.directory,
+            app.sessions[1].spec.directory
+        );
+        let mut git = ai_terminal::git::GitClient::new(ctx.clone());
+        git.patch = Some(ai_terminal::git::PatchResult {
+            source: ai_terminal::git::PatchSource::WorkingTree,
+            path: "fixture.txt".into(),
+            data: None,
+            error: None,
+            loading: true,
+        });
+        app.git = Some(git);
+        app.sync_visibility();
+        let mut frame = |events| {
+            let _ = ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1200.0, 700.0),
+                    )),
+                    events,
+                    ..Default::default()
+                },
+                |ui| {
+                    app.sidebar(ui);
+                    app.terminal(ui);
+                },
+            );
+        };
+        frame(vec![]);
+        let pos = ctx
+            .read_response(egui::Id::new(("session-row", target.as_str())))
+            .unwrap()
+            .rect
+            .center();
+        for pressed in [true, false] {
+            frame(vec![
+                egui::Event::PointerMoved(pos),
+                egui::Event::PointerButton {
+                    pos,
+                    button: egui::PointerButton::Primary,
+                    pressed,
+                    modifiers: egui::Modifiers::NONE,
+                },
+            ]);
+        }
+        assert_eq!(app.active.as_deref(), Some(target.as_str()));
+        assert!(app.git.as_ref().unwrap().patch.is_none());
+        assert!(app.terminal_rect.is_some());
+        assert!(
+            app.sessions
+                .iter()
+                .zip(pids)
+                .all(|(s, pid)| s.backend.as_ref().unwrap().pty_id() == pid)
         );
     }
 

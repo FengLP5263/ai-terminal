@@ -21,7 +21,28 @@ const CASES: &[(&str, f32, f32)] = &[
     ("cli.md", 1120.0, 1.0),
     ("cli.md", 560.0, 1.0),
     ("settings-context.md", 900.0, 1.0),
+    ("emoji-and-math.md", 940.0, 1.0),
+    ("emoji-and-math.md", 940.0, 1.0),
+    ("emoji-and-math.md", 700.0, 1.33),
 ];
+const SOURCE_CASE: usize = CASES.len() - 2;
+const EMOJI_AND_MATH: &str = r"# Markdown 对照 🧠
+
+> 引用 📋，以及 **加粗 🚀** 和 `行内代码 🛠️`。
+
+- 段落中的颜色 🔥 ⚡ 📝，组合 emoji 👩🏽‍💻 🇨🇳。
+- [链接 🤝](#markdown-对照) 与显式文本变体 ♥︎。
+
+| 场景 | 示例 |
+| --- | --- |
+| 表格 | 中文 📋 和组合 👩🏽‍💻 |
+
+行内公式 $E = mc^2$ 与 $\frac{a}{b}$。
+
+$$
+\sum_{i=1}^{n} i = \frac{n(n+1)}{2}
+$$
+";
 struct Probe {
     renderer: egui_term::TextRendererSession,
     root: PathBuf,
@@ -88,6 +109,12 @@ impl eframe::App for Probe {
         let (name, width, zoom) = CASES[self.stage];
         if self.frames == 0 {
             self.view.clear(ui.ctx());
+            self.view.prepare(
+                ui.ctx(),
+                std::path::Path::new(name),
+                &self.documents[self.stage],
+            );
+            self.view.set_source(self.stage == SOURCE_CASE);
             ui.ctx().set_zoom_factor(zoom);
             ui.ctx().send_viewport_cmd(egui::ViewportCommand::InnerSize(
                 egui::vec2(width, 880.0) / zoom,
@@ -131,6 +158,7 @@ fn main() -> eframe::Result {
         std::fs::copy(source.join(name), root.join(name)).unwrap();
     }
     std::fs::copy(source.join("docs/cli.md"), root.join("cli.md")).unwrap();
+    std::fs::write(root.join("emoji-and-math.md"), EMOJI_AND_MATH).unwrap();
     std::fs::copy(source.join("README.md"), root.join("settings-context.md")).unwrap();
     let readme = std::fs::read_to_string(source.join("README.md")).unwrap();
     let section = |heading: &str| {

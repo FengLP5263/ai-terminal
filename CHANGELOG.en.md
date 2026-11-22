@@ -4,6 +4,19 @@
 
 Record user-visible additions, improvements, fixes, and compatibility changes for each release; omit categories that do not apply. Review both languages together, use the same version entry in GitHub Releases, and ship both files in the ZIP. Historical summaries follow existing GitHub release notes and UTC publication dates; development versions without a separate release do not receive invented release dates.
 
+## [0.15.2] - 2026-11-22
+
+### Fixed
+
+- Render plain triangles in Claude's mode bar as text rather than emoji, preserving the terminal's yellow foreground and normal text scale.
+- Close the previous session's file or Git diff preview when switching sessions, so the current terminal is visible even when both sessions use the same directory.
+- Use the same native color emoji as the source view in Markdown prose, headings, quotes, links, and tables.
+- Keep the current file page and reading position when returning to AI Terminal. Show source with an explanation when Markdown content exceeds the rendering limits.
+
+### Improved
+
+- Skip workspace snapshots and revision calculation for CLI operations that do not use a workspace revision, such as reading settings or scrolling the terminal.
+
 ## [0.15.1] - 2026-11-19
 
 ### Fixed

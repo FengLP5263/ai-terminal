@@ -3,6 +3,8 @@ use super::*;
 use pulldown_cmark::{Alignment, Event, Options, Parser, Tag, TagEnd};
 use std::{cell::RefCell, rc::Rc};
 
+mod emoji;
+
 pub(super) fn show(
     ui: &mut egui::Ui,
     cache: &mut CommonMarkCache,
@@ -25,10 +27,12 @@ pub(super) fn show(
             0,
         )
     };
-    CommonMarkViewer::new()
-        .explicit_image_uri_scheme(true)
-        .render_html_fn(Some(&html))
-        .show(ui, cache, &md.text);
+    emoji::paint_labels(ui, md.has_emoji, |ui| {
+        CommonMarkViewer::new()
+            .explicit_image_uri_scheme(true)
+            .render_html_fn(Some(&html))
+            .show(ui, cache, &md.text);
+    });
     let mut result = clicked.borrow_mut().drain(..).collect::<Vec<_>>();
     result.extend(
         md.links

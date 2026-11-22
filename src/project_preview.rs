@@ -55,6 +55,7 @@ impl egui::load::ImageLoader for PreparedImages {
 pub struct View {
     identity: Option<(std::path::PathBuf, usize)>,
     document: Option<Arc<Document>>,
+    reading_view: u64,
     source: bool,
     zoom: Option<f32>,
     texture: Option<TextureHandle>,
@@ -116,6 +117,16 @@ impl View {
             return;
         }
         let same_file = self.identity.as_ref().is_some_and(|(p, _)| p == path);
+        // Worker results can replace the document while the user is still reading
+        // the same page. Reserve a new scroll position for actual navigation.
+        if !same_file
+            || self
+                .document
+                .as_ref()
+                .is_none_or(|previous| previous.page.cursor.offset != data.page.cursor.offset)
+        {
+            self.reading_view = self.reading_view.wrapping_add(1);
+        }
         self.clear(ctx);
         self.identity = Some(key);
         self.document = Some(data.clone());
@@ -175,12 +186,18 @@ impl View {
         }
         let locale = i18n::locale(ui.ctx());
         let paged = data.page.next.is_some() || data.page.cursor.offset > 0;
+        let is_markdown = project_media::markdown_path(path);
+        let preview_available = data.markdown.is_some();
         let mut previous = false;
         let mut next = false;
         ui.horizontal_wrapped(|ui| {
-            if project_media::markdown_path(path) {
+            if is_markdown && preview_available {
                 ui.selectable_value(&mut self.source, false, locale.text("预览", "Preview"));
                 ui.selectable_value(&mut self.source, true, locale.text("源码", "Source"));
+                ui.add_space(8.0);
+            } else if is_markdown {
+                // The file is already being shown as source, with no alternate view.
+                ui.label(locale.text("源码", "Source"));
                 ui.add_space(8.0);
             }
             if let Some(image) = &data.image {
@@ -269,13 +286,13 @@ impl View {
                 ));
             }
             self.show_image(ui, image);
-        } else if !self.source && data.markdown.is_some() {
+        } else if preview_available && !self.source {
             self.show_markdown(ui, path);
         } else {
-            if project_media::markdown_path(path) && !self.source {
+            if is_markdown && !preview_available {
                 ui.weak(locale.text(
-                    "此段 Markdown 结构较复杂，已切换为源码显示。",
-                    "This Markdown section is too complex; showing source.",
+                    "这段内容超出 Markdown 预览上限。",
+                    "This content exceeds the Markdown preview limits.",
                 ));
             }
             if data.content.lines.is_empty() {
@@ -284,7 +301,7 @@ impl View {
             crate::git_ui::diff::body(
                 ui,
                 &data.content,
-                ("project-document", &self.identity),
+                ("project-document", self.reading_view),
                 true,
             );
         }
@@ -337,7 +354,7 @@ impl View {
         });
         let size = original * scale;
         egui::ScrollArea::both()
-            .id_salt(("project-image", &self.identity))
+            .id_salt(("project-image", self.reading_view))
             .auto_shrink([false, false])
             .show_viewport(ui, |ui, viewport| {
                 let (canvas, _) =
@@ -362,7 +379,7 @@ impl View {
         let target = self.pending_anchor.take();
         let mut links = vec![];
         egui::ScrollArea::vertical()
-            .id_salt(("project-markdown", &self.identity))
+            .id_salt(("project-markdown", self.reading_view))
             .auto_shrink([false, false])
             .show(ui, |ui| {
                 let available = ui.available_width();

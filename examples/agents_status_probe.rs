@@ -262,7 +262,7 @@ fn main() -> eframe::Result {
             let mut plan = launch::build(&spec, &bridge, &output.join("runtime"), &helper)
                 .map_err(std::io::Error::other)?;
             if badges {
-                let script = "[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false); $e=[char]27; $lines=@('EQUAL_MODE_BADGES','','⏵⏵ auto mode on','▶▶ auto mode on','⏸ manual mode on','⏵ ⏵ isolated badges','▶︎▶︎ text presentation','你好 ✨ 👩‍💻'); [Console]::Write($e.ToString()+'[2J'+$e+'[H'+[string]::Join([Environment]::NewLine,$lines)); [Console]::WriteLine(''); Start-Sleep -Seconds 40";
+                let script = "[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false); $e=[char]27; $lines=@('EQUAL_MODE_BADGES','',($e+'[38;2;255;193;7m⏵⏵ auto mode on'+$e+'[0m'),'▶▶ auto mode on','⏸ manual mode on','⏵ ⏵ isolated badges','▶︎▶︎ text presentation','你好 ✨ 👩‍💻','',('❯ '+$e+'[38;2;100;100;100mTry '+[char]34+'edit <filepath> to…'+[char]34+$e+'[0m')); [Console]::Write($e.ToString()+'[2J'+$e+'[H'+[string]::Join([Environment]::NewLine,$lines)); [Console]::WriteLine(''); Start-Sleep -Seconds 40";
                 plan.executable = PathBuf::from(std::env::var_os("SystemRoot").unwrap())
                     .join("System32/WindowsPowerShell/v1.0/powershell.exe")
                     .to_string_lossy()
