@@ -2,6 +2,8 @@
 
 [简体中文](data-and-assets.md) | English
 
+Unreleased: Preview bookmarks live only in session memory. They contain the path, bounded page cursors, viewer controls, and media position and volume. Hidden previews release content, decoders, and textures. Exiting drops the bookmarks without changing the saved session format.
+
 0.12.0-preview.5: remove the new-file count cache, read/reuse metrics and direct memchr dependency. Git snapshots retain query results and filter-omission counts. File paste holds paths briefly in memory without persisting bodies, attachment copies or clipboard data; no user settings or font assets are added.
 
 0.12.0 preview adds no persisted fields or user assets. Cargo.lock pins image 0.25.10, pulldown-cmark 0.13.6 and egui_commonmark 0.24.0, and enables native text for existing resvg 0.45.1. Licenses follow the existing dependency inventory workflow. Encoded images are capped at 32 MiB; raster originals at 32 million pixels/16,384 per edge; decode allocation at 256 MiB, and main previews at 4,096 per edge. SVG is capped at 4 MiB/10,000 tags with external resource resolvers disabled. Markdown retains at most 16 local illustrations, each downsampled to 2,048 per edge and totaling 16 million pixels. Bodies, cursors and textures remain in memory and are released on close/switch; no file copies or remote image downloads. SVG text reuses embedded JetBrains Mono and system fonts from Windows Fonts without installing fonts or altering asset bytes.

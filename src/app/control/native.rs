@@ -427,14 +427,14 @@ impl App {
                 if path.as_os_str().is_empty() {
                     return Err(invalid("Specify a file path"));
                 }
-                self.project_view.release_document(ctx);
-                self.project_files.open_file(&path);
-                if let Some(git) = &mut self.git {
-                    git.close_patch();
-                }
-                self.sync_visibility();
+                self.open_project_file(&path, ctx);
                 ctx.request_repaint();
-                Ok(json!({ "path":path,"loading":true } ))
+                let loading = self
+                    .project_files
+                    .file
+                    .as_ref()
+                    .is_some_and(|file| file.loading);
+                Ok(json!({ "path":path,"loading":loading } ))
             }
             Action::FileClose => {
                 self.project_view.release_document(ctx);
@@ -515,6 +515,16 @@ impl App {
                         .preview_mut()
                         .media_player(ctx, media)
                         .map_err(|e| ApiError::new("playback_failed", e))?;
+                    if !player.ready_after_restore() {
+                        return if *operation == MediaOperation::Status {
+                            Ok(json!({"loading":true}))
+                        } else {
+                            Err(ApiError::new(
+                                "not_ready",
+                                "Restoring media playback position",
+                            ))
+                        };
+                    }
                     let result = match operation {
                         MediaOperation::Status => Ok(()),
                         MediaOperation::Play => player.play(),

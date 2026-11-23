@@ -29,6 +29,7 @@ struct Session {
     terminal_id: u64,
     spec: SessionSpec,
     project_panel: model::ProjectPanel,
+    file_preview: Option<SessionFilePreview>,
     status: Status,
     backend: Option<TerminalBackend>,
     job: Option<crate::platform::ProcessJob>,
@@ -42,6 +43,11 @@ struct Session {
     agent_process: Option<crate::platform::ProcessWatch>,
     shells: Vec<ShellFrame>,
 }
+struct SessionFilePreview {
+    file: ai_terminal::project_files::FileBookmark,
+    view: Option<ai_terminal::project_preview::ViewBookmark>,
+}
+
 struct ShellFrame {
     agent: Agent,
     invocation: String,
@@ -53,6 +59,7 @@ impl Session {
             terminal_id: 0,
             spec,
             project_panel: Default::default(),
+            file_preview: None,
             status: Status::default(),
             backend: None,
             job: None,
@@ -710,37 +717,78 @@ impl App {
     }
     fn clear_project_preview(&mut self, ctx: &egui::Context) {
         self.project_view.release_document(ctx);
-        self.project_files.close_file();
+        self.project_files.set_root(None);
         if let Some(git) = &mut self.git {
             git.close_patch();
         }
     }
+    fn open_project_file(&mut self, path: &std::path::Path, ctx: &egui::Context) {
+        if self
+            .project_files
+            .file
+            .as_ref()
+            .is_none_or(|file| file.path != path)
+        {
+            self.project_view.release_document(ctx);
+            self.project_files.open_file(path);
+        }
+        if let Some(git) = &mut self.git {
+            git.close_patch();
+        }
+        self.sync_visibility();
+    }
+
     fn activate(&mut self, id: String, ctx: &egui::Context) {
+        let Some(index) = self.sessions.iter().position(|s| s.spec.id == id) else {
+            return;
+        };
         if self.active.as_deref() != Some(&id) {
+            let bookmark = self.project_files.take_bookmark().map(|file| {
+                let view = self
+                    .project_view
+                    .preview_mut()
+                    .take_bookmark(ctx, &file.path);
+                SessionFilePreview { file, view }
+            });
             if let Some(previous) = self
                 .sessions
                 .iter_mut()
                 .find(|s| Some(&s.spec.id) == self.active.as_ref())
             {
                 previous.project_panel = model::ProjectPanel::from_settings(self.preferences);
+                previous.file_preview = bookmark;
             }
-            self.sessions
-                .iter()
-                .find(|s| s.spec.id == id)
-                .map(|s| s.project_panel)
-                .unwrap_or_default()
-                .apply(&mut self.preferences);
             self.clear_project_preview(ctx);
+            let session = &mut self.sessions[index];
+            session.project_panel.apply(&mut self.preferences);
+            let directory = &session.spec.directory;
+            let bookmark = session
+                .file_preview
+                .take()
+                .filter(|preview| directory.starts_with(&preview.file.root));
+            let root = bookmark
+                .as_ref()
+                .map_or(directory, |preview| &preview.file.root);
+            self.project_files.set_root(Some(root));
+            if let Some(git) = &mut self.git
+                && git.set_directory(Some(directory))
+            {
+                self.git_view.reset();
+            }
+            self.project_session = Some(id.clone());
+            if let Some(SessionFilePreview { file, view }) = bookmark {
+                self.project_files.restore_bookmark(file);
+                if let Some(view) = view {
+                    self.project_view.preview_mut().restore_bookmark(view);
+                }
+            }
         }
         self.terminal_focus_pending = true;
-        self.active = Some(id.clone());
-        if let Some(session) = self.sessions.iter_mut().find(|s| s.spec.id == id) {
-            session.status.acknowledge();
-            self.last_directory = Some(session.spec.directory.clone());
-        }
-        if let Some(index) = self.sessions.iter().position(|s| s.spec.id == id) {
-            self.start_session(index, ctx);
-        }
+        self.active = Some(id);
+        let session = &mut self.sessions[index];
+        session.status.acknowledge();
+        self.last_directory = Some(session.spec.directory.clone());
+        self.start_session(index, ctx);
         self.sync_visibility();
         // Selection is persisted on exit; switching terminals never writes to disk.
     }
@@ -874,6 +922,9 @@ impl App {
             })
             .or_else(|| active_directory.map(std::path::Path::to_owned));
         let root_changed = self.project_files.set_root(project_root.as_deref());
+        if root_changed || session_changed {
+            self.project_view.release_document(ctx);
+        }
         self.project_files.poll();
         if focused && !self.git_focused && !root_changed {
             self.project_files
@@ -1833,11 +1884,7 @@ impl eframe::App for App {
             &mut self.preferences.project_files_open,
         );
         if let Some(path) = actions.file {
-            self.project_files.open_file(&path);
-            if let Some(git) = &mut self.git {
-                git.close_patch();
-            }
-            self.sync_visibility();
+            self.open_project_file(&path, &ctx);
         }
         let git_actions = actions.git;
         if git_actions.refresh
@@ -1859,6 +1906,7 @@ impl eframe::App for App {
             && let Some(git) = &mut self.git
         {
             git.open_file(source, &path);
+            self.project_view.release_document(&ctx);
             self.project_files.close_file();
             self.sync_visibility();
         }

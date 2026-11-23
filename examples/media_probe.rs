@@ -60,8 +60,16 @@ fn main() -> eframe::Result {
     }
     impl eframe::App for Probe {
         fn raw_input_hook(&mut self, _: &egui::Context, input: &mut egui::RawInput) {
+            input.focused = true;
+            input.events.retain(|event| {
+                !matches!(
+                    event,
+                    egui::Event::PointerMoved(_)
+                        | egui::Event::PointerButton { .. }
+                        | egui::Event::PointerGone
+                )
+            });
             if let Some(events) = self.input.pop_front() {
-                input.focused = true;
                 input.events.extend(events);
             }
         }
@@ -119,6 +127,7 @@ fn main() -> eframe::Result {
                     self.changed = Instant::now();
                     self.stage = 1;
                 }
+                let video_center = ui.available_rect_before_wrap().center();
                 if let Some(player) = &mut self.player {
                     player.show(ui);
                 }
@@ -144,7 +153,10 @@ fn main() -> eframe::Result {
                     }
                 } else {
                     match self.stage {
-                        1 if player.duration().is_finite() && player.duration() > 1.0 => {
+                        1 if elapsed > Duration::from_millis(200)
+                            && player.duration().is_finite()
+                            && player.duration() > 1.0 =>
+                        {
                             self.check("does-not-autoplay", player.paused());
                             let player = self.player.as_ref().unwrap();
                             player.volume(0.0).unwrap(); // Tests remain silent.
@@ -152,10 +164,45 @@ fn main() -> eframe::Result {
                             self.stage = 2;
                             self.changed = Instant::now();
                         }
-                        2 if elapsed > Duration::from_millis(900) => {
+                        2 if self.case == 1 && !player.paused() => {
+                            self.input.push_back(vec![egui::Event::PointerGone]);
+                            self.stage = 14;
+                            self.changed = Instant::now();
+                        }
+                        14 if elapsed > Duration::from_millis(2600) => {
+                            let visible = ctx
+                                .read_response(egui::Id::new("media-play-toggle"))
+                                .is_some();
+                            self.check("video-controls-remain-visible-during-fade", visible);
+                            self.stage = 15;
+                        }
+                        15 if elapsed > Duration::from_millis(2960) => {
+                            let moving = player.position() > 0.2 && !player.paused();
+                            self.check("position-advances", moving);
+                            let hidden = ctx
+                                .read_response(egui::Id::new("media-play-toggle"))
+                                .is_none();
+                            self.check("video-controls-hide-during-idle-playback", hidden);
+                            self.input
+                                .push_back(vec![egui::Event::PointerMoved(video_center)]);
+                            self.stage = 13;
+                            self.changed = Instant::now();
+                        }
+                        2 if self.case == 0 && elapsed > Duration::from_millis(900) => {
                             let moving = player.position() > 0.2 && !player.paused();
                             self.check("position-advances", moving);
                             self.click(&ctx, "media-play-toggle");
+                            self.stage = 10;
+                            self.changed = Instant::now();
+                        }
+                        13 if elapsed > Duration::from_millis(160) => {
+                            let visible = ctx
+                                .read_response(egui::Id::new("media-play-toggle"))
+                                .is_some();
+                            self.check("video-controls-return-on-pointer-move", visible);
+                            if visible {
+                                self.click(&ctx, "media-play-toggle");
+                            }
                             self.stage = 10;
                             self.changed = Instant::now();
                         }
