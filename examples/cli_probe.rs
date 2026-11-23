@@ -274,6 +274,12 @@ fn native_driver(output: &Path, leader: &str) -> Value {
     let read = ok(output, &["file", "read", "--limit", "1"]);
     assert_eq!(read["content"]["items"].as_array().unwrap().len(), 1);
     ok(output, &["file", "source"]);
+    ok(output, &["session", "activate", leader]);
+    assert_eq!(ok(output, &["file", "show"])["open"], false);
+    ok(output, &["session", "activate", io]);
+    let restored = until(output, &["file", "show"], |v| v["loading"] == false);
+    assert_eq!(restored["path"], "sample.md");
+    assert_eq!(restored["document"]["source"], true);
     ok(output, &["file", "preview"]);
     ok(output, &["file", "open", "--path", "large.txt"]);
     until(output, &["file", "show"], |v| {
@@ -282,6 +288,14 @@ fn native_driver(output: &Path, leader: &str) -> Value {
     ok(output, &["file", "next"]);
     let next = until(output, &["file", "show"], |v| v["loading"] == false);
     assert!(next["document"]["page_offset"].as_u64().unwrap() > 0);
+    ok(output, &["session", "activate", leader]);
+    ok(output, &["session", "activate", io]);
+    let restored = until(output, &["file", "show"], |v| v["loading"] == false);
+    assert_eq!(
+        restored["document"]["page_offset"],
+        next["document"]["page_offset"]
+    );
+    assert_eq!(restored["document"]["has_previous_page"], true);
     ok(output, &["file", "previous"]);
     ok(output, &["file", "open", "--path", "image.png"]);
     until(output, &["file", "show"], |v| v["loading"] == false);
@@ -299,6 +313,21 @@ fn native_driver(output: &Path, leader: &str) -> Value {
     });
     ok(output, &["media", "pause"]);
     ok(output, &["media", "seek", "--seconds", "1.5"]);
+    until(output, &["media", "status"], |v| {
+        v["position_seconds"]
+            .as_f64()
+            .is_some_and(|s| (s - 1.5).abs() <= 0.15)
+    });
+    ok(output, &["session", "activate", leader]);
+    assert_eq!(ok(output, &["file", "show"])["open"], false);
+    ok(output, &["session", "activate", io]);
+    let restored = until(output, &["media", "status"], |v| {
+        v["position_seconds"]
+            .as_f64()
+            .is_some_and(|s| (s - 1.5).abs() <= 0.15)
+    });
+    assert_eq!(restored["paused"], true);
+    assert_eq!(restored["volume_percent"], 0.0);
     ok(output, &["file", "close"]);
     until(output, &["git", "status"], |v| {
         v["loading"] == false && v["status"]["total_files"].as_u64().is_some_and(|n| n > 0)

@@ -10,6 +10,8 @@
 
 0.12.0 preview: file requests carry a cancellation generation, byte offset, real line number and file length/modification stamp. Text pages are bounded to 2 MiB/20,000 rows with continued long-line segments. Markdown is bounded to 256 KiB/2,000 rows, 16,000 events and 32 nesting levels, falling back to source on complexity. Previous-page history retains at most 64 cursors; reload returns to the beginning. Decoding and syntax preparation run in the worker; UI neither holds terminal grid locks nor reads disk/waits for the worker. Markdown links are intercepted and classified: local targets use the same containment/link checks; HTTP(S)/mailto reach the system only on a click. Remote images and SVG external resources are not loaded.
 
+Switching sessions retains the file path, page cursors, viewer controls, and playback position in the owning session. The same worker revalidates the project path and reloads the saved page on return. Cancellation generations isolate old requests. Only the foreground preview owns its player and textures. Restoration applies position and volume after media metadata loads, with playback paused.
+
 ## Supported environment
 
 Verified on Windows x64 with Rust 1.99.1 MSVC, Visual Studio C++ Build Tools and Windows SDK. `Cargo.toml` declares minimum Rust 1.92; packages record the actual compiler and do not claim bit-for-bit reproducibility. Python 3.11+ supports governance and packaging. POSIX entry points do not imply native macOS/Linux GUI support.

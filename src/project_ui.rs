@@ -560,7 +560,7 @@ impl FileView {
             self.preview.clear(ui.ctx());
             return false;
         };
-        if state.data.is_none() {
+        if state.data.is_none() && !state.loading {
             self.preview.clear(ui.ctx());
         }
         let root = client.root.clone();

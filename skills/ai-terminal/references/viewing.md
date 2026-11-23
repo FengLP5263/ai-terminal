@@ -38,7 +38,7 @@ ai-terminal-cli media pause
 ai-terminal-cli media seek --seconds 1.5
 ```
 
-先打开相应图片或音视频文件。图片缩放 5–800%；媒体默认暂停，duration_seconds 尚为 null 时等待就绪。volume 为 0–100，seek 不能越过时长。媒体来自已验证的本地文件，复用 Windows 原生播放器；不接入远程 URL、播放列表或浏览器，解码器缺失明确报错。关闭文件／切换会话会释放播放资源。
+先打开相应图片或音视频文件。图片缩放 5–800%；媒体默认暂停，duration_seconds 尚为 null 时等待就绪。volume 为 0–100，seek 不能越过时长。媒体来自已验证的本地文件，复用 Windows 原生播放器；不接入远程 URL、播放列表或浏览器，解码器缺失明确报错。关闭文件或切换会话会释放播放资源。支持会话预览恢复的版本在切回时从保存的进度暂停，恢复期间 `media status` 可返回 `loading=true`。
 
 ```powershell
 ai-terminal-cli git status
