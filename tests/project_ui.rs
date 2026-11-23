@@ -411,7 +411,7 @@ fn markdown_prose_headings_and_tables_use_native_color_emoji() {
 }
 
 #[test]
-fn refreshing_a_markdown_page_keeps_its_reading_position() {
+fn refreshing_and_reopening_a_markdown_page_keep_its_reading_position() {
     let mut f = Fixture::new();
     f.files_open = false;
     let path = Path::new("README.md");
@@ -460,6 +460,16 @@ fn refreshing_a_markdown_page_keeps_its_reading_position() {
         (before.top() - after.top()).abs() < 8.0,
         "{before:?} -> {after:?}"
     );
+
+    let file = f.client.take_bookmark().unwrap();
+    let view = f.view.preview_mut().take_bookmark(&f.ctx, path).unwrap();
+    f.client.restore_bookmark(file);
+    f.view.preview_mut().restore_bookmark(view);
+    f.frame(vec![], 900.0);
+    wait(&mut f.client, loaded);
+    let reopened = f.frame(vec![], 900.0);
+    let restored = text_rect(&reopened, &marker).expect("reading position survived reopening");
+    assert!((after.top() - restored.top()).abs() < 8.0);
 }
 
 #[test]

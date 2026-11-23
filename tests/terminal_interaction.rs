@@ -774,7 +774,7 @@ fn scrollbar_keeps_columns_when_history_appears_and_stays_bounded() {
     let ctx = egui::Context::default();
     let mut backend = terminal(
         &ctx,
-        "Start-Sleep -Milliseconds 700; 1..5400 | ForEach-Object {Write-Output ('BOUNDED_LINE_'+$_)}; Write-Output 'HISTORY_READY'; Start-Sleep -Seconds 20",
+        "Start-Sleep -Milliseconds 700; $lines = 1..5400 | ForEach-Object { 'BOUNDED_LINE_'+$_ }; [Console]::WriteLine([string]::Join(\"`r`n\", $lines)); [Console]::WriteLine('HISTORY_READY'); Start-Sleep -Seconds 20",
     );
     frame(&ctx, &mut backend, vec![], false);
     let initial: egui_term::WindowSize = backend.sync().terminal_size.into();

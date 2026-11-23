@@ -26,6 +26,13 @@ pub fn source_path(path: &Path) -> Result<String, String> {
 
 #[cfg(windows)]
 pub use native::Player;
+#[cfg(windows)]
+#[derive(Clone, Copy)]
+pub struct PlaybackPosition {
+    seconds: f64,
+    volume: f64,
+    unmuted_volume: f64,
+}
 #[cfg(not(windows))]
 pub struct Player;
 #[cfg(not(windows))]
@@ -210,7 +217,9 @@ mod native {
         kind: MediaKind,
         error: Option<String>,
         seek_preview: Option<f64>,
+        video_overlay: controls::VideoOverlay,
         unmuted_volume: f64,
+        restore: Option<PlaybackPosition>,
     }
     impl Player {
         pub fn new(ctx: &egui::Context, media: &Playable) -> Result<Self, String> {
@@ -255,7 +264,9 @@ mod native {
                 kind: media.kind,
                 error: None,
                 seek_preview: None,
+                video_overlay: Default::default(),
                 unmuted_volume: 1.0,
+                restore: None,
             };
             unsafe {
                 player.engine.SetAutoPlay(false)?;
@@ -290,6 +301,43 @@ mod native {
         pub fn current_volume(&self) -> f64 {
             unsafe { self.engine.GetVolume() }
         }
+        pub fn playback_position(&self) -> PlaybackPosition {
+            self.restore.unwrap_or_else(|| PlaybackPosition {
+                seconds: self.position(),
+                volume: self.current_volume(),
+                unmuted_volume: self.unmuted_volume,
+            })
+        }
+        pub fn restore_position(&mut self, position: PlaybackPosition) {
+            self.restore = Some(position);
+        }
+        /// The decoder loads metadata asynchronously. Both the UI and the CLI may
+        /// be the first to access this player when the preview is restored.
+        pub fn ready_after_restore(&mut self) -> bool {
+            let Some(position) = self.restore else {
+                return true;
+            };
+            if self.failed() {
+                self.restore = None;
+                return true;
+            }
+            let duration = self.duration();
+            if !duration.is_finite() {
+                return false;
+            }
+            self.restore = None;
+            self.unmuted_volume = position.unmuted_volume;
+            let result = self.volume(position.volume).and_then(|()| {
+                if position.seconds.is_finite() && position.seconds > 0.0 {
+                    self.seek(position.seconds.min(duration))?;
+                }
+                Ok(())
+            });
+            if let Err(error) = result {
+                self.error = Some(error.to_string());
+            }
+            true
+        }
         pub fn play(&self) -> windows::core::Result<()> {
             unsafe { self.engine.Play() }
         }
@@ -303,7 +351,7 @@ mod native {
             unsafe { self.engine.SetVolume(volume.clamp(0.0, 1.0)) }
         }
         pub fn failed(&self) -> bool {
-            self.events.error.load(Ordering::Acquire) != 0
+            self.error.is_some() || self.events.error.load(Ordering::Acquire) != 0
         }
         pub fn has_frame(&self) -> bool {
             self.texture.is_some()
@@ -401,6 +449,7 @@ mod native {
                     volume: self.current_volume(),
                 },
                 &mut self.seek_preview,
+                self.kind,
             );
             let action = (|| -> windows::core::Result<()> {
                 if actions.toggle_play {
@@ -437,7 +486,11 @@ mod native {
         }
         pub fn show(&mut self, ui: &mut egui::Ui) {
             let locale = crate::i18n::locale(ui.ctx());
-            if self.failed() || self.error.is_some() {
+            if !self.ready_after_restore() {
+                ui.weak(locale.text("正在恢复播放位置…", "Restoring playback position…"));
+                return;
+            }
+            if self.failed() {
                 let available = ui.available_rect_before_wrap();
                 let rect = egui::Rect::from_center_size(
                     available.center(),
@@ -467,16 +520,21 @@ mod native {
                     let (canvas, _) = ui.allocate_exact_size(
                         egui::vec2(
                             viewport.width().max(212.0),
-                            viewport
-                                .height()
-                                .max(control_height + if audio { 32.0 } else { 80.0 }),
+                            viewport.height().max(if audio {
+                                control_height + 32.0
+                            } else {
+                                220.0
+                            }),
                         ),
                         egui::Sense::hover(),
                     );
-                    let controls = if audio {
-                        egui::Rect::from_center_size(
-                            canvas.center(),
-                            egui::vec2(width, control_height),
+                    let (controls, opacity) = if audio {
+                        (
+                            egui::Rect::from_center_size(
+                                canvas.center(),
+                                egui::vec2(width, control_height),
+                            ),
+                            1.0,
                         )
                     } else {
                         let original = if self.frame_size[0] > 0 && self.frame_size[1] > 0 {
@@ -484,19 +542,9 @@ mod native {
                         } else {
                             egui::vec2(16.0, 9.0)
                         };
-                        let scale = (width / original.x)
-                            .min((canvas.height() - control_height - 44.0) / original.y)
-                            .max(0.0);
-                        let picture_size = original * scale;
-                        let group = egui::Rect::from_center_size(
-                            canvas.center(),
-                            egui::vec2(width, picture_size.y + 12.0 + control_height),
-                        );
-                        let picture = egui::Rect::from_min_size(
-                            egui::pos2(group.center().x - picture_size.x / 2.0, group.top()),
-                            picture_size,
-                        );
-                        ui.painter().rect_filled(picture, 6.0, egui::Color32::BLACK);
+                        let (player, picture, controls) =
+                            controls::video_layout(canvas, width, original);
+                        ui.painter().rect_filled(player, 0.0, egui::Color32::BLACK);
                         if let Some(texture) = &self.texture {
                             ui.painter().image(
                                 texture.id(),
@@ -513,16 +561,30 @@ mod native {
                                 crate::chrome::SECONDARY,
                             );
                         }
-                        egui::Rect::from_min_size(
-                            egui::pos2(group.left(), picture.bottom() + 12.0),
-                            egui::vec2(width, control_height),
-                        )
+                        let paused = self.paused();
+                        let opacity = self.video_overlay.opacity(
+                            ui,
+                            player,
+                            controls,
+                            paused,
+                            self.seek_preview.is_some(),
+                        );
+                        if opacity == 0.0 {
+                            return;
+                        }
+                        if opacity < 1.0 {
+                            ui.ctx().request_repaint_after(Duration::from_millis(16));
+                        }
+                        (controls, opacity)
                     };
                     ui.scope_builder(
                         egui::UiBuilder::new()
                             .max_rect(controls)
                             .layout(egui::Layout::top_down(egui::Align::Min)),
-                        |ui| self.show_transport(ui),
+                        |ui| {
+                            ui.multiply_opacity(opacity);
+                            self.show_transport(ui);
+                        },
                     );
                 });
             if !self.paused() {

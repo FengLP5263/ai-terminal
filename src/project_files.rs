@@ -112,6 +112,13 @@ pub struct FileState {
     pub loading: bool,
 }
 
+pub struct FileBookmark {
+    pub root: PathBuf,
+    pub path: PathBuf,
+    cursor: Cursor,
+    history: Vec<Cursor>,
+}
+
 fn linked(metadata: &fs::Metadata) -> bool {
     #[cfg(windows)]
     {
@@ -540,6 +547,7 @@ pub struct FileClient {
     pub limit_reached: bool,
     shared: Arc<Shared>,
     next_directory: u64,
+    file_cursor: Cursor,
     page_history: Vec<Cursor>,
 }
 impl FileClient {
@@ -579,6 +587,7 @@ impl FileClient {
             revision: 0,
             limit_reached: false,
             next_directory: 0,
+            file_cursor: Cursor::default(),
             page_history: vec![],
             shared,
         }
@@ -640,16 +649,36 @@ impl FileClient {
         if self.root.is_none() || self.file.as_ref().is_some_and(|f| f.path == path) {
             return;
         }
-        let ticket = self.shared.ticket.fetch_add(1, Ordering::Relaxed) + 1;
+        self.page_history.clear();
+        self.open_page(path.to_owned(), Cursor::default());
+    }
+
+    fn open_page(&mut self, path: PathBuf, cursor: Cursor) {
         self.file = Some(FileState {
-            path: path.into(),
+            path,
             data: None,
             error: None,
             loading: true,
         });
-        self.page_history.clear();
-        self.request(path, Kind::File(ticket, Cursor::default()));
-        self.revision += 1;
+        self.request_page(cursor);
+    }
+
+    pub fn take_bookmark(&mut self) -> Option<FileBookmark> {
+        let bookmark = FileBookmark {
+            root: self.root.clone()?,
+            path: self.file.take()?.path,
+            cursor: self.file_cursor,
+            history: std::mem::take(&mut self.page_history),
+        };
+        self.close_file();
+        Some(bookmark)
+    }
+
+    pub fn restore_bookmark(&mut self, bookmark: FileBookmark) {
+        if self.root.as_ref() == Some(&bookmark.root) {
+            self.page_history = bookmark.history;
+            self.open_page(bookmark.path, bookmark.cursor);
+        }
     }
     pub fn close_file(&mut self) {
         self.page_history.clear();
@@ -670,7 +699,9 @@ impl FileClient {
             return;
         };
         if let Some(data) = &state.data {
-            self.request_page(data.page.cursor);
+            if data.media.is_none() {
+                self.request_page(data.page.cursor);
+            }
         } else {
             self.reload_file();
         }
@@ -712,6 +743,7 @@ impl FileClient {
         };
         state.loading = true;
         state.error = None;
+        self.file_cursor = cursor;
         let path = state.path.clone();
         let ticket = self.shared.ticket.fetch_add(1, Ordering::Relaxed) + 1;
         self.request(&path, Kind::File(ticket, cursor));

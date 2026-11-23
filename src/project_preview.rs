@@ -11,7 +11,7 @@ use egui_commonmark::{CommonMarkCache, CommonMarkViewer};
 mod markdown;
 use std::{
     collections::BTreeMap,
-    path::Path,
+    path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
 
@@ -53,8 +53,9 @@ impl egui::load::ImageLoader for PreparedImages {
 
 #[derive(Default)]
 pub struct View {
-    identity: Option<(std::path::PathBuf, usize)>,
     document: Option<Arc<Document>>,
+    reading_location: Option<(PathBuf, u64)>,
+    next_reading_view: u64,
     reading_view: u64,
     source: bool,
     zoom: Option<f32>,
@@ -68,6 +69,17 @@ pub struct View {
     pending_link: Option<std::path::PathBuf>,
     pending_anchor: Option<String>,
     player: Option<Result<crate::media_player::Player, String>>,
+    #[cfg(windows)]
+    media_position: Option<crate::media_player::PlaybackPosition>,
+}
+
+pub struct ViewBookmark {
+    location: (PathBuf, u64),
+    reading_view: u64,
+    source: bool,
+    zoom: Option<f32>,
+    #[cfg(windows)]
+    media_position: Option<crate::media_player::PlaybackPosition>,
 }
 impl View {
     /// Select the same prepared document as the native viewer, including while minimized.
@@ -83,19 +95,69 @@ impl View {
     pub fn controls(&self) -> (bool, Option<f32>) {
         (self.source, self.zoom)
     }
-    #[cfg(windows)]
     pub fn media_player(
         &mut self,
         ctx: &egui::Context,
         media: &crate::project_media::Playable,
     ) -> Result<&mut crate::media_player::Player, String> {
-        self.player
+        let player = self
+            .player
             .get_or_insert_with(|| crate::media_player::Player::new(ctx, media))
             .as_mut()
-            .map_err(|e| e.clone())
+            .map_err(|e| e.clone())?;
+        #[cfg(windows)]
+        if let Some(position) = self.media_position.take() {
+            player.restore_position(position);
+        }
+        Ok(player)
     }
+
+    pub fn take_bookmark(&mut self, ctx: &egui::Context, path: &Path) -> Option<ViewBookmark> {
+        let bookmark = self
+            .reading_location
+            .take()
+            .filter(|(current, _)| current == path)
+            .map(|location| ViewBookmark {
+                location,
+                reading_view: self.reading_view,
+                source: self.source,
+                zoom: self.zoom,
+                #[cfg(windows)]
+                media_position: self
+                    .player
+                    .as_ref()
+                    .and_then(|player| player.as_ref().ok())
+                    .map(crate::media_player::Player::playback_position)
+                    .or(self.media_position),
+            });
+        self.clear(ctx);
+        bookmark
+    }
+
+    pub fn restore_bookmark(&mut self, bookmark: ViewBookmark) {
+        self.reading_location = Some(bookmark.location);
+        self.reading_view = bookmark.reading_view;
+        self.source = bookmark.source;
+        self.zoom = bookmark.zoom;
+        #[cfg(windows)]
+        {
+            self.media_position = bookmark.media_position;
+        }
+    }
+
     pub fn clear(&mut self, ctx: &egui::Context) {
-        if self.identity.is_none() {
+        self.reading_location = None;
+        self.source = false;
+        self.zoom = None;
+        #[cfg(windows)]
+        {
+            self.media_position = None;
+        }
+        self.release_rendered(ctx);
+    }
+
+    fn release_rendered(&mut self, ctx: &egui::Context) {
+        if self.document.is_none() {
             return;
         }
         for uri in self.uris.drain(..) {
@@ -103,7 +165,6 @@ impl View {
         }
         self.images.0.lock().unwrap().clear();
         self.player = None;
-        self.identity = None;
         self.document = None;
         self.texture = None;
         self.markdown = CommonMarkCache::default();
@@ -112,27 +173,38 @@ impl View {
         self.pending_anchor = None;
     }
     fn select(&mut self, ctx: &egui::Context, path: &Path, data: &Arc<Document>) {
-        let key = (path.to_path_buf(), Arc::as_ptr(data) as usize);
-        if self.identity.as_ref() == Some(&key) {
+        if self
+            .document
+            .as_ref()
+            .is_some_and(|current| Arc::ptr_eq(current, data))
+        {
             return;
         }
-        let same_file = self.identity.as_ref().is_some_and(|(p, _)| p == path);
+        let same_file = self
+            .reading_location
+            .as_ref()
+            .is_some_and(|(current, _)| current == path);
         // Worker results can replace the document while the user is still reading
         // the same page. Reserve a new scroll position for actual navigation.
         if !same_file
             || self
-                .document
+                .reading_location
                 .as_ref()
-                .is_none_or(|previous| previous.page.cursor.offset != data.page.cursor.offset)
+                .is_none_or(|(_, offset)| *offset != data.page.cursor.offset)
         {
-            self.reading_view = self.reading_view.wrapping_add(1);
+            self.next_reading_view = self.next_reading_view.wrapping_add(1);
+            self.reading_view = self.next_reading_view;
         }
-        self.clear(ctx);
-        self.identity = Some(key);
+        self.release_rendered(ctx);
+        self.reading_location = Some((path.to_owned(), data.page.cursor.offset));
         self.document = Some(data.clone());
         if !same_file {
             self.source = false;
             self.zoom = None;
+            #[cfg(windows)]
+            {
+                self.media_position = None;
+            }
         }
         if !self.registered {
             ctx.add_image_loader(self.images.clone());
@@ -165,10 +237,7 @@ impl View {
     ) {
         self.select(ui.ctx(), path, data);
         if let Some(media) = &data.media {
-            match self
-                .player
-                .get_or_insert_with(|| crate::media_player::Player::new(ui.ctx(), media))
-            {
+            match self.media_player(ui.ctx(), media) {
                 Ok(player) => player.show(ui),
                 Err(error) => {
                     let locale = i18n::locale(ui.ctx());

@@ -38,7 +38,7 @@ ai-terminal-cli media pause
 ai-terminal-cli media seek --seconds 1.5
 ```
 
-Open the appropriate image/audio/video first. Image zoom is 5–800%. Media initially pauses; wait while duration_seconds is null. Volume is 0–100; seek cannot exceed duration. Playback uses verified local paths and the native Windows player, without remote URLs, playlists or a browser. Missing decoders fail explicitly. Closing the file or switching sessions releases playback resources.
+Open the appropriate image/audio/video first. Image zoom is 5–800%. Media initially pauses; wait while duration_seconds is null. Volume is 0–100; seek cannot exceed duration. Playback uses verified local paths and the native Windows player, without remote URLs, playlists or a browser. Missing decoders fail explicitly. Closing a file or switching sessions releases playback resources. Managers with session preview restoration return paused at the saved position. `media status` may report `loading=true` while restoring.
 
 ```powershell
 ai-terminal-cli git status
