@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "name": "ai-terminal",
-  "version": "0.15.0",
+  "version": "0.15.1",
   "minimum_cli_version": "0.14.0",
   "control_schema": 1,
   "source_repository": "https://github.com/FengLP5263/ai-terminal"

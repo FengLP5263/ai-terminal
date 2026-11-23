@@ -4,12 +4,17 @@
 
 Record user-visible additions, improvements, fixes, and compatibility changes for each release; omit categories that do not apply. Review both languages together, use the same version entry in GitHub Releases, and ship both files in the ZIP. Historical summaries follow existing GitHub release notes and UTC publication dates; development versions without a separate release do not receive invented release dates.
 
-## [Unreleased]
+## [0.15.3] - 2026-11-23
 
 ### Fixed
 
 - Restore the last open file, page, scroll position, and view mode when returning to a session. Audio and video return paused at the previous position with the same volume.
-- Use a slim seek bar and a soft gradient for video controls. Fade them out during idle playback and reveal them when the pointer moves over the picture.
+- Overlay playback controls at the bottom of the video. They fade out smoothly after about 2.5 seconds of idle playback and reappear when the pointer moves. They stay visible while paused or in use.
+
+### Compatibility
+
+- Existing sessions and settings need no migration. Each session keeps its file preview and playback position during the current app run.
+- Standalone Agent Skill 0.15.1 updates the media restoration guidance and still requires CLI 0.14.0 or later.
 
 ## [0.15.2] - 2026-11-22
 
