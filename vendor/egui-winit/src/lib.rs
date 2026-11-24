@@ -54,6 +54,20 @@ pub fn pixels_per_point(egui_ctx: &egui::Context, window: &Window) -> f32 {
     egui_zoom_factor * native_pixels_per_point
 }
 
+fn ime_area_in_pixels(ime: &egui::output::IMEOutput, pixels_per_point: f32) -> Rect {
+    // The Windows candidate form excludes this area and uses its origin as
+    // the caret. A full terminal rectangle pushes the list to an edge.
+    let area = if cfg!(target_os = "windows")
+        && ime.cursor_rect.is_finite()
+        && !ime.cursor_rect.is_negative()
+    {
+        ime.cursor_rect
+    } else {
+        ime.rect
+    };
+    pixels_per_point * area
+}
+
 // ----------------------------------------------------------------------------
 
 #[must_use]
@@ -695,10 +709,23 @@ impl State {
         // }
 
         match ime {
-            // [`winit::event::Ime::Enabled`] means different things in X11 and
-            // Wayland, but it doesn't matter to us.
-            // See <https://github.com/rust-windowing/winit/issues/2498>
-            winit::event::Ime::Enabled | winit::event::Ime::Disabled => {}
+            winit::event::Ime::Enabled => {
+                #[cfg(target_os = "windows")]
+                {
+                    // A new composition can reset the native candidate form.
+                    self.ime_rect_px = None;
+                }
+            }
+            winit::event::Ime::Disabled => {
+                // Windows can end composition without an empty preedit or a commit.
+                #[cfg(target_os = "windows")]
+                self.egui_input
+                    .events
+                    .push(egui::Event::Ime(egui::ImeEvent::Preedit {
+                        text: String::new(),
+                        active_range_chars: None,
+                    }));
+            }
             winit::event::Ime::Preedit(text, active_range_bytes) => {
                 let active_range_chars = match *active_range_bytes {
                     Some((start_bytes, end_bytes)) => {
@@ -1141,9 +1168,10 @@ impl State {
             }
 
             let pixels_per_point = pixels_per_point(&self.egui_ctx, window);
-            let ime_rect_px = pixels_per_point * ime.rect;
+            let ime_rect_px = ime_area_in_pixels(&ime, pixels_per_point);
             if self.ime_rect_px != Some(ime_rect_px)
-                || self.egui_ctx.input(|i| !i.events.is_empty())
+                || (cfg!(not(target_os = "windows"))
+                    && self.egui_ctx.input(|i| !i.events.is_empty()))
             {
                 self.ime_rect_px = Some(ime_rect_px);
                 profiling::scope!("set_ime_cursor_area");
@@ -2294,6 +2322,61 @@ mod paste_tests {
         );
         assert!(
             matches!(super::paste_request(Some("one\r\ntwo".into())), egui::Event::Paste(s) if s == "one\ntwo")
+        );
+    }
+}
+
+#[cfg(all(test, target_os = "windows"))]
+mod ime_tests {
+    use super::*;
+
+    struct NoDisplay;
+
+    impl HasDisplayHandle for NoDisplay {
+        fn display_handle(
+            &self,
+        ) -> Result<raw_window_handle::DisplayHandle<'_>, raw_window_handle::HandleError> {
+            Err(raw_window_handle::HandleError::Unavailable)
+        }
+    }
+
+    #[test]
+    fn candidate_area_uses_the_scaled_caret() {
+        let terminal = Rect::from_min_size(Pos2::new(80.0, 40.0), Vec2::new(700.0, 500.0));
+        let caret = Rect::from_min_size(Pos2::new(420.0, 480.0), Vec2::new(1.0, 20.0));
+        let mut ime = egui::output::IMEOutput {
+            rect: terminal,
+            cursor_rect: caret,
+            should_interrupt_composition: false,
+        };
+        assert_eq!(ime_area_in_pixels(&ime, 1.5), 1.5 * caret);
+        ime.cursor_rect = Rect::NOTHING;
+        assert_eq!(ime_area_in_pixels(&ime, 1.5), 1.5 * terminal);
+    }
+
+    #[test]
+    fn native_composition_end_dismisses_preedit_without_a_commit() {
+        let mut state = State::new(
+            egui::Context::default(),
+            ViewportId::ROOT,
+            &NoDisplay,
+            None,
+            None,
+            None,
+        );
+        state.ime_rect_px = Some(Rect::ZERO);
+        state.on_ime(&winit::event::Ime::Enabled);
+        assert!(state.ime_rect_px.is_none());
+
+        state.on_ime(&winit::event::Ime::Preedit("nihao".into(), None));
+        state.on_ime(&winit::event::Ime::Disabled);
+        let events = &state.egui_input.events;
+        assert_eq!(events.len(), 2);
+        assert!(
+            matches!(&events[0], egui::Event::Ime(egui::ImeEvent::Preedit { text, .. }) if text == "nihao")
+        );
+        assert!(
+            matches!(&events[1], egui::Event::Ime(egui::ImeEvent::Preedit { text, .. }) if text.is_empty())
         );
     }
 }

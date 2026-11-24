@@ -380,13 +380,17 @@ fn chinese_commit_and_enter_reach_real_conpty_once() {
     frame(
         &ctx,
         &mut backend,
-        vec![Event::Ime(ImeEvent::Commit("你好".into()))],
+        vec![
+            key(Key::Enter),
+            Event::Ime(ImeEvent::Commit("你好".into())),
+            Event::Text("d".into()),
+            key(Key::Enter),
+        ],
         false,
     );
-    frame(&ctx, &mut backend, vec![key(Key::Enter)], false);
     let text = wait_text(&mut backend, "INPUT_HEX:");
     assert!(
-        text.contains("INPUT_HEX:61-62-63-E4-BD-A0-E5-A5-BD"),
+        text.contains("INPUT_HEX:61-62-63-E4-BD-A0-E5-A5-BD-64"),
         "input was dropped or duplicated: {text}"
     );
 }
@@ -495,14 +499,16 @@ fn canceled_composition_does_not_block_editing_or_enter() {
     frame(
         &ctx,
         &mut backend,
-        vec![Event::Ime(ImeEvent::Preedit {
-            text: String::new(),
-            active_range_chars: None,
-        })],
+        vec![
+            Event::Ime(ImeEvent::Preedit {
+                text: String::new(),
+                active_range_chars: None,
+            }),
+            Event::Text("你好".into()),
+            key(Key::Enter),
+        ],
         false,
     );
-    frame(&ctx, &mut backend, vec![Event::Text("你好".into())], false);
-    frame(&ctx, &mut backend, vec![key(Key::Enter)], false);
     let text = wait_text(&mut backend, "EDIT_HEX:");
     assert!(
         text.contains("EDIT_HEX:61-62-63-E4-BD-A0-E5-A5-BD"),

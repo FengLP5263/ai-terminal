@@ -18,7 +18,7 @@ The current version is in `Cargo.toml`; the initial baseline was 0.1.2. Windows 
 | `src/bridge.rs`, `bin/ai-terminal-hook.rs` | Authenticated loopback metadata bridge and independent hook helper. |
 | `src/discovery.rs`, `launch.rs`, `shell.rs` | Public CLI/shell entry points, session-scoped integration, directory updates, Agent lifecycle metadata. |
 | `src/model.rs`, `platform.rs` | Atomic session metadata persistence; Windows Job Objects and manager memory observation. |
-| `vendor/egui_term`, `vendor/egui-winit` | Alacritty/ConPTY and native text/input rendering; pinned egui-winit 0.35.0 paste patch. |
+| `vendor/egui_term`, `vendor/egui-winit` | Alacritty/ConPTY and native text/input rendering; pinned egui-winit 0.35.0 with non-text paste and Windows IME positioning and dismissal fixes. |
 | `assets/fonts`, `assets/icons`, `assets/branding` | Pinned default JetBrains Mono and optional Cascadia Mono/Hack fonts, Agent icons, and the selected original B application icon. |
 | `examples/terminal_probe.rs`, `workspace_probe.rs` | Real TUI or local ANSI probes, controlled input, GPU screenshots and exit. |
 | `examples/bash_probe.rs` | Real Git Bash and isolated HOME: startup configuration, directory notifications, Agent entries and native screenshots; no model request. |
