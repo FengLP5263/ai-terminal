@@ -4,6 +4,14 @@
 
 Record user-visible additions, improvements, fixes, and compatibility changes for each release; omit categories that do not apply. Review both languages together, use the same version entry in GitHub Releases, and ship both files in the ZIP. Historical summaries follow existing GitHub release notes and UTC publication dates; development versions without a separate release do not receive invented release dates.
 
+## [Unreleased]
+
+## [0.15.4] - 2026-11-24
+
+### Fixed
+
+- Keep the Windows Chinese IME candidate list at the terminal cursor and resume typing immediately after canceling or committing composition.
+
 ## [0.15.3] - 2026-11-23
 
 ### Fixed

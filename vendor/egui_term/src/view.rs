@@ -276,11 +276,6 @@ impl<'a> TerminalView<'a> {
         self.backend.sync();
         let geometry = scrollbar::Geometry::new(bar_rect, self.backend.last_content());
         let mut pending_input = Vec::new();
-        let ime_composing = !state.preedit.is_empty()
-            || events
-                .iter()
-                .any(|event| matches!(event,
-                    egui::Event::Ime(egui::ImeEvent::Preedit { text, .. } | egui::ImeEvent::Commit(text)) if !text.is_empty()));
         for event in events {
             let (claimed, offset) = state.scrollbar.event(&event, bar_rect, geometry.as_ref());
             if claimed {
@@ -310,16 +305,20 @@ impl<'a> TerminalView<'a> {
             match event {
                 egui::Event::Ime(egui::ImeEvent::Commit(text)) => {
                     state.preedit.clear();
-                    input_actions.push(InputAction::BackendCall(BackendCommand::Write(
-                        text.into_bytes(),
-                    )));
+                    if !text.is_empty() {
+                        input_actions.push(InputAction::BackendCall(BackendCommand::Write(
+                            text.into_bytes(),
+                        )));
+                    }
                 }
                 egui::Event::Ime(egui::ImeEvent::Preedit { text, .. }) => {
                     state.preedit = text;
                 }
                 #[allow(deprecated)]
                 egui::Event::Ime(egui::ImeEvent::Disabled) => state.preedit.clear(),
-                egui::Event::Key { .. } | egui::Event::Text(_) if ime_composing => {}
+                // Keep candidate keys away from the PTY during preedit, but
+                // accept ordinary input after dismissal in the same event batch.
+                egui::Event::Key { .. } | egui::Event::Text(_) if !state.preedit.is_empty() => {}
                 egui::Event::Text(_)
                 | egui::Event::Key { .. }
                 | egui::Event::Copy

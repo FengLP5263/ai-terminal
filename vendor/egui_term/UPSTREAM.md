@@ -80,6 +80,10 @@ Managed Codex invocations: a bounded, session-scoped OSC 9 observer forwards onl
 
 输入法焦点恢复：窗口或终端失去焦点、显式恢复焦点时清理未提交的组合状态，避免失焦期间的取消事件被跳过后吞掉后续按键；普通重绘保留正在输入的候选。真实 ConPTY 回归覆盖失焦时取消、返回后输入与提交。
 
+IME input is handled in event order. The terminal consumes candidate keystrokes while preedit is active. After cancellation or commit, ordinary input continues through the same batch.
+
+终端按事件顺序处理输入法。组字期间拦截候选按键，取消或提交后同一批事件中的普通输入恢复发送。
+
 编码 CLI 的拖选：宿主可启用 set_drag_selection，在应用鼠标模式下将普通左键拖动用于本地选择；移动阈值为 3 逻辑像素，无拖动单击在释放时转发按下／释放。Shift 可强制本地选择，普通终端程序的 1002／1003 拖动协议保持可用；滚轮独立路由。复制选区不向 PTY 发送 Ctrl+C，无选区保留中断。真实 ConPTY 回归覆盖标准／SGR 鼠标、点击、拖动、复制及中断；原生探针截图不改写系统剪贴板。
 
 Windows 兼容性验收：为宿主探针公开重导出 Alacritty 的 WindowSize，以核查最终 ConPTY 行列／物理字符尺寸。宿主在程序目录随带固定版微软 conpty.dll／OpenConsole.exe，使用 Alacritty 既有动态加载路径；本补丁不改其 ConPTY 协议实现。

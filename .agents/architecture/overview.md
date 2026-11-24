@@ -21,7 +21,7 @@ Alacritty 0.26；默认 glow/OpenGL，可选 wgpu/DX12 用于本机对照。依�
 | src/model.rs | 会话元数据原子保存与加载 |
 | src/platform.rs | Windows Job Object、主进程内存观测 |
 | vendor/egui_term | Alacritty/ConPTY、输入、字形与 viewport 渲染；Windows 原生文字、组合 emoji 和有界 atlas |
-| vendor/egui-winit | 与 eframe 相同的 0.35.0；仅保留无文本剪贴板的粘贴请求 |
+| vendor/egui-winit | 与 eframe 相同的 0.35.0，保留非文本粘贴请求，转发 Windows 输入法定位和组字结束 |
 | assets/fonts、assets/icons、assets/branding | 固定来源的 JetBrains Mono 默认字体及 Cascadia Mono、Hack 可选字体、Agent 图标，以及原创 B 方案程序图标和来源校验 |
 | examples/terminal_probe.rs、workspace_probe.rs | 开发核查：真实 TUI 或本地 ANSI 样例、受控输入、GPU 截图后退出 |
 | examples/bash_probe.rs | 真实 Git Bash 与隔离 HOME，启动配置、目录通知、Agent 入口和原生截图核查；不请求模型 |
