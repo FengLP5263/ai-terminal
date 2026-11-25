@@ -22,12 +22,15 @@ use std::{
 const BG: Color32 = ai_terminal::appearance::TERMINAL_BG;
 #[path = "app/control.rs"]
 mod control;
+#[path = "app/session_titles.rs"]
+mod session_titles;
 const MUTED: Color32 = ai_terminal::chrome::SECONDARY;
 const YELLOW: Color32 = Color32::from_rgb(235, 184, 82);
 
 struct Session {
     terminal_id: u64,
     spec: SessionSpec,
+    unnamed: bool,
     project_panel: model::ProjectPanel,
     file_preview: Option<SessionFilePreview>,
     status: Status,
@@ -42,6 +45,7 @@ struct Session {
     invocation: Option<String>,
     agent_process: Option<crate::platform::ProcessWatch>,
     shells: Vec<ShellFrame>,
+    title_attempt: Option<(session_titles::Target, bool)>,
 }
 struct SessionFilePreview {
     file: ai_terminal::project_files::FileBookmark,
@@ -58,6 +62,7 @@ impl Session {
         Self {
             terminal_id: 0,
             spec,
+            unnamed: false,
             project_panel: Default::default(),
             file_preview: None,
             status: Status::default(),
@@ -72,6 +77,7 @@ impl Session {
             invocation: None,
             agent_process: None,
             shells: Vec::new(),
+            title_attempt: None,
         }
     }
     fn display_agent(&self) -> Agent {
@@ -80,6 +86,105 @@ impl Session {
                 .last()
                 .map_or(self.spec.agent, |shell| shell.agent)
         })
+    }
+    fn adopt_codex_title(&mut self, title: &str) -> bool {
+        if !self.unnamed || self.display_agent() != Agent::Codex || !self.status.native_lifecycle {
+            return false;
+        }
+        let Some((name, project)) = title.split_once(" | ") else {
+            return false;
+        };
+        // Codex's default idle terminal title is "<thread-name> | <project-name>".
+        // The project can be the current directory or its repository root.
+        if !self.spec.directory.ancestors().any(|dir| {
+            dir.file_name().is_some_and(|part| {
+                part.to_string_lossy()
+                    .split_whitespace()
+                    .eq(project.split_whitespace())
+            })
+        }) {
+            return false;
+        }
+        self.adopt_agent_title(name)
+    }
+    fn adopt_agent_title(&mut self, name: &str) -> bool {
+        let name = name.trim();
+        if !self.unnamed
+            || name.is_empty()
+            || name.chars().count() > 128
+            || name.chars().any(char::is_control)
+            || uuid::Uuid::parse_str(name).is_ok()
+        {
+            return false;
+        }
+        self.spec.name = name.to_owned();
+        self.unnamed = false;
+        true
+    }
+    fn title_lookup_target(&self) -> Option<session_titles::Target> {
+        let agent = self.display_agent();
+        if !self.unnamed
+            || !matches!(
+                agent,
+                Agent::Qoder | Agent::QoderCn | Agent::Trae | Agent::ZCode
+            )
+        {
+            return None;
+        }
+        Some(session_titles::Target {
+            local_id: self.spec.id.clone(),
+            generation: self.generation.clone(),
+            invocation: self.invocation.clone(),
+            agent,
+            conversation_id: self.status.session_id.clone()?,
+        })
+    }
+    fn request_session_title(&mut self, event: &HookEvent, lookup: &mut session_titles::Lookup) {
+        let after_turn = match event.name.as_str() {
+            "SessionStart" if event.source.as_deref() != Some("compact") => false,
+            "Stop" => true,
+            _ => return,
+        };
+        let Some(target) = self.title_lookup_target() else {
+            return;
+        };
+        if self
+            .title_attempt
+            .as_ref()
+            .is_some_and(|(previous, tried_after_turn)| {
+                previous == &target && (*tried_after_turn || !after_turn)
+            })
+        {
+            return;
+        }
+        if lookup.request(target.clone(), self.spec.directory.clone()) {
+            self.title_attempt = Some((target, after_turn));
+        }
+    }
+    fn adopt_lookup_title(&mut self, target: &session_titles::Target, title: &str) -> bool {
+        self.title_lookup_target().as_ref() == Some(target) && self.adopt_agent_title(title)
+    }
+    fn adopt_hook_title(&mut self, event: &HookEvent) -> bool {
+        if self.display_agent() != Agent::Claude
+            || !matches!(event.name.as_str(), "SessionStart" | "UserPromptSubmit")
+            || self.status.session_id.as_deref() != Some(event.session_id.as_str())
+        {
+            return false;
+        }
+        event
+            .session_title
+            .as_deref()
+            .is_some_and(|title| self.adopt_agent_title(title))
+    }
+    fn adopt_terminal_title(&mut self, app: egui_term::ProgramApp, title: &str) -> bool {
+        match app {
+            egui_term::ProgramApp::Codex => self.adopt_codex_title(title),
+            egui_term::ProgramApp::Kimi => {
+                self.display_agent() == Agent::Kimi
+                    && self.status.native_lifecycle
+                    && self.adopt_agent_title(title)
+            }
+        }
     }
     fn prune_shells(&mut self) {
         if let Some(index) = self.shells.iter().position(|shell| shell.process.exited()) {
@@ -220,15 +325,24 @@ impl Session {
                 if process.exited() {
                     return false;
                 }
-                let native_connected = matches!(agent, Agent::Codex | Agent::Kimi)
+                let native = matches!(agent, Agent::Codex | Agent::Kimi);
+                let native_connected = native
                     && self.detected_agent == Some(agent)
                     && self.invocation.is_none()
                     && self.status.native_lifecycle;
+                // The Shell observer is already armed. The child can publish its
+                // first lifecycle frame before this start receipt is consumed.
+                let keep_observer = native
+                    && self.invocation.is_none()
+                    && (self.detected_agent.is_none() || native_connected);
                 self.detected_agent = Some(agent);
-                if let Some(backend) = &self.backend
-                    && !native_connected
-                {
-                    backend.set_codex_notifications(matches!(agent, Agent::Codex | Agent::Kimi));
+                if let Some(backend) = &self.backend {
+                    if !keep_observer {
+                        backend.set_codex_notifications(native);
+                    }
+                    if agent == Agent::Kimi && self.unnamed {
+                        backend.expect_kimi_titles();
+                    }
                 }
                 self.invocation = Some(invocation);
                 self.agent_process = Some(process);
@@ -311,6 +425,7 @@ pub struct App {
     terminal_rect: Option<egui::Rect>,
     sidebar_right: f32,
     bridge: Option<Bridge>,
+    session_titles: session_titles::Lookup,
     control: Option<ai_terminal::control::ControlServer>,
     control_receipts: VecDeque<(String, Vec<u8>, ai_terminal::control::Response)>,
     control_closers: Vec<crate::shutdown::ShutdownTask>,
@@ -454,12 +569,14 @@ impl App {
                 .sessions
                 .into_iter()
                 .map(|spec| {
+                    let unnamed = workspace.unnamed_sessions.contains(&spec.id);
                     let panel = workspace
                         .session_panels
                         .get(&spec.id)
                         .copied()
                         .unwrap_or_default();
                     let mut session = Session::new(spec);
+                    session.unnamed = unnamed;
                     session.project_panel = panel;
                     session
                 })
@@ -475,6 +592,7 @@ impl App {
             terminal_rect: None,
             sidebar_right: 0.0,
             bridge,
+            session_titles: session_titles::Lookup::new(cc.egui_ctx.clone()),
             control,
             control_receipts: VecDeque::new(),
             control_closers: Vec::new(),
@@ -532,6 +650,12 @@ impl App {
             sessions: self.sessions.iter().map(|s| s.spec.clone()).collect(),
             groups: self.groups.clone(),
             session_panels: self.session_panel_states(),
+            unnamed_sessions: self
+                .sessions
+                .iter()
+                .filter(|s| s.unnamed)
+                .map(|s| s.spec.id.clone())
+                .collect(),
             active: self.active.clone(),
             last_directory: self.last_directory.clone(),
             ui: self.preferences,
@@ -1061,6 +1185,8 @@ impl App {
                 }
                 let viewing = focused && self.active.as_deref() == Some(&session.spec.id);
                 if session.event(&event, viewing) {
+                    self.dirty |= session.adopt_hook_title(&event);
+                    session.request_session_title(&event, &mut self.session_titles);
                     session.last_event = Some(Instant::now());
                     if session.status.session_id.is_some()
                         && session.spec.agent_session_id != session.status.session_id
@@ -1087,8 +1213,12 @@ impl App {
                 PtyEvent::Title(title) if title.starts_with(egui_term::CODEX_PROGRAM_EVENT) => {
                     let viewing = focused && self.active.as_deref() == Some(&session.spec.id);
                     if let Some(backend) = &session.backend {
-                        for state in backend.take_program_events(&title) {
+                        let (states, terminal_title) = backend.take_program_update(&title);
+                        for state in states {
                             session.program_event(state, viewing);
+                        }
+                        if let Some((app, title)) = terminal_title {
+                            self.dirty |= session.adopt_terminal_title(app, &title);
                         }
                     }
                 }
@@ -1152,6 +1282,15 @@ impl App {
                 }
                 PtyEvent::Bell => {} // Agent lifecycle events own status; terminal bells are not completion.
                 _ => {}
+            }
+        }
+        for (target, title) in self.session_titles.titles() {
+            if let Some(session) = self
+                .sessions
+                .iter_mut()
+                .find(|s| s.spec.id == target.local_id)
+            {
+                self.dirty |= session.adopt_lookup_title(&target, &title);
             }
         }
         if git_prompt && let Some(git) = &mut self.git {
@@ -1453,7 +1592,9 @@ impl App {
             color: None,
         };
         let id = spec.id.clone();
-        self.sessions.push(Session::new(spec));
+        let mut session = Session::new(spec);
+        session.unnamed = true;
+        self.sessions.push(session);
         self.last_directory = Some(directory);
         self.dirty = true;
         self.activate(id, ctx);
@@ -1510,6 +1651,7 @@ impl App {
             if done {
                 if let Some(s) = self.sessions.iter_mut().find(|s| s.spec.id == id) {
                     s.spec.name = self.rename_text.trim().into();
+                    s.unnamed = false;
                 }
                 self.dirty = true;
                 self.rename = None;
@@ -1668,6 +1810,7 @@ impl App {
                                 generation: generation.clone(),
                                 name: name.into(),
                                 session_id: format!("fixture-{index}"),
+                                session_title: None,
                                 turn_id: Some("one".into()),
                                 tool_name: None,
                                 tool_use_id: None,
@@ -2288,6 +2431,78 @@ Send-State 'state=clear'; Wait-Step 5
         }
     }
     #[test]
+    fn unnamed_shell_adopts_one_codex_thread_title_after_connecting() {
+        let mut session = Session::new(SessionSpec {
+            id: "first-chat".into(),
+            name: "PowerShell".into(),
+            directory: PathBuf::from(r"C:\work\project\src"),
+            agent: Agent::Shell,
+            agent_session_id: None,
+            color: None,
+        });
+        session.unnamed = true;
+        assert!(!session.adopt_codex_title("Shell title | project"));
+        session.codex_program(egui_term::CodexProgramStatus::Idle, true);
+        assert!(!session.adopt_codex_title("project"));
+        assert!(!session.adopt_codex_title("Unrelated | other"));
+        assert!(session.adopt_codex_title("中文输入排查 📝 | project"));
+        assert!(!session.adopt_codex_title("Second chat | project"));
+        assert_eq!(session.spec.name, "中文输入排查 📝");
+    }
+
+    #[test]
+    fn lookup_title_requires_the_current_unnamed_conversation() {
+        for agent in [Agent::Qoder, Agent::QoderCn, Agent::Trae, Agent::ZCode] {
+            let mut session = Session::new(SessionSpec {
+                id: "terminal".into(),
+                name: "PowerShell".into(),
+                directory: PathBuf::new(),
+                agent: Agent::Shell,
+                agent_session_id: None,
+                color: None,
+            });
+            session.unnamed = true;
+            session.detected_agent = Some(agent);
+            session.status.session_id = Some("original".into());
+            session.invocation = Some("invocation".into());
+            let original = session.title_lookup_target().unwrap();
+            session.status.session_id = Some("current".into());
+            let current = session.title_lookup_target().unwrap();
+            assert!(!session.adopt_lookup_title(&original, "Other title"));
+            assert!(!session.adopt_lookup_title(&current, "First line\nSecond line"));
+            assert!(session.adopt_lookup_title(&current, "界面验收 🧪"));
+            assert!(!session.adopt_lookup_title(&current, "Late update"));
+            assert_eq!(session.spec.name, "界面验收 🧪");
+        }
+    }
+
+    #[test]
+    fn claude_custom_title_requires_a_matching_session_start_or_prompt_event() {
+        let mut session = Session::new(SessionSpec {
+            id: "terminal".into(),
+            name: "PowerShell".into(),
+            directory: PathBuf::new(),
+            agent: Agent::Shell,
+            agent_session_id: None,
+            color: None,
+        });
+        session.unnamed = true;
+        session.detected_agent = Some(Agent::Claude);
+        session.status.session_id = Some("current".into());
+        let mut event = shell_metadata("SessionStart", "invocation", "resume");
+        event.session_id = "old".into();
+        event.session_title = Some("Session title".into());
+        assert!(!session.adopt_hook_title(&event));
+        event.session_id = "current".into();
+        event.name = "Stop".into();
+        assert!(!session.adopt_hook_title(&event));
+        event.name = "SessionStart".into();
+        assert!(session.adopt_hook_title(&event));
+        assert!(!session.adopt_hook_title(&event));
+        assert_eq!(session.spec.name, "Session title");
+    }
+
+    #[test]
     fn kimi_root_lifecycle_drives_identity_unread_and_cannot_steal_codex() {
         let mut session = Session::new(SessionSpec {
             id: "kimi".into(),
@@ -2448,16 +2663,17 @@ Send-State 'state=clear'; Wait-Step 5
         let mut session = Session::new(SessionSpec {
             id: "native-hidden".into(),
             name: "native".into(),
-            directory: root.path().into(),
+            directory: root.path().join("project"),
             agent: Agent::Shell,
             agent_session_id: None,
             color: None,
         });
         session.terminal_id = 981;
+        session.unnamed = true;
         let backend = TerminalBackend::new(981, ctx.clone(), app.pty_sender.clone(), egui_term::BackendSettings {
             shell: "powershell.exe".into(),
             args: vec!["-NoLogo".into(), "-NoProfile".into(), "-NonInteractive".into(), "-Command".into(),
-                "Start-Sleep -Milliseconds 500; $e=[char]27; [Console]::Write($e.ToString()+']7501;state=working:app=codex'+[char]7+$e+']7501;state=done:app=codex'+[char]7); Start-Sleep -Seconds 15".into()],
+                "Start-Sleep -Milliseconds 500; $e=[char]27; [Console]::Write($e.ToString()+']7501;state=working:app=codex'+[char]7+$e+']0;Recovered thread | project'+[char]7+$e+']7501;state=done:app=codex'+[char]7); Start-Sleep -Seconds 15".into()],
             ..Default::default()
         }).unwrap();
         backend.set_visible(false);
@@ -2465,7 +2681,23 @@ Send-State 'state=clear'; Wait-Step 5
         let pid = backend.pty_id();
         session.job = Some(crate::platform::ProcessJob::attach(pid).unwrap());
         session.backend = Some(backend);
-        session.detected_agent = Some(Agent::Codex);
+        // Let ConPTY queue its native event before applying a delayed start receipt.
+        let notice = loop {
+            let (id, event) = app
+                .pty_receiver
+                .recv_timeout(Duration::from_secs(8))
+                .unwrap();
+            if id == 981
+                && matches!(&event, PtyEvent::Title(title) if title.starts_with(egui_term::CODEX_PROGRAM_EVENT))
+            {
+                break event;
+            }
+        };
+        assert!(session.event(
+            &shell_metadata("ShellAgentStarted", "native", "codex"),
+            false
+        ));
+        app.pty_sender.send((981, notice)).unwrap();
         app.sessions.push(session);
         app.sessions.push(Session::new(SessionSpec {
             id: "other".into(),
@@ -2487,6 +2719,8 @@ Send-State 'state=clear'; Wait-Step 5
         }
         assert!(app.sessions[0].status.native_lifecycle);
         assert!(app.sessions[0].status.unread);
+        assert_eq!(app.sessions[0].spec.name, "Recovered thread");
+        assert!(!app.sessions[0].unnamed);
         assert_eq!(app.sessions[1].status.activity, Activity::Unknown);
         app.floating_action(
             ai_terminal::floating::Action::Activate("native-hidden".into()),
@@ -2646,6 +2880,7 @@ Send-State 'state=clear'; Wait-Step 5
                 generation: "background-generation".into(),
                 name: "Stop".into(),
                 session_id: "main".into(),
+                session_title: None,
                 turn_id: None,
                 tool_name: None,
                 tool_use_id: None,
@@ -3279,6 +3514,7 @@ Send-State 'state=clear'; Wait-Step 5
             generation: "generation".into(),
             name: name.into(),
             session_id: String::new(),
+            session_title: None,
             turn_id: None,
             tool_name: None,
             tool_use_id: None,

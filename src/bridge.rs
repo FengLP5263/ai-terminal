@@ -175,6 +175,11 @@ pub fn report_hook() {
                 .to_owned(),
             )
         });
+        let name = field("hook_event_name").unwrap_or_default();
+        let session_title = match name.as_str() {
+            "SessionStart" | "UserPromptSubmit" => field("session_title"),
+            _ => None,
+        };
         let event = HookEvent {
             invocation: std::env::var("AI_TERMINAL_INVOCATION").ok(),
             process_id: None,
@@ -183,8 +188,9 @@ pub fn report_hook() {
             event_id: uuid::Uuid::new_v4().to_string(),
             local_id,
             generation,
-            name: field("hook_event_name").unwrap_or_default(),
+            name,
             session_id: field("session_id").unwrap_or_default(),
+            session_title,
             turn_id: field("turn_id").or_else(|| field("turnId")),
             tool_name: field("tool_name").or_else(|| notification_detail("toolName")),
             tool_use_id: field("tool_use_id").or_else(|| notification_detail("toolUseId")),
@@ -233,6 +239,7 @@ mod tests {
             generation: "launch".into(),
             name: "Stop".into(),
             session_id: "agent".into(),
+            session_title: None,
             turn_id: None,
             tool_name: None,
             tool_use_id: None,

@@ -77,6 +77,12 @@ All three avoid screen-text parsing, automatic login and trust approval. Real mo
 
 0.13.0: international Qoder resolves public qodercli (managed shells provide both qoder/qodercli), independently of Qoder CN, without treating the IDE qoder launcher as the CLI. It reuses session-scoped --settings, --resume and Qoder hook events, preserving explicit settings and leaving user configuration and trust decisions untouched. Native startup with installed 1.1.90, synthetic hooks and real model turns are recorded separately. Official contracts: https://docs.qoder.com/cli/cli-reference and https://docs.qoder.com/cli/hooks . Audio/video decoding uses system Media Foundation, without another source repository.
 
+0.16.0. Automatic naming uses the public Qoder and Qoder CN CLI entry points in `--acp` mode. It sends only `initialize` and directory-scoped `session/list`, then takes the `title` for the conversation ID from the lifecycle event. The terminal keeps its existing name if the title is unavailable. A separate process runs each lookup with time, page and output limits. See [Qoder CLI](https://docs.qoder.com/cli/cli-reference) and [Qoder CN ACP](https://docs.qoder.cn/cli/acp).
+
+TRAE CLI reads the `name` for the exact ID through `thread/read` on its public `app-server --stdio`, with `includeTurns` set to false. Community ZCode sends one `sessionIds` entry to `session/list` on its public `zcode app-server` and adopts the `title` for the matching ID. Interfaces were checked with TRAE CLI 0.214.1 and zcode-app-cli 3.17.2-44 with runtime 0.17.1. The terminal keeps its existing name when the CLI version or configuration lacks the required interface.
+
+Claude Code supplies custom titles in `session_title` through its [official hooks](https://code.claude.com/docs/en/hooks#sessionstart-input). Kimi Code uses its own terminal title, associated with its root program identity. Title adoption uses the configured session-scoped hooks and terminal lifecycle channels.
+
 
 0.14.0 preview allows other Agents to use ai-terminal-cli for navigation, owned-session process lifecycle and team orchestration within user authorization. session run invokes existing public CLIs/shims only when no terminal is running, without injecting into an interactive terminal, submitting prompts or accepting trust/permissions. Preview.1 queries expose navigation/status metadata; preview.2 explicit content APIs are described below and never expose hook tokens or accounts. See docs/cli.en.md and skills/ai-terminal/SKILL.en.md.
 

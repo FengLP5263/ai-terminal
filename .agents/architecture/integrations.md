@@ -88,6 +88,12 @@ Kimi Code 2.5.0 使用自身 pi-tui 的 OSC 7501 `app=kimi-code`；仅受管入�
 
 0.13.0：Qoder 国际版通过公开 qodercli（受管 Shell 同时提供 qoder／qodercli）接入，独立于 Qoder CN；不将 IDE 的 qoder 命令视为 CLI。复用会话级 --settings、--resume 及 Qoder hook 事件，不覆盖显式设置、不写用户配置或确认信任。本机 1.1.90 的真实启动、合成 hook 和真实模型回合分别记录。官方接口见 https://docs.qoder.com/cli/cli-reference 与 https://docs.qoder.com/cli/hooks 。Windows 音视频解码使用系统 Media Foundation，不引入其他源码仓库。
 
+0.16.0。Qoder 和 Qoder CN 的自动命名使用公开 CLI 入口的 `--acp` 模式，仅发送 `initialize` 和按目录筛选的 `session/list`，按生命周期事件中的对话 ID 取 `title`。当前台会话的标题无法通过该接口取得时，保留终端原名称。查询由独立子进程执行，设有时限、页数和输出大小上限。官方接口见 [Qoder CLI](https://docs.qoder.com/cli/cli-reference) 和 [Qoder CN ACP](https://docs.qoder.cn/cli/acp)。
+
+TRAE CLI 通过公开 `app-server --stdio` 的 `thread/read` 读取指定 ID 的 `name`，参数 `includeTurns` 为 false。社区 ZCode 通过公开 `zcode app-server` 的 `session/list` 传入单个 `sessionIds` 条目，只采用 ID 匹配的 `title`。接口分别核对 TRAE CLI 0.214.1 与 zcode-app-cli 3.17.2-44／运行时 0.17.1。CLI 版本或配置缺少所需入口时，查询结束后保留原名称。
+
+Claude Code 使用 [官方 hook](https://code.claude.com/docs/en/hooks#sessionstart-input) 的 `session_title`，字段由 CLI 提供自定义标题。Kimi Code 使用自身终端标题并匹配根进程身份。标题接入沿用已配置的会话级 hook 和终端生命周期通道。
+
 
 0.14.0 预览：其他 Agent 可通过 ai-terminal-cli 管理导航、会话所属进程生命周期和团队编排，能力范围与用户授权一致。session run 仅在没有运行终端的会话中调用现有公开 CLI／shim，不向已有终端注入输入、不发送提示词、不接受信任或权限。preview.1 查询仅导航和状态元数据；preview.2 的显式内容接口见下文，不暴露 hook token 或账号。CLI 接口和消费技能分别见 docs/cli.md 与 skills/ai-terminal/SKILL.md。
 
