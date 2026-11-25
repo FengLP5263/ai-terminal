@@ -10,6 +10,8 @@
 
 ## 数据与恢复
 
+新建的界面会话以可选的 unnamed_sessions 列表标记默认名称，键为会话 UUID。首次采用 Agent 对话标题或在界面／管理 CLI 中显式命名时移除标记。缺少该字段的旧工作区保留已存名称；关闭会话同时清理标记。
+
 %LOCALAPPDATA%/ai-terminal/sessions.json 保存会话名称、目录、Agent 类型、实际 resume ID、列表顺序和 UI 偏好。
 0.3.0 新增可选 last_directory；Cmd/Bash 类型与旧 Codex/Claude/Shell 并存，旧记录保持兼容。0.3.2 起将旧 Codex/Claude 类型转换为 PowerShell，保留其余字段；只自动打开选中的 Shell，其余按需打开。当前 shell 的目录由提示符元数据更新；运行中的 Agent 图标与调用 ID 只存在内存。
 0.3.3 每个会话新增可选 color（7 个固定颜色的枚举值）；旧记录缺失时默认无色，恢复默认时省略字段。改色不改变 UUID、目录、Agent 身份或运行进程。

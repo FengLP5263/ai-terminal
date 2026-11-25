@@ -4,7 +4,16 @@
 
 Record user-visible additions, improvements, fixes, and compatibility changes for each release; omit categories that do not apply. Review both languages together, use the same version entry in GitHub Releases, and ship both files in the ZIP. Historical summaries follow existing GitHub release notes and UTC publication dates; development versions without a separate release do not receive invented release dates.
 
-## [Unreleased]
+## [0.16.0] - 2026-11-25
+
+### Added
+
+- New terminals without a custom name adopt the first available Agent conversation title. Supported sources include Codex, Qoder, Qoder CN, Kimi Code, TRAE CLI, ZCode and custom titles from Claude Code.
+- Manual names take precedence. Kimi Code supplies the terminal title with a limit of 32 UTF-16 code units.
+
+### Fixed
+
+- Preserve native Codex lifecycle events received before the launch receipt, including the first idle notification.
 
 ## [0.15.4] - 2026-11-24
 

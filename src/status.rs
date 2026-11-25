@@ -28,6 +28,8 @@ pub struct HookEvent {
     pub generation: String,
     pub name: String,
     pub session_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session_title: Option<String>,
     pub turn_id: Option<String>,
     pub tool_name: Option<String>,
     pub tool_use_id: Option<String>,
@@ -371,6 +373,7 @@ mod tests {
             generation: "first".into(),
             name: name.into(),
             session_id: "main".into(),
+            session_title: None,
             turn_id: Some(turn.into()),
             tool_name: None,
             tool_use_id: None,

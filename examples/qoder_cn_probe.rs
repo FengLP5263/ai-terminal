@@ -93,6 +93,7 @@ impl Probe {
             generation: "fixture".into(),
             name: name.into(),
             session_id: "qoder-fixture".into(),
+            session_title: None,
             turn_id: None,
             tool_name: tool.map(String::from),
             tool_use_id: tool_id.map(String::from),

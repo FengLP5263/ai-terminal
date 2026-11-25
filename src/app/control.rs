@@ -130,6 +130,7 @@ impl App {
                         .sessions
                         .into_iter()
                         .map(|spec| {
+                            let unnamed = prepared.workspace.unnamed_sessions.contains(&spec.id);
                             if let Some(mut live) = existing.remove(&spec.id) {
                                 live.project_panel = prepared
                                     .workspace
@@ -138,6 +139,7 @@ impl App {
                                     .copied()
                                     .unwrap_or_default();
                                 live.spec = spec;
+                                live.unnamed = unnamed;
                                 live
                             } else {
                                 Session::new(spec)
@@ -229,6 +231,7 @@ impl App {
                 let mut next = self.workspace_snapshot();
                 next.sessions.retain(|s| s.id != id);
                 next.session_panels.remove(&id);
+                next.unnamed_sessions.remove(&id);
                 model::assign_group(&mut next.groups, &id, None);
                 if next.active.as_deref() == Some(&id) {
                     next.active = next.sessions.first().map(|s| s.id.clone());

@@ -1,5 +1,9 @@
 # 运行、配置与操作
 
+0.16.0：已识别的 Codex 会话可从默认 OSC 0/2 的对话名和项目名标题一次性命名新建终端。仅接受项目名匹配终端目录或祖先目录的有界标题，使用现有 PTY 代次和后台状态唤醒。活动动画只参与去重，命名不要求对话空闲。Shell 启动回执保留已排队的 Codex／Kimi 原生事件。Codex 0.167.0 可把 MCP 初始化报告为 working。接入共享服务后持久工作状态的上游修复见 [Codex #60280](https://github.com/openai/codex/pull/60280)。
+
+Qoder、Qoder CN、TRAE CLI 和 ZCode 在会话进入及首轮结束时按当前对话 ID 查询标题。单个后台工作线程处理有界请求，结果按终端启动代次、Agent 调用和对话 ID 核对。Claude Code 接收 SessionStart／UserPromptSubmit 的自定义标题。Kimi Code 采用与根 OSC 7501 身份匹配的 OSC 标题，该 CLI 的终端标题上限为 32 个 UTF-16 单元。自动命名只应用于未命名的新终端，一个终端采用一次标题，手动名称优先。
+
 0.12.0-preview.5：终端粘贴在按键触发时识别 Windows CF_HDROP 文件列表，用 DragQueryFileW 读取路径并逐个加引号、空格分隔后写入 PTY；无文字时读取文件列表，优先于图片格式。仅查询路径，不读文件正文、不复制临时附件、不改剪贴板、不发送回车。位图截图继续交给 CLI 原生图片粘贴；附件识别由 CLI 负责。最多 1,024 项、合计 65,536 个 UTF-16 单元，格式异常整体回退既有粘贴路径。
 
 简体中文 | [English](runtime.en.md)

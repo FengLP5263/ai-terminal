@@ -308,6 +308,7 @@ fn notice(name: &str, agent: Agent, invocation: &str, exit_code: Option<i32>) {
         generation,
         name: name.into(),
         session_id: String::new(),
+        session_title: None,
         turn_id: None,
         tool_name: None,
         tool_use_id: None,

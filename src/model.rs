@@ -294,6 +294,8 @@ pub struct Workspace {
     pub groups: Vec<SessionGroup>,
     #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
     pub session_panels: std::collections::BTreeMap<String, ProjectPanel>,
+    #[serde(default, skip_serializing_if = "std::collections::BTreeSet::is_empty")]
+    pub unnamed_sessions: std::collections::BTreeSet<String>,
     pub active: Option<String>,
     #[serde(default)]
     pub last_directory: Option<PathBuf>,
@@ -329,6 +331,9 @@ pub fn load(path: &Path) -> Result<Workspace, String> {
     workspace
         .session_panels
         .retain(|id, _| workspace.sessions.iter().any(|s| &s.id == id));
+    workspace
+        .unnamed_sessions
+        .retain(|id| workspace.sessions.iter().any(|s| &s.id == id));
     if let Some(id) = &workspace.active
         && workspace.sessions.iter().any(|s| &s.id == id)
     {
