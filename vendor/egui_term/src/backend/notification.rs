@@ -54,19 +54,36 @@ pub(super) struct ProgramQueue {
     epoch: u64,
     last: Option<ProgramEvent>,
     values: VecDeque<ProgramEvent>,
+    title: Option<(ProgramApp, String)>,
+    title_pending: bool,
+    expect_kimi_title: bool,
 }
 impl ProgramQueue {
     pub fn reset(&mut self, epoch: u64) {
         self.epoch = epoch;
         self.last = None;
         self.values.clear();
+        self.title = None;
+        self.title_pending = false;
+        self.expect_kimi_title = false;
+    }
+    pub fn expect_kimi_title(&mut self) {
+        self.expect_kimi_title = true;
     }
     fn push(&mut self, epoch: u64, state: ProgramEvent) -> bool {
         if epoch != self.epoch || self.last == Some(state) {
             return false;
         }
+        let wake = self.values.is_empty() && !self.has_pending_title();
         self.last = Some(state);
-        let wake = self.values.is_empty();
+        if self
+            .title
+            .as_ref()
+            .is_some_and(|(app, _)| Some(*app) != self.active_app())
+        {
+            self.title = None;
+            self.title_pending = false;
+        }
         if self.values.len() == 32 {
             self.values.pop_front();
         }
@@ -75,6 +92,47 @@ impl ProgramQueue {
     }
     pub fn drain(&mut self) -> Vec<ProgramEvent> {
         self.values.drain(..).collect()
+    }
+    fn active_app(&self) -> Option<ProgramApp> {
+        self.last
+            .filter(|event| event.state != CodexProgramStatus::Clear)
+            .and_then(|event| event.app)
+    }
+    fn has_pending_title(&self) -> bool {
+        self.title_pending
+            && self
+                .title
+                .as_ref()
+                .is_some_and(|(app, _)| Some(*app) == self.active_app())
+    }
+    fn osc_title(&mut self, epoch: u64, params: &[&[u8]]) -> bool {
+        let app = if self.expect_kimi_title || self.active_app() == Some(ProgramApp::Kimi) {
+            ProgramApp::Kimi
+        } else {
+            ProgramApp::Codex
+        };
+        let title = match app {
+            ProgramApp::Codex => codex_title(params),
+            ProgramApp::Kimi => kimi_title(params),
+        };
+        self.receive_title(epoch, title.map(|s| (app, s)))
+    }
+    fn receive_title(&mut self, epoch: u64, title: Option<(ProgramApp, String)>) -> bool {
+        if epoch != self.epoch || self.title == title {
+            return false;
+        }
+        let had_pending = self.has_pending_title();
+        self.title_pending = title.is_some();
+        self.title = title;
+        self.values.is_empty() && !had_pending && self.has_pending_title()
+    }
+    pub fn take_title(&mut self) -> Option<(ProgramApp, String)> {
+        if self.has_pending_title() {
+            self.title_pending = false;
+            self.title.clone()
+        } else {
+            None
+        }
     }
 }
 
@@ -162,19 +220,25 @@ struct Collector {
 impl vte::Perform for Collector {
     fn osc_dispatch(&mut self, params: &[&[u8]], _: bool) {
         if let Some(state) = program_status(params) {
-            if self.epoch.load(Ordering::Acquire) == self.observed_epoch
+            let wake = self.epoch.load(Ordering::Acquire) == self.observed_epoch
                 && self
                     .program
                     .lock()
                     .unwrap()
-                    .push(self.observed_epoch, state)
-            {
-                let _ = self.sender.send((
-                    self.id,
-                    PtyEvent::Title(format!("{CODEX_PROGRAM_EVENT};{}", self.observed_epoch)),
-                ));
-                self.ctx.request_repaint_of(egui::ViewportId::ROOT);
-            }
+                    .push(self.observed_epoch, state);
+            self.wake_program(wake);
+            return;
+        }
+        if params
+            .first()
+            .is_some_and(|kind| matches!(*kind, b"0" | b"2"))
+        {
+            let wake = self
+                .program
+                .lock()
+                .unwrap()
+                .osc_title(self.observed_epoch, params);
+            self.wake_program(wake);
             return;
         }
         // Codex currently emits these text prefixes for the filtered notification
@@ -215,6 +279,72 @@ impl vte::Perform for Collector {
         }
         self.ctx.request_repaint_of(egui::ViewportId::ROOT);
     }
+}
+
+impl Collector {
+    fn wake_program(&self, wake: bool) {
+        if wake && self.epoch.load(Ordering::Acquire) == self.observed_epoch {
+            let _ = self.sender.send((
+                self.id,
+                PtyEvent::Title(format!("{CODEX_PROGRAM_EVENT};{}", self.observed_epoch)),
+            ));
+            self.ctx.request_repaint_of(egui::ViewportId::ROOT);
+        }
+    }
+}
+
+fn terminal_title(params: &[&[u8]]) -> Option<String> {
+    let parts = params.get(1..)?;
+    if parts.iter().map(|part| part.len() + 1).sum::<usize>() > 1024 {
+        return None;
+    }
+    // OSC treats a semicolon in a title as another parameter.
+    let bytes = parts.join(&b';');
+    let title = std::str::from_utf8(&bytes).ok()?.trim();
+    (!title.is_empty() && !title.chars().any(char::is_control)).then(|| title.to_owned())
+}
+
+fn kimi_title(params: &[&[u8]]) -> Option<String> {
+    let title = terminal_title(params)?;
+    // Kimi Code sets its OSC title to its conversation label (up to 32 UTF-16
+    // code units). Its application name is the fallback for an unnamed chat.
+    if title.encode_utf16().count() > 32
+        || [
+            "Kimi Code",
+            "kimi-code",
+            "kimi",
+            "cmd",
+            "PowerShell",
+            "pwsh",
+            "bash",
+        ]
+        .iter()
+        .any(|default| title.eq_ignore_ascii_case(default))
+        || title.starts_with("ai-terminal-cwd;")
+        || title.ends_with(".exe")
+    {
+        return None;
+    }
+    Some(title)
+}
+
+fn codex_title(params: &[&[u8]]) -> Option<String> {
+    let title = terminal_title(params)?;
+    // The default activity indicator uses one leading glyph and a space.
+    let title = title
+        .strip_prefix(['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏', '●'])
+        .and_then(|rest| rest.strip_prefix(' '))
+        .unwrap_or(&title);
+    let (name, project) = title.split_once(" | ")?;
+    if name.is_empty()
+        || project.is_empty()
+        || project.contains(" | ")
+        || title.starts_with("[ ! ]")
+        || title.starts_with("[ . ]")
+    {
+        return None;
+    }
+    Some(title.to_owned())
 }
 
 impl<P: EventedPty> ObservedPty<P> {
@@ -312,6 +442,52 @@ impl<P: EventedPty + OnResize> OnResize for ObservedPty<P> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn codex_title_waits_for_identity_and_deduplicates_animated_titles() {
+        use CodexProgramStatus as S;
+        let mut queue = ProgramQueue::default();
+        queue.reset(1);
+        let params = [b"0".as_slice(), b"Fix; details | project".as_slice()];
+        assert!(!queue.osc_title(0, &params));
+        assert!(!queue.osc_title(1, &params));
+        assert!(queue.take_title().is_none());
+        assert!(queue.push(1, S::Working.into()));
+        assert_eq!(
+            queue.take_title(),
+            Some((ProgramApp::Codex, "Fix; details | project".into()))
+        );
+        assert!(!queue.osc_title(1, &[b"0", "⠋ Fix; details | project".as_bytes()]));
+        assert!(queue.take_title().is_none());
+        assert!(codex_title(&[b"0", b"[ ! ] Action Required | project"]).is_none());
+        assert!(codex_title(&[b"0", b"codex | Fix | project"]).is_none());
+        queue.osc_title(1, &params);
+        queue.push(1, S::Clear.into());
+        assert!(queue.take_title().is_none());
+    }
+    #[test]
+    fn kimi_title_uses_the_scoped_native_identity_and_rejects_placeholders() {
+        let mut queue = ProgramQueue::default();
+        queue.reset(1);
+        queue.expect_kimi_title();
+        assert!(!queue.osc_title(1, &[b"0", b"Kimi Code"]));
+        assert!(!queue.osc_title(1, &[b"0", b"Kimi conversation"]));
+        assert!(queue.take_title().is_none());
+        assert!(queue.push(
+            1,
+            ProgramEvent {
+                app: Some(ProgramApp::Kimi),
+                state: CodexProgramStatus::Idle,
+            }
+        ));
+        assert_eq!(
+            queue.take_title(),
+            Some((ProgramApp::Kimi, "Kimi conversation".into()))
+        );
+        queue.reset(2);
+        assert!(!queue.osc_title(1, &[b"0", b"Old title"]));
+        assert!(queue.take_title().is_none());
+    }
     #[test]
     fn native_lifecycle_is_ordered_bounded_and_epoch_scoped() {
         let (tx, rx) = std::sync::mpsc::channel();

@@ -26,7 +26,8 @@ fn ops(value: serde_json::Value) -> Vec<Operation> {
 #[test]
 fn batch_builds_team_with_current_references_and_global_order() {
     let dir = tempfile::tempdir().unwrap();
-    let original = workspace(dir.path());
+    let mut original = workspace(dir.path());
+    original.unnamed_sessions.insert("leader".into());
     let plan = ops(json!([
         {"op":"session.create","key":"frontend","name":"前端 ✨","directory":dir.path(),"color":"blue"},
         {"op":"session.create","key":"backend","name":"后端","directory":dir.path(),"shell":"cmd"},
@@ -42,6 +43,8 @@ fn batch_builds_team_with_current_references_and_global_order() {
     )
     .unwrap();
     assert_eq!(original.sessions.len(), 1);
+    assert!(original.unnamed_sessions.contains("leader"));
+    assert!(p.workspace.unnamed_sessions.is_empty());
     assert_eq!(
         p.workspace
             .sessions

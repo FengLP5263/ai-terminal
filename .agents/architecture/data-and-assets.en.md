@@ -10,6 +10,8 @@ Unreleased: Preview bookmarks live only in session memory. They contain the path
 
 ## Data and recovery
 
+The optional unnamed_sessions list tracks newly created UI sessions with a default label by UUID. Adopting an Agent conversation title or giving the session an explicit name in the UI or management CLI removes its entry. Older workspaces keep their stored names. Closing a session removes its entry.
+
 `%LOCALAPPDATA%/ai-terminal/sessions.json` stores session names, directories, Agent types, actual resume IDs, ordering, and UI preferences. 0.3.0 added optional `last_directory`; CMD/Bash and legacy Codex/Claude/Shell records coexist. Since 0.3.2, old Agent records load as PowerShell while preserving other metadata; only the selected shell opens automatically. Prompt metadata updates the working directory; running Agent identity and invocation IDs exist only in memory.
 
 0.3.3 introduced optional `color` (seven fixed enum values); old entries default to no color, and resetting omits it. Color does not change UUID, directory, Agent identity, or process. `ui` stores `sidebar_collapsed`, `sidebar_width`, and `ui_scale` with serde defaults for old data. `terminal_font_size` remains a legacy compatibility field; the UI now scales as a whole from 0.5 to 2.5, with sidebar logical width 190–420. Zoom/width changes save after 400 ms, with immediate save on exit. Writes use a same-directory temporary file, flush/sync, and atomic replacement; malformed JSON must not be silently overwritten.

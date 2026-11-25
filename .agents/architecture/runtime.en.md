@@ -1,5 +1,9 @@
 # Runtime, configuration, and operations
 
+0.16.0. A new terminal running a recognized Codex session may take its name once from Codex's default OSC 0/2 conversation-and-project title. The bounded title must name the terminal directory or an ancestor as its project. The update uses the existing PTY invocation epoch and background wake. Activity animation is deduplicated, and the title can be adopted during active work. The Shell start receipt keeps queued native events from Codex or Kimi. Codex 0.167.0 can report MCP startup as working. See [Codex #60280](https://github.com/openai/codex/pull/60280) for the upstream fix to a persistent busy state after attaching to a shared server.
+
+Qoder, Qoder CN, TRAE CLI and ZCode look up the title by conversation ID on entry, with another opportunity after the first turn. One background worker processes a bounded queue, and results are checked against the terminal generation, Agent invocation and conversation ID. Claude Code supplies custom titles through SessionStart and UserPromptSubmit. Kimi Code uses the OSC title associated with the root OSC 7501 identity, limited by its CLI to 32 UTF-16 units. A new terminal without a custom name adopts a title once. Explicit names take precedence.
+
 0.12.0-preview.5: terminal paste recognizes Windows CF_HDROP on demand, reads paths with DragQueryFileW, quotes each path and writes a space-separated list to the PTY. Without text, file lists take priority over image formats. It reads no file bodies, creates no temporary attachments, changes no clipboard data and sends no Enter. Bitmap screenshots retain native CLI image paste; attachment recognition belongs to the CLI. Lists are bounded to 1,024 items/65,536 UTF-16 units; invalid data falls back to existing paste behavior.
 
 [简体中文](runtime.md) | English

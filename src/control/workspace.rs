@@ -130,6 +130,7 @@ pub fn prepare(
                     let id = resolve(id)?;
                     let i = session_index(&w, &id)?;
                     w.sessions[i].name = label(name)?;
+                    w.unnamed_sessions.remove(&id);
                     Ok(json!({"id": id}))
                 }
                 Operation::Color { id, color } => {

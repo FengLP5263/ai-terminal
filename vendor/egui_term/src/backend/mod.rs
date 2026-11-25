@@ -316,8 +316,20 @@ impl TerminalBackend {
         self.codex_notifications.store(enabled, Ordering::Release);
     }
 
+    pub fn expect_kimi_titles(&self) {
+        self.codex_program.lock().unwrap().expect_kimi_title();
+    }
+
     /// Drain a bounded, ordered lifecycle queue for this invocation only.
     pub fn take_program_events(&self, notice: &str) -> Vec<ProgramEvent> {
+        self.take_program_update(notice).0
+    }
+
+    /// Drain lifecycle changes and the latest stable title for this invocation.
+    pub fn take_program_update(
+        &self,
+        notice: &str,
+    ) -> (Vec<ProgramEvent>, Option<(ProgramApp, String)>) {
         let epoch = notice
             .strip_prefix(CODEX_PROGRAM_EVENT)
             .and_then(|s| s.strip_prefix(';'))
@@ -325,9 +337,10 @@ impl TerminalBackend {
         if !self.codex_notifications.load(Ordering::Acquire)
             || epoch != Some(self.codex_notice_epoch.load(Ordering::Acquire))
         {
-            return Vec::new();
+            return (Vec::new(), None);
         }
-        self.codex_program.lock().unwrap().drain()
+        let mut program = self.codex_program.lock().unwrap();
+        (program.drain(), program.take_title())
     }
 
     /// Compatibility accessor for callers observing Codex only.
