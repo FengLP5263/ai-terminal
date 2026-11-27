@@ -16,6 +16,71 @@ fn wait(client: &mut FileClient, ready: impl Fn(&FileClient) -> bool) {
         std::thread::sleep(Duration::from_millis(5));
     }
 }
+
+fn search(client: &mut FileClient, query: &str) -> files::SearchResults {
+    client.set_search(query);
+    wait(client, |c| {
+        c.search_state().is_some_and(|s| s.result.is_some())
+    });
+    let result = client
+        .search_state()
+        .unwrap()
+        .result
+        .as_ref()
+        .unwrap()
+        .as_ref()
+        .unwrap();
+    files::SearchResults {
+        paths: result.paths.clone(),
+        partial: result.partial,
+    }
+}
+
+#[test]
+fn search_finds_unloaded_ignored_paths_and_ranks_exact_names_with_a_result_limit() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path();
+    fs::create_dir_all(root.join("output/预览")).unwrap();
+    fs::write(root.join(".gitignore"), "output/\n").unwrap();
+    fs::write(root.join("output/预览/Preview.exe"), []).unwrap();
+    fs::write(root.join("output/预览/Preview"), []).unwrap();
+    for index in 0..205 {
+        fs::write(root.join(format!("output/preview-{index:03}.txt")), []).unwrap();
+    }
+    let mut client = FileClient::new(egui::Context::default());
+    client.set_root(Some(root));
+    let results = search(&mut client, "PREVIEW");
+    assert!(results.partial);
+    assert_eq!(results.paths.len(), 200);
+    assert_eq!(results.paths[0], Path::new("output/预览/Preview"));
+    let exact = search(&mut client, "PREVIEW.EXE");
+    assert_eq!(exact.paths, [Path::new("output/预览/Preview.exe")]);
+    let query = search(&mut client, r"output\预览\preview.exe");
+    assert_eq!(query.paths, exact.paths);
+    assert!(client.directories.is_empty());
+}
+
+#[test]
+fn search_discards_old_queries_and_refreshes_the_current_results() {
+    let temp = tempfile::tempdir().unwrap();
+    let other = tempfile::tempdir().unwrap();
+    fs::write(temp.path().join("old.txt"), []).unwrap();
+    fs::write(other.path().join("new.txt"), []).unwrap();
+    let mut client = FileClient::new(egui::Context::default());
+    client.set_root(Some(temp.path()));
+    client.set_search("old");
+    client.set_root(Some(other.path()));
+    assert!(client.search_state().is_none());
+    client.set_search("old");
+    let results = search(&mut client, "new");
+    assert_eq!(results.paths, [Path::new("new.txt")]);
+    fs::write(other.path().join("newer.txt"), []).unwrap();
+    client.refresh();
+    assert_eq!(search(&mut client, "new").paths.len(), 2);
+    client.set_search("");
+    client.poll();
+    assert!(client.search_state().is_none());
+}
 #[test]
 fn lazy_directory_listing_orders_folders_and_preserves_unicode_and_hidden_files() {
     let temp = tempfile::tempdir().unwrap();
@@ -269,6 +334,10 @@ fn links_outside_the_project_are_visible_but_never_traversed() {
         files::read_directory(&project, Path::new("link"), || false),
         Err(FileError::Link)
     ));
+    let mut client = FileClient::new(egui::Context::default());
+    client.set_root(Some(&project));
+    assert!(search(&mut client, "private").paths.is_empty());
+    assert!(search(&mut client, "link/private.txt").paths.is_empty());
 }
 
 fn repo_git(root: &Path, args: &[&str]) {
