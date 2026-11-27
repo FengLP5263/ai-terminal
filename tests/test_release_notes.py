@@ -1,7 +1,10 @@
 import importlib.util
+import hashlib
+import json
 from pathlib import Path
 import tempfile
 import unittest
+import zipfile
 
 spec=importlib.util.spec_from_file_location('release_package',Path(__file__).resolve().parents[1]/'scripts/package.py')
 packaging=importlib.util.module_from_spec(spec);spec.loader.exec_module(packaging)
@@ -33,5 +36,37 @@ class ReleaseNotesContract(unittest.TestCase):
             root=Path(folder);self.write(root)
             p=root/'CHANGELOG.md';p.write_text(p.read_text(encoding='utf-8').replace('- Current fix.',''),encoding='utf-8')
             with self.assertRaisesRegex(ValueError,'no categorized changes'):packaging.release_notes('1.2.3',root)
+
+    def test_update_attachment_tracks_verified_archive_and_rejects_tampering(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            self.write(root)
+            archive = root / 'ai-terminal-v1.2.3-windows-x64-demo.zip'
+            members = (
+                'ai-terminal.exe', 'ai-terminal-hook.exe', 'LICENSE.txt',
+                'Hack-LICENSE.txt', 'egui-term-LICENSE.txt',
+            )
+            body = b'fixture'
+            with zipfile.ZipFile(archive, 'w') as package:
+                for name in members:
+                    package.writestr(name, body)
+                package.writestr('manifest.json', json.dumps({
+                    'version': '1.2.3',
+                    'dirty': True,
+                    'files': {name: {'bytes': len(body), 'sha256': hashlib.sha256(body).hexdigest()}
+                              for name in members},
+                }))
+            checked = packaging.verify_archive(archive)
+            attachment = packaging.write_update_attachment(
+                archive, checked, True, packaging.release_notes('1.2.3', root),
+            )
+            self.assertEqual(packaging.verify_archive(archive)['update_attachment'], str(attachment))
+            data = json.loads(attachment.read_text(encoding='utf-8'))
+            self.assertTrue(data['dirty'])
+            self.assertEqual(data['notes']['en'], '- Current fix.')
+            data['sha256'] = '0' * 64
+            attachment.write_text(json.dumps(data), encoding='utf-8')
+            with self.assertRaisesRegex(ValueError, 'does not match the verified ZIP'):
+                packaging.verify_archive(archive)
 
 if __name__=='__main__':unittest.main()

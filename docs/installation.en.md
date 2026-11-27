@@ -10,7 +10,13 @@ Both formats share sessions/settings at `%LOCALAPPDATA%/ai-terminal`. Applicatio
 
 Installed builds carry `.ai-terminal-installed` in their program directory and leave desktop-shortcut ownership to Setup; ZIP builds retain their original first-run behavior. Upgrades reuse the registered directory by default; an explicit `/D=` override takes priority. Installation records use only the current user's Windows uninstall registry. No background service is required.
 
-Version 0.4.10 introduces installed builds alongside the portable ZIP. Public availability follows actual GitHub Release assets; automatic update checking and code signing are not integrated.
+Version 0.4.10 introduces installed builds alongside the portable ZIP. Public availability follows actual GitHub Release assets.
+
+## Update in the app
+
+AI Terminal checks the project's stable GitHub releases in the background after startup. A green arrow appears in the terminal header when an update is available. Open it to see the versions and release notes, then choose **Update and restart**. You can keep using the terminal while the app downloads and verifies the update. Once the package is ready, the app saves session settings and restarts. Running terminal processes end, while each Agent retains its conversation history.
+
+The updater reads the version, release summary, and Windows x64 ZIP SHA-256 digest from a fixed-name GitHub release attachment. It verifies the ZIP and checks the files against the package manifest. The new version is staged under `updates` in the session data directory. The original launcher continues to open the app. The active version changes after the new window starts. If preparation is interrupted, open AI Terminal as usual. If active update files are damaged, the original launcher starts its bundled version.
 
 ## Terminal fonts
 

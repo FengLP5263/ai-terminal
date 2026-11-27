@@ -20,7 +20,7 @@ package 会调用 Cargo release 构建，生成独立版本目录和 ZIP，记�
 归档 manager/helper 与许可证，再回读核验；源码身份包括 build.rs 与 assets/branding，正式图标已内嵌于主程序。默认拒绝未提交改动；治理／本地验收显式 AllowDirty 且 manifest 标记。
 不覆盖正在运行的 preview、不改用户数据、不创建标签、远端或上传。
 依赖许可证收集缺口须在 manifest/第三方清单明确，不把自动收集当作完整法律审查。
-签名、公开发行与自动更新尚未建立；用户授权发布后才对具体目标处理。
+打包从已验证的 Windows x64 ZIP 生成 `<ZIP 同名>.release/ai-terminal-windows-x64-update.json`，包含版本、大小、SHA-256 和双语摘要。正式发行须同时附上干净的 ZIP 和对应更新清单，保留附件文件名；回读 ZIP 时核对同目录结构中的清单。代码签名与发行操作各自遵循授权。
 变更打包规则时同步 Python 回归、Windows/POSIX 入口、scripts/README.md、README 和数据/资产记录。
 
 

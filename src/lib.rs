@@ -37,3 +37,6 @@ pub mod media_player;
 pub mod project_media;
 pub mod project_preview;
 pub mod project_ui;
+#[cfg(windows)]
+#[doc(hidden)]
+pub mod updater;

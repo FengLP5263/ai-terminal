@@ -12,6 +12,9 @@ use std::{
     time::{Duration, Instant},
 };
 
+mod search;
+pub use search::SearchResults;
+
 pub const MAX_ENTRIES: usize = 1000;
 pub const MAX_DIRECTORIES: usize = 64;
 pub const MAX_BYTES: u64 = 2 * 1024 * 1024;
@@ -505,10 +508,10 @@ pub fn read_page(
     })
 }
 
-#[derive(Clone, Copy)]
 enum Kind {
     Directory(u64),
     File(u64, Cursor),
+    Search(u64, String),
 }
 struct Request {
     epoch: u64,
@@ -519,6 +522,7 @@ struct Request {
 enum ResultData {
     Directory(u64, Result<Arc<Listing>, FileError>),
     File(u64, Result<Arc<Document>, FileError>),
+    Search(u64, Result<SearchResults, FileError>),
 }
 struct Response {
     epoch: u64,
@@ -536,9 +540,15 @@ struct Shared {
     stop: AtomicBool,
     epoch: AtomicU64,
     ticket: AtomicU64,
+    search_ticket: AtomicU64,
 }
 
-/// One worker and bounded queues/cache; no recursive indexing, timer or file-body persistence.
+pub struct SearchState {
+    query: String,
+    pub result: Option<Result<SearchResults, FileError>>,
+}
+
+/// One worker and bounded queues/cache for browsing and on-demand search.
 pub struct FileClient {
     pub root: Option<PathBuf>,
     pub directories: BTreeMap<PathBuf, DirectoryState>,
@@ -549,6 +559,7 @@ pub struct FileClient {
     next_directory: u64,
     file_cursor: Cursor,
     page_history: Vec<Cursor>,
+    search: Option<SearchState>,
 }
 impl FileClient {
     pub fn new(ctx: egui::Context) -> Self {
@@ -558,28 +569,71 @@ impl FileClient {
             stop: AtomicBool::new(false),
             epoch: AtomicU64::new(0),
             ticket: AtomicU64::new(0),
+            search_ticket: AtomicU64::new(0),
         });
         let state = shared.clone();
-        std::thread::Builder::new().name("project-files".into()).spawn(move || loop {
-            let request = {
-                let mut queue=state.queue.lock().unwrap();
-                while queue.requests.is_empty() && !state.stop.load(Ordering::Relaxed) { queue=state.wake.wait(queue).unwrap(); }
-                if state.stop.load(Ordering::Relaxed) { break; }
-                queue.requests.pop_front().unwrap()
-            };
-            let cancelled=|| state.stop.load(Ordering::Relaxed) || state.epoch.load(Ordering::Relaxed)!=request.epoch || matches!(request.kind,Kind::File(ticket, _) if state.ticket.load(Ordering::Relaxed)!=ticket);
-            if cancelled() { continue; }
-            let data=match request.kind {
-                Kind::Directory(ticket)=>ResultData::Directory(ticket,read_directory(&request.root,&request.path,cancelled).map(Arc::new)),
-                Kind::File(ticket, cursor)=>ResultData::File(ticket,read_page(&request.root,&request.path,cursor,cancelled).map(Arc::new)),
-            };
-            if cancelled() { continue; }
-            let mut queue=state.queue.lock().unwrap();
-            // At most 64 directory requests and one coalesced selected-file request.
-            if queue.responses.len()<128 { queue.responses.push_back(Response {epoch:request.epoch,path:request.path,data}); }
-            drop(queue);
-            ctx.request_repaint_of(egui::ViewportId::ROOT);
-        }).expect("project file worker");
+        std::thread::Builder::new()
+            .name("project-files".into())
+            .spawn(move || {
+                loop {
+                    let request = {
+                        let mut queue = state.queue.lock().unwrap();
+                        while queue.requests.is_empty() && !state.stop.load(Ordering::Relaxed) {
+                            queue = state.wake.wait(queue).unwrap();
+                        }
+                        if state.stop.load(Ordering::Relaxed) {
+                            break;
+                        }
+                        queue.requests.pop_front().unwrap()
+                    };
+                    let cancelled = || {
+                        state.stop.load(Ordering::Relaxed)
+                            || state.epoch.load(Ordering::Relaxed) != request.epoch
+                            || match &request.kind {
+                                Kind::File(ticket, _) => {
+                                    state.ticket.load(Ordering::Relaxed) != *ticket
+                                }
+                                Kind::Search(ticket, _) => {
+                                    state.search_ticket.load(Ordering::Relaxed) != *ticket
+                                }
+                                Kind::Directory(_) => false,
+                            }
+                    };
+                    if cancelled() {
+                        continue;
+                    }
+                    let data = match &request.kind {
+                        Kind::Directory(ticket) => ResultData::Directory(
+                            *ticket,
+                            read_directory(&request.root, &request.path, cancelled).map(Arc::new),
+                        ),
+                        Kind::File(ticket, cursor) => ResultData::File(
+                            *ticket,
+                            read_page(&request.root, &request.path, *cursor, cancelled)
+                                .map(Arc::new),
+                        ),
+                        Kind::Search(ticket, query) => ResultData::Search(
+                            *ticket,
+                            search::find(&request.root, query, cancelled),
+                        ),
+                    };
+                    if cancelled() {
+                        continue;
+                    }
+                    let mut queue = state.queue.lock().unwrap();
+                    // Directory requests and one coalesced request each for preview and search.
+                    if queue.responses.len() < 128 {
+                        queue.responses.push_back(Response {
+                            epoch: request.epoch,
+                            path: request.path,
+                            data,
+                        });
+                    }
+                    drop(queue);
+                    ctx.request_repaint_of(egui::ViewportId::ROOT);
+                }
+            })
+            .expect("project file worker");
         Self {
             root: None,
             directories: BTreeMap::new(),
@@ -589,6 +643,7 @@ impl FileClient {
             next_directory: 0,
             file_cursor: Cursor::default(),
             page_history: vec![],
+            search: None,
             shared,
         }
     }
@@ -598,6 +653,7 @@ impl FileClient {
         }
         self.shared.epoch.fetch_add(1, Ordering::Relaxed);
         self.close_file();
+        self.search = None;
         self.root = root.map(Path::to_owned);
         self.directories.clear();
         self.limit_reached = false;
@@ -610,18 +666,67 @@ impl FileClient {
     fn request(&self, path: &Path, kind: Kind) {
         if let Some(root) = &self.root {
             let mut queue = self.shared.queue.lock().unwrap();
-            if matches!(kind, Kind::File(..)) {
+            let is_file = matches!(kind, Kind::File(..));
+            if is_file {
                 queue.requests.retain(|r| !matches!(r.kind, Kind::File(..)));
                 queue
                     .responses
                     .retain(|r| !matches!(r.data, ResultData::File(..)));
             }
-            queue.requests.push_back(Request {
+            let request = Request {
                 epoch: self.shared.epoch.load(Ordering::Relaxed),
                 root: root.clone(),
                 path: path.into(),
                 kind,
+            };
+            if is_file {
+                queue.requests.push_front(request);
+            } else {
+                queue.requests.push_back(request);
+            }
+            self.shared.wake.notify_one();
+        }
+    }
+    pub fn search_state(&self) -> Option<&SearchState> {
+        self.search.as_ref()
+    }
+    pub fn set_search(&mut self, query: &str) {
+        let query = query.trim();
+        if self.search.as_ref().map_or("", |search| &search.query) != query {
+            self.request_search(query);
+        }
+    }
+    fn request_search(&mut self, query: &str) {
+        let ticket = self.shared.search_ticket.fetch_add(1, Ordering::Relaxed) + 1;
+        let mut queue = self.shared.queue.lock().unwrap();
+        queue
+            .requests
+            .retain(|request| !matches!(request.kind, Kind::Search(..)));
+        queue
+            .responses
+            .retain(|response| !matches!(response.data, ResultData::Search(..)));
+        self.search = None;
+        if let Some(root) = &self.root
+            && !query.is_empty()
+        {
+            self.search = Some(SearchState {
+                query: query.to_owned(),
+                result: None,
             });
+            let request = Request {
+                epoch: self.shared.epoch.load(Ordering::Relaxed),
+                root: root.clone(),
+                path: PathBuf::new(),
+                kind: Kind::Search(ticket, query.to_owned()),
+            };
+            // A queued file preview takes priority over traversing the project.
+            let position = usize::from(
+                queue
+                    .requests
+                    .front()
+                    .is_some_and(|r| matches!(r.kind, Kind::File(..))),
+            );
+            queue.requests.insert(position, request);
             self.shared.wake.notify_one();
         }
     }
@@ -689,6 +794,9 @@ impl FileClient {
     pub fn refresh(&mut self) {
         self.refresh_directories();
         self.reload_file();
+        if let Some(query) = self.search.as_ref().map(|search| search.query.clone()) {
+            self.request_search(&query);
+        }
     }
 
     pub fn refresh_on_focus(&mut self, refresh_tree: bool) {
@@ -713,10 +821,10 @@ impl FileClient {
             let mut queue = self.shared.queue.lock().unwrap();
             queue
                 .requests
-                .retain(|request| matches!(request.kind, Kind::File(..)));
+                .retain(|request| !matches!(request.kind, Kind::Directory(_)));
             queue
                 .responses
-                .retain(|response| matches!(response.data, ResultData::File(..)));
+                .retain(|response| !matches!(response.data, ResultData::Directory(..)));
         }
         self.limit_reached = false;
         for path in directories {
@@ -796,6 +904,14 @@ impl FileClient {
                 continue;
             }
             match response.data {
+                ResultData::Search(ticket, result) => {
+                    if self.shared.search_ticket.load(Ordering::Relaxed) == ticket
+                        && let Some(search) = &mut self.search
+                    {
+                        search.result = Some(result);
+                    }
+                    continue;
+                }
                 ResultData::Directory(ticket, result) => {
                     if let Some(state) = self
                         .directories

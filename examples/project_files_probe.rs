@@ -32,7 +32,9 @@ const CASES: &[(Language, f32, Option<&str>)] = &[
     (Language::En, 1.0, Some("large-next.txt")),
     (Language::ZhCn, 1.0, Some("document.docx")),
     (Language::ZhCn, 1.0, None),
+    (Language::ZhCn, 1.34, None),
 ];
+const SEARCH_STAGE: usize = CASES.len() - 1;
 #[path = "../src/platform.rs"]
 #[allow(dead_code)]
 mod platform;
@@ -71,7 +73,7 @@ impl eframe::App for Probe {
         self.client.poll();
         ctx.request_repaint_after(Duration::from_millis(40));
     }
-    fn raw_input_hook(&mut self, _: &egui::Context, input: &mut egui::RawInput) {
+    fn raw_input_hook(&mut self, ctx: &egui::Context, input: &mut egui::RawInput) {
         for event in &input.events {
             if let egui::Event::Screenshot { image, .. } = event {
                 let name = format!("project-{}.png", self.stage);
@@ -103,6 +105,11 @@ impl eframe::App for Probe {
         input
             .events
             .retain(|e| matches!(e, egui::Event::Screenshot { .. }));
+        if self.stage == SEARCH_STAGE && self.frames == 4 {
+            input.focused = true;
+            input.events.push(egui::Event::Text("说明".into()));
+            ctx.memory_mut(|memory| memory.request_focus(egui::Id::new("project-file-search")));
+        }
     }
     fn ui(&mut self, ui: &mut egui::Ui, _: &mut eframe::Frame) {
         if self.stage == CASES.len() {
@@ -181,8 +188,16 @@ impl eframe::App for Probe {
                 .get(std::path::Path::new(""))
                 .is_some_and(|s| s.data.is_some())
             && self.client.file.as_ref().is_none_or(|f| !f.loading);
+        let search_ready = self.stage != SEARCH_STAGE
+            || self.client.search_state().is_some_and(|s| {
+                s.result.as_ref().is_some_and(|r| {
+                    r.as_ref()
+                        .is_ok_and(|r| r.paths == [std::path::Path::new("docs/使用说明.md")])
+                })
+            });
         if !self.pending
             && ready
+            && search_ready
             && self.frames > 8
             && self.since.elapsed() > Duration::from_millis(450)
         {

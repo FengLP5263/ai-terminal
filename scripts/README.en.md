@@ -34,6 +34,7 @@ Windows builds compile embedded icon resources through `build.rs` and Windows SD
 - The default action is `governance`. `-Release` selects the release directory for smoke and measurements; build before running them.
 - Labels accept letters, digits, and hyphens. The real-model helper supports debug/release profiles and defaults to release.
 - Packaging requires a clean Git tree. `-AllowDirty` is only for local acceptance and marks the manifest dirty; do not present it as a clean release.
+- Packaging also generates `<ZIP stem>.release/ai-terminal-windows-x64-update.json`. Ship it alongside the clean ZIP using the original filenames. `verify-package` checks the update attachment when it is present, and older ZIPs still verify on their own.
 - Model verification requires both `-AllowModelRequest` and explicit user authorization; `ci` and `test` do not call it.
 - Optional `.tools/env.ps1` and `.tools/cargo-network.toml` are ignored local configuration and are not packaged.
 - Errors return nonzero. Default checks do not upgrade dependencies, modify user data, or access remotes. Packages use unique directories under `output/packages/` and do not overwrite running previews.

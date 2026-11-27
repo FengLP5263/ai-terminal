@@ -39,6 +39,7 @@ Windows 构建由 `build.rs` 编译程序图标资源；需 Windows SDK 的 rc.e
 - Action 默认 governance。Release 仅切换 smoke/measure 的 debug/release 目录，测试前需已构建。
 - Label 只允许字母、数字、连字符；Profile 为真实模型 helper 的 debug/release，默认 release。
 - package 默认拒绝脏工作区；-AllowDirty 仅本地验收并在 manifest 标记，不能冒充干净发行。
+- package 另在 `<ZIP 同名>.release/` 生成 `ai-terminal-windows-x64-update.json`。正式发行时与干净 ZIP 同时上传，保留两个附件的文件名。verify-package 会核对同目录结构中的更新附件，历史 ZIP 仍可单独校验。
 - 模型核查必须带 -AllowModelRequest；还必须有用户明确授权，不被 ci/test 调用。
 - .tools/env.ps1 和 .tools/cargo-network.toml 是可选且忽略的本机配置，不含在包和提交中。
 - 错误返回非零；默认检查不升级依赖、不改用户数据、不操作远端。新包在 output/packages/ 唯一目录，不覆盖运行中的预览。
