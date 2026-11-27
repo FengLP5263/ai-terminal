@@ -1,6 +1,6 @@
 [package]
 name = "ai-terminal"
-version = "0.16.0"
+version = "0.17.0"
 edition = "2024"
 rust-version = "1.92"
 description = "A small native workspace for coding-agent terminals"
@@ -22,6 +22,7 @@ vte = { path = "vendor/vte" }
 default = ["renderer-glow"]
 renderer-glow = ["eframe/glow"]
 renderer-wgpu = ["eframe/wgpu_no_default_features", "dep:wgpu"]
+update-preview = []
 
 [dependencies]
 eframe = { version = "0.35", default-features = false, features = ["default_fonts"] }
@@ -30,6 +31,7 @@ egui_term = { path = "vendor/egui_term" }
 wgpu = { version = "29", optional = true, default-features = false, features = ["dx12", "wgsl"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+semver = "1"
 uuid = { version = "1", features = ["v4", "serde"] }
 tempfile = "3"
 png = "0.18"
@@ -41,10 +43,11 @@ resvg = { version = "=0.45.1", default-features = false, features = ["text"] }
 image = { version = "=0.25.10", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp", "ico", "tiff"] }
 pulldown-cmark = { version = "=0.13.6", default-features = false }
 egui_commonmark = { version = "=0.24.0", default-features = false, features = ["pulldown_cmark"] }
+zip = { version = "=9.8.2", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 
 [target.'cfg(windows)'.dependencies]
 windows-core = "0.62.2"
-windows-sys = { version = "0.61", features = ["Win32_Graphics_Gdi", "Win32_Graphics_Dwm", "Win32_Globalization", "Win32_Foundation", "Win32_System_Threading", "Win32_System_LibraryLoader", "Win32_System_JobObjects", "Win32_Security", "Win32_Security_Cryptography", "Win32_System_ProcessStatus", "Win32_System_Registry", "Win32_System_Console", "Win32_Storage_FileSystem", "Win32_System_IO", "Win32_UI_WindowsAndMessaging", "Win32_UI_Shell", "Win32_UI_Controls", "Win32_UI_HiDpi", "Win32_UI_Input_KeyboardAndMouse"] }
+windows-sys = { version = "0.61", features = ["Win32_Graphics_Gdi", "Win32_Graphics_Dwm", "Win32_Globalization", "Win32_Foundation", "Win32_Networking_WinHttp", "Win32_System_Threading", "Win32_System_LibraryLoader", "Win32_System_JobObjects", "Win32_Security", "Win32_Security_Cryptography", "Win32_System_ProcessStatus", "Win32_System_Registry", "Win32_System_Console", "Win32_Storage_FileSystem", "Win32_System_IO", "Win32_UI_WindowsAndMessaging", "Win32_UI_Shell", "Win32_UI_Controls", "Win32_UI_HiDpi", "Win32_UI_Input_KeyboardAndMouse"] }
 windows = { version = "0.62.2", features = ["Win32_Foundation", "Win32_System_Com", "Win32_UI_Shell", "Win32_Media_MediaFoundation", "Win32_Graphics_Imaging", "Win32_Graphics_Dxgi_Common"] }
 
 [profile.release]

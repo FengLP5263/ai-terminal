@@ -4,6 +4,14 @@
 
 Record user-visible additions, improvements, fixes, and compatibility changes for each release; omit categories that do not apply. Review both languages together, use the same version entry in GitHub Releases, and ship both files in the ZIP. Historical summaries follow existing GitHub release notes and UTC publication dates; development versions without a separate release do not receive invented release dates.
 
+## [0.17.0] - 2026-11-27
+
+### Added
+
+- Search the Files tab by filename or relative path, including unopened folders and files ignored by Git. Click a result for a read-only preview or right-click to copy its full path.
+- Check stable GitHub releases in the background and show a green arrow in the terminal header when an update is available. Confirm to download and verify the Windows update, save sessions, and restart automatically.
+- In-app updates start with 0.17.0. Upgrade from an earlier version by downloading the installer or portable ZIP once. Restarting for an update ends running terminal processes and preserves saved sessions and Agent conversation history.
+
 ## [0.16.0] - 2026-11-25
 
 ### Added

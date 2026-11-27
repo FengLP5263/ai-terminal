@@ -8,6 +8,8 @@ Folders load lazily and sort before files. Click a file to view its contents rea
 
 Each session keeps its open file, page, scroll position, Markdown view mode, and image zoom for the lifetime of the app. Switching away releases content and textures. Returning reads the file again. Closing the preview, closing the session, or exiting clears this state.
 
+Search from the top of the Files tab by filename or relative path, regardless of case. Results include files in unopened folders and files ignored by Git. Click a result to open its read-only preview, right-click to copy its full path, or clear the search to return to the tree. Search displays up to 200 results. When results are partial, specify more of the directory path.
+
 ## Projects and updates
 
 The browser uses an available Git repository root, falling back to the current session's working directory. Ordinary folders need no Git installation. Switching projects clears the old view and stale query results. Moving within a repository in the same session retains its project root.
@@ -26,7 +28,7 @@ Directories load on first opening or expansion and remain cached for the current
 
 Folders and actions use Microsoft Codicons. File-type icons use embedded Tabler SVG and are shared with Git, following app size and zoom. Closed/Files/Git panel state is saved per session; file bodies, directory snapshots and recent files are not persisted. Legacy global preferences migrate only to their original active session; other sessions start closed.
 
-The right panel omits the repeated root name. The tree follows the tabs and action row directly, with collapse-all, refresh and close on the same row.
+The search field sits below the tabs and above the files. Collapse all, refresh and close stay in the tab row.
 
 Embedded Tabler SVG icons (MIT) distinguish Python, HTML, Rust, JS/TS, React, Vue, CSS, scripts, media, documents and more. Common project filenames take precedence over extensions; unknown types use plain-file or binary fallbacks. Classification does not read file content. The tree, Git changes/commit lists and read-only titles share the mapping; folders and actions still use Codicons.
 

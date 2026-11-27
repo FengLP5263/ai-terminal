@@ -10,6 +10,8 @@ Unreleased: Preview bookmarks live only in session memory. They contain the path
 
 ## Data and recovery
 
+0.17.0 stores verified Windows x64 versions under `updates` within the workspace data directory. Entries are scoped to the original executable path. An atomic launch record holds the version and candidate directory name. File search keeps the current query and results in memory.
+
 The optional unnamed_sessions list tracks newly created UI sessions with a default label by UUID. Adopting an Agent conversation title or giving the session an explicit name in the UI or management CLI removes its entry. Older workspaces keep their stored names. Closing a session removes its entry.
 
 `%LOCALAPPDATA%/ai-terminal/sessions.json` stores session names, directories, Agent types, actual resume IDs, ordering, and UI preferences. 0.3.0 added optional `last_directory`; CMD/Bash and legacy Codex/Claude/Shell records coexist. Since 0.3.2, old Agent records load as PowerShell while preserving other metadata; only the selected shell opens automatically. Prompt metadata updates the working directory; running Agent identity and invocation IDs exist only in memory.

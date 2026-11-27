@@ -24,6 +24,8 @@ const BG: Color32 = ai_terminal::appearance::TERMINAL_BG;
 mod control;
 #[path = "app/session_titles.rs"]
 mod session_titles;
+#[path = "app/update_ui.rs"]
+mod update_ui;
 const MUTED: Color32 = ai_terminal::chrome::SECONDARY;
 const YELLOW: Color32 = Color32::from_rgb(235, 184, 82);
 
@@ -448,6 +450,7 @@ pub struct App {
     font: TerminalFont,
     preferences: model::UiSettings,
     settings_open: bool,
+    pub(crate) updater: Option<ai_terminal::updater::Updater>,
     git: Option<ai_terminal::git::GitClient>,
     git_view: ai_terminal::git_ui::GitView,
     git_focused: bool,
@@ -614,6 +617,7 @@ impl App {
             theme: TerminalTheme::default(),
             font: ai_terminal::appearance::terminal_font_for(actual_font, 14.0),
             preferences,
+            updater: None,
             settings_open: !smoke
                 && !idle_benchmark
                 && std::env::args_os().any(|a| a == "--settings"),
@@ -963,12 +967,18 @@ impl App {
             self.closing = None;
             match result {
                 Ok(()) => {
+                    if let Some(updater) = &mut self.updater {
+                        updater.complete_shutdown();
+                    }
                     self.shutdown_saved = true;
                     self.dirty = false;
                     self.allow_exit = true;
                     ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                 }
                 Err(error) => {
+                    if let Some(updater) = &mut self.updater {
+                        updater.cancel_shutdown();
+                    }
                     self.save_error = Some(error);
                     self.dirty = false;
                     self.confirm_exit = true;
@@ -984,6 +994,21 @@ impl App {
             return;
         }
         if self.poll_shutdown(ctx) || self.shutdown_saved {
+            return;
+        }
+        if !self.load_failed
+            && !self.confirm_exit
+            && self
+                .updater
+                .as_mut()
+                .is_some_and(|updater| updater.poll(ctx))
+        {
+            self.begin_shutdown(ctx);
+            if self.closing.is_none()
+                && let Some(updater) = &mut self.updater
+            {
+                updater.cancel_shutdown();
+            }
             return;
         }
         let can_draw = !ctx.input(|input| input.viewport().minimized.unwrap_or(false));
@@ -1481,21 +1506,38 @@ impl App {
                     });
                     return;
                 };
-                let focus = self.rename.is_none()
+                let editor_focus = self.rename.is_none()
                     && self.group_edit.is_none()
                     && self.close_session.is_none()
                     && !self.confirm_exit
                     && !self.settings_open
+                    && !ai_terminal::project_ui::search_has_focus(&ctx)
                     && !egui::Popup::is_any_open(&ctx);
                 let session = &self.sessions[index];
                 let was_git_open = self.preferences.git_panel_open;
                 let was_files_open = self.preferences.project_files_open;
-                let reset = ai_terminal::git_ui::header_with_files(ui, ai_terminal::git_ui::Header {
+                let mut header = |ui: &mut egui::Ui| ai_terminal::git_ui::header_with_files(ui, ai_terminal::git_ui::Header {
                     name: &session.spec.name,
                     directory: &session.spec.directory,
                     scale: self.preferences.ui_scale,
                     connection: (session.backend.is_some() && !session.display_agent().is_shell()).then_some((session.display_agent(), &session.status)),
                 }, self.git.as_ref(), &mut self.preferences.git_panel_open, &mut self.preferences.project_files_open, self.project_files.root.as_deref());
+                let reset = if let Some(updater) = self.updater.as_mut().filter(|updater| updater.offer.is_some()) {
+                    ui.horizontal(|ui| {
+                        let action_width = ai_terminal::chrome::CONTROL + ui.spacing().item_spacing.x;
+                        let header_width = (ui.available_width() - action_width).max(0.0);
+                        let reset = ui.allocate_ui_with_layout(
+                            egui::vec2(header_width, ai_terminal::chrome::CONTROL),
+                            egui::Layout::top_down(egui::Align::Min),
+                            header,
+                        ).inner;
+                        update_ui::button(ui, updater);
+                        reset
+                    }).inner
+                } else {
+                    header(ui)
+                };
+                let focus = editor_focus && self.updater.as_ref().is_none_or(|updater| !updater.open);
                 if !was_git_open && self.preferences.git_panel_open {self.preferences.project_files_open=false;}
                 if was_git_open != self.preferences.git_panel_open || was_files_open != self.preferences.project_files_open {
                     if self.preferences.git_panel_open && let Some(git) = &mut self.git { git.refresh_if_needed(); }
@@ -2068,6 +2110,20 @@ impl eframe::App for App {
         self.dialogs(&ctx);
         if self.closing.is_none() {
             self.persist();
+            if !self.load_failed
+                && let Some(updater) = &mut self.updater
+                && let Err(error) = updater.first_frame(&ctx, self.frames)
+            {
+                self.save_error = Some(format!(
+                    "{} {error}",
+                    tr(
+                        &ctx,
+                        "未能激活新版本。",
+                        "Could not activate the new version."
+                    )
+                ));
+                ctx.request_repaint();
+            }
         }
         self.ui_micros += began.elapsed().as_micros();
     }

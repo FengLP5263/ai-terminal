@@ -12,6 +12,12 @@ use std::{
     path::{Path, PathBuf},
 };
 
+const SEARCH_INPUT_ID: &str = "project-file-search";
+
+pub fn search_has_focus(ctx: &egui::Context) -> bool {
+    ctx.memory(|memory| memory.has_focus(egui::Id::new(SEARCH_INPUT_ID)))
+}
+
 pub const PROJECT_FILES_ICON: &str = "\u{ea83}";
 
 fn font(ui: &egui::Ui) -> FontId {
@@ -143,6 +149,8 @@ pub struct FileView {
     revision: Option<u64>,
     locale: Option<&'static str>,
     rows: Vec<Row>,
+    search_text: String,
+    search_scroll_reset: bool,
     preview: crate::project_preview::View,
 }
 impl FileView {
@@ -158,6 +166,7 @@ impl FileView {
         if self.root != client.root {
             self.root = client.root.clone();
             self.expanded.clear();
+            self.search_text.clear();
         }
         self.expanded.insert(path.into());
         client.ensure_directory(path);
@@ -233,6 +242,7 @@ impl FileView {
             self.root = client.root.clone();
             self.expanded.clear();
             self.revision = None;
+            self.search_text.clear();
         }
         if client.root.is_none() {
             ui.weak(locale.text(
@@ -240,6 +250,12 @@ impl FileView {
                 "This session has no working directory.",
             ));
             return None;
+        }
+        self.search_field(ui, client, locale);
+        if let Some(search) = client.search_state() {
+            let reset_scroll =
+                search.result.is_some() && std::mem::take(&mut self.search_scroll_reset);
+            return search_results(ui, search, client, locale, reset_scroll);
         }
         client.ensure_directory(Path::new(""));
         let locale_key = locale.text("zh", "en");
@@ -417,6 +433,176 @@ impl FileView {
         }
         open
     }
+
+    fn search_field(&mut self, ui: &mut egui::Ui, client: &mut FileClient, locale: i18n::Locale) {
+        ui.horizontal(|ui| {
+            ui.label(
+                RichText::new("\u{ea6d}")
+                    .font(glyph_font(font(ui).size))
+                    .color(chrome::SECONDARY),
+            );
+            let clear_width = if self.search_text.is_empty() {
+                0.0
+            } else {
+                24.0 + ui.spacing().item_spacing.x
+            };
+            let response = ui.add(
+                egui::TextEdit::singleline(&mut self.search_text)
+                    .id(egui::Id::new(SEARCH_INPUT_ID))
+                    .hint_text(locale.text("搜索文件名或路径", "Find files by name or path"))
+                    .desired_width((ui.available_width() - clear_width).max(0.0))
+                    .char_limit(1024)
+                    .margin(egui::vec2(7.0, 5.0)),
+            );
+            let clear = !self.search_text.is_empty()
+                && ui
+                    .add_sized(
+                        [24.0, response.rect.height()],
+                        egui::Button::new(
+                            RichText::new("\u{ea76}").font(glyph_font(font(ui).size)),
+                        )
+                        .frame(false),
+                    )
+                    .on_hover_text(locale.text("清除搜索", "Clear search"))
+                    .clicked();
+            let escape = response.has_focus()
+                && ui
+                    .input_mut(|input| input.consume_key(egui::Modifiers::NONE, egui::Key::Escape));
+            if response.has_focus() {
+                ui.memory_mut(|memory| {
+                    memory.set_focus_lock_filter(
+                        response.id,
+                        egui::EventFilter {
+                            horizontal_arrows: true,
+                            vertical_arrows: true,
+                            escape: true,
+                            ..Default::default()
+                        },
+                    )
+                });
+            }
+            if clear || escape {
+                if escape && self.search_text.is_empty() {
+                    response.surrender_focus();
+                } else {
+                    self.search_text.clear();
+                    if clear {
+                        response.request_focus();
+                    }
+                }
+            }
+            // Synchronize on change only. A new request cancels the previous query.
+            if response.changed() || clear || escape {
+                client.set_search(&self.search_text);
+                self.search_scroll_reset = true;
+            }
+        });
+    }
+}
+
+fn search_results(
+    ui: &mut egui::Ui,
+    search: &crate::project_files::SearchState,
+    client: &FileClient,
+    locale: i18n::Locale,
+    reset_scroll: bool,
+) -> Option<PathBuf> {
+    let results = match &search.result {
+        None => {
+            ui.weak(locale.text("正在搜索…", "Searching…"));
+            return None;
+        }
+        Some(Err(error)) => {
+            ui.weak(error_message(error, locale));
+            return None;
+        }
+        Some(Ok(results)) => results,
+    };
+    if results.partial {
+        ui.weak(locale.text(
+            "仅显示部分结果，可输入更具体的路径。",
+            "Partial results. Try a more specific path.",
+        ));
+    } else if results.paths.is_empty() {
+        ui.weak(locale.text("未找到匹配的文件", "No matching files"));
+    }
+    let font = font(ui);
+    let path_font = egui::FontId::new((font.size - 2.0).max(1.0), font.family.clone());
+    let line_height = ui.fonts_mut(|fonts| fonts.row_height(&font));
+    let path_height = ui.fonts_mut(|fonts| fonts.row_height(&path_font));
+    let row_height = line_height + path_height + 8.0;
+    let root = client.root.as_deref().unwrap_or_else(|| Path::new(""));
+    let mut open = None;
+    let mut scroll = egui::ScrollArea::vertical()
+        .id_salt(("project-search-results", root))
+        .auto_shrink([false, false]);
+    if reset_scroll {
+        scroll = scroll.vertical_scroll_offset(0.0);
+    }
+    scroll.show_rows(ui, row_height, results.paths.len(), |ui, range| {
+        for path in &results.paths[range] {
+            let (rect, response) = ui.allocate_exact_size(
+                egui::vec2(ui.available_width(), row_height),
+                egui::Sense::click(),
+            );
+            let absolute = root.join(path).display().to_string();
+            let response = response.on_hover_text(&absolute);
+            let selected = client.file.as_ref().is_some_and(|file| file.path == *path);
+            if selected || response.hovered() {
+                ui.painter().rect_filled(
+                    rect,
+                    3,
+                    if selected {
+                        chrome::SELECTED
+                    } else {
+                        chrome::HOVER
+                    },
+                );
+            }
+            let name = path.file_name().unwrap_or_default().to_string_lossy();
+            let icon_rect = egui::Rect::from_min_size(
+                rect.min + egui::vec2(6.0, 4.0),
+                egui::Vec2::splat(font.size),
+            );
+            file_icons::icon(&name, false).paint(ui, icon_rect);
+            let bounds = egui::Rect::from_min_max(
+                egui::pos2(icon_rect.right() + 7.0, rect.top() + 3.0),
+                rect.max,
+            );
+            let mut labels = ui.new_child(egui::UiBuilder::new().id_salt(path).max_rect(bounds));
+            labels.set_clip_rect(bounds.intersect(ui.clip_rect()));
+            labels.spacing_mut().item_spacing.y = 0.0;
+            crate::ui_text::label_with_font(
+                &mut labels,
+                &name,
+                font.clone(),
+                chrome::TEXT,
+                bounds.width().max(0.0),
+            );
+            if let Some(directory) = path.parent().filter(|dir| !dir.as_os_str().is_empty()) {
+                crate::ui_text::label_with_font(
+                    &mut labels,
+                    &directory.to_string_lossy(),
+                    path_font.clone(),
+                    chrome::SECONDARY,
+                    bounds.width().max(0.0),
+                );
+            }
+            response.context_menu(|ui| {
+                if ui
+                    .button(locale.text("复制完整路径", "Copy full path"))
+                    .clicked()
+                {
+                    ui.ctx().copy_text(absolute);
+                    ui.close();
+                }
+            });
+            if response.clicked() {
+                open = Some(path.clone());
+            }
+        }
+    });
+    open
 }
 
 #[derive(Default)]

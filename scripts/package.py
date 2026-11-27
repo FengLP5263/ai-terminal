@@ -30,6 +30,7 @@ skill_bundle=importlib.util.module_from_spec(_skill_spec)
 _skill_spec.loader.exec_module(skill_bundle)
 NATIVE_REQUIRED={'conpty.dll','OpenConsole.exe','Microsoft-ConPTY-LICENSE.txt','Microsoft-ConPTY-SOURCE.json'}
 CHANGELOGS=('CHANGELOG.md','CHANGELOG.en.md')
+UPDATE_ATTACHMENT = 'ai-terminal-windows-x64-update.json'
 
 def release_notes(version,root=ROOT):
     """Require dated, nonempty current-version entries in both languages."""
@@ -75,6 +76,29 @@ def source_identity(root=ROOT):
 def command(args,check=True):
     return subprocess.run(args,cwd=ROOT,capture_output=True,text=True,encoding='utf-8',errors='replace',check=check)
 
+def update_attachment_path(archive):
+    return archive.with_suffix('.release') / UPDATE_ATTACHMENT
+
+
+def update_identity(archive, verified, dirty):
+    return {
+        'schema_version': 1, 'version': verified['version'], 'name': archive.name,
+        'size': archive.stat().st_size, 'sha256': verified['sha256'], 'dirty': dirty,
+    }
+
+
+def write_update_attachment(archive, verified, dirty, entries):
+    notes = {}
+    for locale, filename in zip(('zh_cn', 'en'), CHANGELOGS):
+        bullets = [line for line in entries[filename].splitlines() if line.startswith('- ')]
+        notes[locale] = '\n'.join(bullets[:2])[:480]
+    attachment = update_attachment_path(archive)
+    attachment.parent.mkdir()
+    data = dict(update_identity(archive, verified, dirty), notes=notes)
+    attachment.write_text(json.dumps(data, ensure_ascii=False, indent=2)+'\n', encoding='utf-8')
+    return attachment
+
+
 def verify_archive(path):
     path=Path(path)
     with zipfile.ZipFile(path) as archive:
@@ -105,7 +129,22 @@ def verify_archive(path):
         for name,record in manifest['files'].items():
             data=archive.read(name)
             if len(data)!=record['bytes'] or hashlib.sha256(data).hexdigest()!=record['sha256']:raise ValueError('checksum mismatch: '+name)
-    return {'ok':True,'archive':path.name,'sha256':sha(path),'files':len(names),'version':manifest['version']}
+    result = {'ok': True, 'archive': path.name, 'sha256': sha(path),
+              'files': len(names), 'version': manifest['version']}
+    attachment = update_attachment_path(path)
+    if attachment.exists():
+        data = json.loads(attachment.read_text(encoding='utf-8'))
+        identity = update_identity(path, result, manifest.get('dirty', False))
+        if not isinstance(data, dict) or any(data.get(key) != value for key, value in identity.items()):
+            raise ValueError('update attachment does not match the verified ZIP')
+        notes = data.get('notes')
+        if not isinstance(notes, dict) or any(
+            not isinstance(notes.get(locale), str) or len(notes[locale]) > 480
+            for locale in ('zh_cn', 'en')
+        ):
+            raise ValueError('invalid localized notes in update attachment')
+        result['update_attachment'] = str(attachment)
+    return result
 
 def native_console_assets(folder,root=ROOT):
     source=root/'assets/windows/conpty'
@@ -220,7 +259,7 @@ def build(allow_dirty=False):
     dirty=bool(git.strip())
     if dirty and not allow_dirty:raise ValueError('worktree is dirty; commit first or explicitly use --allow-dirty for local acceptance')
     version=tomllib.loads((ROOT/'Cargo.toml').read_text(encoding='utf-8'))['package']['version']
-    release_notes(version)
+    entries=release_notes(version)
     cargo=['cargo']
     local_network=ROOT/'.tools/cargo-network.toml'
     if local_network.exists():cargo+=['--config',str(local_network)]
@@ -267,7 +306,10 @@ def build(allow_dirty=False):
     os.replace(partial,archive)
     result=verify_archive(archive)
     archive.with_suffix('.sha256').write_text(result['sha256']+'  '+archive.name+'\n',encoding='ascii')
+    attachment = write_update_attachment(archive, result, dirty, entries)
+    result = verify_archive(archive)
     print(json.dumps(result,ensure_ascii=False,indent=2));print('Artifact:',archive)
+    print('Update attachment:', attachment)
     return archive
 
 def main():

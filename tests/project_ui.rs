@@ -155,6 +155,45 @@ fn folder_click_loads_children_and_file_click_opens_a_read_only_document() {
     f.click(close, 1200.0);
     assert!(f.client.file.is_none());
 }
+
+#[test]
+fn typing_a_file_search_opens_an_unexpanded_match_and_clear_restores_the_tree() {
+    let mut f = Fixture::new();
+    f.frame(vec![], 1200.0);
+    let search_id = egui::Id::new("project-file-search");
+    let search = f.ctx.read_response(search_id).unwrap().rect;
+    f.click(search.center(), 1200.0);
+    assert!(project_ui::search_has_focus(&f.ctx));
+    f.frame(vec![Event::Text("APP.RS".into())], 1200.0);
+    wait(&mut f.client, |c| {
+        c.search_state().is_some_and(|s| s.result.is_some())
+    });
+    let output = f.frame(vec![], 1200.0);
+    assert!(!f.client.directories.contains_key(Path::new("src")));
+    f.click(text_rect(&output, "app.rs").unwrap().center(), 1200.0);
+    wait(&mut f.client, |c| {
+        c.file.as_ref().is_some_and(|s| s.data.is_some())
+    });
+    assert_eq!(
+        f.client.file.as_ref().unwrap().path,
+        Path::new("src/app.rs")
+    );
+
+    let search = f.ctx.read_response(search_id).unwrap().rect;
+    f.click(search.center(), 1200.0);
+    let output = f.frame(
+        vec![Event::Key {
+            key: egui::Key::Escape,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers: Modifiers::NONE,
+        }],
+        1200.0,
+    );
+    assert!(f.client.search_state().is_none());
+    assert!(text_rect(&output, "package.json").is_some());
+}
 #[test]
 fn panel_tabs_are_exclusive_and_the_files_entry_exists_outside_git() {
     let mut f = Fixture::new();
@@ -790,10 +829,14 @@ fn files_use_shared_type_icons_and_inherited_font_without_scaling_a_painted_laye
                 && collapse.right() <= refresh.left()
                 && refresh.right() <= close.left()
         );
-        assert!(
-            text_rect(&output, "src").unwrap().top() < 80.0,
-            "A redundant row separates the toolbar and tree"
-        );
+        let search = f
+            .ctx
+            .read_response(egui::Id::new("project-file-search"))
+            .unwrap()
+            .rect;
+        let tree = text_rect(&output, "src").unwrap();
+        assert!(search.top() > tabs.bottom() && search.bottom() <= tree.top());
+        assert!(tree.top() - search.bottom() < 20.0);
         let texts = output
             .shapes
             .iter()

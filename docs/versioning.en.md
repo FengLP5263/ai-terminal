@@ -19,6 +19,8 @@ Before release, record the previous stable tag, full scope, change level and tar
 
 Do not overwrite or rename published versions, tags or artifacts. Fix issues in a new version. Historical public releases and delivered local previews retain their original versions. The local 0.4.12-preview.N development is consolidated into stable 0.5.0; no stable 0.4.12 is published.
 
+Starting with 0.17.0, a stable release includes both its clean Windows x64 ZIP and the generated `ai-terminal-windows-x64-update.json` under their original filenames. After publishing, read the fixed attachment on the latest stable GitHub release and verify its version, ZIP filename, size, and SHA-256.
+
 
 ## Release display titles
 
